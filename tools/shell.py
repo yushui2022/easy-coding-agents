@@ -35,8 +35,19 @@ async def run_shell(cmd: str) -> str:
             proc.kill()
             return "Error: Command timed out after 30s."
             
-        output = stdout.decode('utf-8', errors='replace')
-        error = stderr.decode('utf-8', errors='replace')
+        # Decode strategy: Try system encoding first (Windows GBK), then UTF-8
+        import locale
+        system_encoding = locale.getpreferredencoding()
+        
+        try:
+            output = stdout.decode(system_encoding)
+        except UnicodeDecodeError:
+            output = stdout.decode('utf-8', errors='replace')
+            
+        try:
+            error = stderr.decode(system_encoding)
+        except UnicodeDecodeError:
+            error = stderr.decode('utf-8', errors='replace')
         
         result = output
         if error:

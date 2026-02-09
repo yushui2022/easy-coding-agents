@@ -37,14 +37,26 @@ class ToolRegistry:
             })
         return schemas
 
-    async def execute(self, name: str, args: Dict[str, Any]) -> str:
+    async def execute(self, name: str, args: Dict[str, Any], context: Any = None) -> str:
         if name not in self.tools:
             return f"Error: Tool '{name}' not found."
         try:
             func = self.tools[name].func
+            
+            # Check if function accepts 'context' argument
+            sig = inspect.signature(func)
+            if "context" in sig.parameters:
+                if context is None:
+                     return f"Error: Tool '{name}' requires context but none was provided."
+                # Inject context into args (don't modify original args dict)
+                call_args = args.copy()
+                call_args["context"] = context
+            else:
+                call_args = args
+
             if inspect.iscoroutinefunction(func):
-                return await func(**args)
-            return func(**args)
+                return await func(**call_args)
+            return func(**call_args)
         except Exception as e:
             return f"Error executing {name}: {str(e)}"
 

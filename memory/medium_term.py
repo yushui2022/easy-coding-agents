@@ -18,6 +18,9 @@ class MediumTermMemory:
         Execute AU2 Compression Algorithm.
         Returns (New Context List, AU2 Structured Summary Dict)
         """
+        # Feature Flag: If AU2 is disabled via config (implied), or we just want to skip it for stability
+        # For now, we still allow it, but we add a guard.
+        
         if self.is_compressing or len(full_context) < 10:
             return full_context, None
 
@@ -41,62 +44,47 @@ class MediumTermMemory:
             
             middle_text = json.dumps(middle, ensure_ascii=False, indent=1)
 
-            # 2. AU2 Prompt Generation
+            # 2. AU2 Prompt Generation (Markdown Optimized)
             prompt = f"""
             You are a Memory Compressor (AU2 Algorithm).
-            Compress the following conversation history into a structured 8-dimensional summary.
+            Compress the following conversation history into a concise Markdown summary.
             
             Input JSON:
             {middle_text}
             
-            Output Format (Strict JSON):
-            {{
-                "background": "Context of the task",
-                "decisions": "Key technical decisions made",
-                "tools": "Tools used and their outcomes",
-                "intent": "User's core intent evolution",
-                "results": "What has been achieved so far",
-                "errors": "Errors encountered and fixes",
-                "legacy_issues": "Unresolved problems",
-                "next_steps": "Planned next actions"
-            }}
+            Output Format (Strict Markdown):
+            ## Background
+            (Context of the task)
+            
+            ## Key Decisions
+            (Key technical decisions made)
+            
+            ## Progress
+            (What has been achieved so far)
+            
+            ## Current State
+            (Pending tasks and next steps)
             """
             
-            # 3. Call LLM for compression (using a separate, non-streaming call if possible, 
-            # but reusing stream_handler for simplicity)
-            # We construct a temporary message list for the compressor
+            # 3. Call LLM for compression
             compress_msgs = [{"role": "user", "content": prompt}]
             
-            # We use a separate "inner" loop or just await the stream
-            response_gen = self.stream_handler.chat(compress_msgs, tools=None) # No tools for compressor
-            compressed_json_str, _ = await self.stream_handler.render_stream(response_gen) # Wait for full output
+            response_gen = self.stream_handler.chat(compress_msgs, tools=None)
+            compressed_str, _ = await self.stream_handler.render_stream(response_gen)
             
-            # 4. Parse and Format
-            # If JSON parsing fails, we fallback to raw text
-            summary_text = ""
-            try:
-                # Clean up markdown code blocks if present
-                clean_json = compressed_json_str.replace("```json", "").replace("```", "").strip()
-                au2_data = json.loads(clean_json)
-                
-                summary_text = (
-                    f"--- AU2 COMPRESSED MEMORY ---\n"
-                    f"Background: {au2_data.get('background')}\n"
-                    f"Decisions: {au2_data.get('decisions')}\n"
-                    f"Intent: {au2_data.get('intent')}\n"
-                    f"Results: {au2_data.get('results')}\n"
-                    f"Legacy Issues: {au2_data.get('legacy_issues')}\n"
-                    f"-----------------------------"
-                )
-            except json.JSONDecodeError:
-                summary_text = f"--- COMPRESSED SUMMARY ---\n{compressed_json_str}"
-                # Even if JSON fails, we might want to structure it loosely, 
-                # but for session store we need a dict.
-                au2_data = {"raw_summary": compressed_json_str}
+            # 4. Use raw markdown directly
+            au2_data = compressed_str # For session store
+            summary_text = compressed_str
 
             # 5. Reflow
             # New Context = System + Intro + [Summary] + Recent
-            new_context = system_msgs + intro + [{"role": "system", "content": summary_text}] + recent
+            # Note: We use "user" role for summary to avoid breaking message alternation rules.
+            summary_message = {
+                "role": "user",
+                "content": f"System Notification: Previous conversation history has been compressed due to length limits.\n\n=== MEMORY SUMMARY ===\n{summary_text}\n======================\n\nPlease continue the task based on this summary and the recent messages below."
+            }
+            
+            new_context = system_msgs + intro + [summary_message] + recent
             
             logger.info("AU2 Compression Completed.")
             return new_context, au2_data

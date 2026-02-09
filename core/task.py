@@ -70,16 +70,21 @@ class TaskManager:
         lines = ["Current Todo List:"]
         for task in self.tasks:
             icon = " "
+            status_note = ""
             if task.status == "completed":
                 icon = "[x]"
+                status_note = " (Done - DO NOT REPEAT)"
             elif task.status == "in_progress":
                 icon = "[->]"
+                status_note = " (CURRENT FOCUS)"
             elif task.status == "skipped":
                 icon = "[-]"
+                status_note = " (Skipped)"
             else:
                 icon = "[ ]"
+                status_note = " (Pending)"
             
-            lines.append(f"{task.id}. {icon} {task.content}")
+            lines.append(f"{task.id}. {icon} {task.content}{status_note}")
         return "\n".join(lines)
 
     def print_summary(self):
@@ -87,8 +92,8 @@ class TaskManager:
         if not self.tasks:
             return
 
-        # Removed progress bar as requested by user
-        # self.print_progress() 
+        # Show progress bar
+        self.print_progress() 
 
         console.print("\n[bold underline]Todo List Status:[/bold underline]")
         for task in self.tasks:

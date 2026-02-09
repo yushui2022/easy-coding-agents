@@ -1,19 +1,6 @@
 from tools.base import registry
 from core.task import TaskManager
-
-# We need a way to access the global task manager instance.
-# Since tools are stateless functions, we'll inject the manager later or use a singleton pattern.
-# For simplicity in this architecture, we will rely on the Engine to inject the manager 
-# or use a global instance if we must. 
-# However, a cleaner way is to let the Engine handle the state and these functions just operate on it.
-# But `registry.register` expects standalone functions.
-# Let's use a global variable pattern for the active manager, set by the Engine on startup.
-
-_GLOBAL_TASK_MANAGER = None
-
-def set_global_task_manager(manager: TaskManager):
-    global _GLOBAL_TASK_MANAGER
-    _GLOBAL_TASK_MANAGER = manager
+from typing import Any
 
 @registry.register(
     name="todo_add",
@@ -25,11 +12,13 @@ def set_global_task_manager(manager: TaskManager):
         "required": ["content"]
     }
 )
-def todo_add(content: str) -> str:
-    if not _GLOBAL_TASK_MANAGER:
-        return "Error: Task manager not initialized."
-    task_id = _GLOBAL_TASK_MANAGER.add_task(content)
-    _GLOBAL_TASK_MANAGER.print_summary()
+def todo_add(content: str, context: Any) -> str:
+    if not hasattr(context, 'task_manager'):
+        return "Error: Invalid context (missing task_manager)."
+    
+    manager: TaskManager = context.task_manager
+    task_id = manager.add_task(content)
+    manager.print_summary()
     return f"Task added with ID: {task_id}"
 
 @registry.register(
@@ -43,11 +32,13 @@ def todo_add(content: str) -> str:
         "required": ["task_id", "status"]
     }
 )
-def todo_update(task_id: str, status: str) -> str:
-    if not _GLOBAL_TASK_MANAGER:
-        return "Error: Task manager not initialized."
-    if _GLOBAL_TASK_MANAGER.update_task(task_id, status):
-        _GLOBAL_TASK_MANAGER.print_summary()
+def todo_update(task_id: str, status: str, context: Any) -> str:
+    if not hasattr(context, 'task_manager'):
+        return "Error: Invalid context (missing task_manager)."
+        
+    manager: TaskManager = context.task_manager
+    if manager.update_task(task_id, status):
+        manager.print_summary()
         return f"Task {task_id} updated to {status}."
     return f"Error: Task {task_id} not found."
 
@@ -59,7 +50,9 @@ def todo_update(task_id: str, status: str) -> str:
         "required": []
     }
 )
-def todo_list() -> str:
-    if not _GLOBAL_TASK_MANAGER:
-        return "Error: Task manager not initialized."
-    return _GLOBAL_TASK_MANAGER.render()
+def todo_list(context: Any) -> str:
+    if not hasattr(context, 'task_manager'):
+        return "Error: Invalid context (missing task_manager)."
+        
+    manager: TaskManager = context.task_manager
+    return manager.render()

@@ -45,6 +45,18 @@ class MemoryManager:
 
     def set_system_prompt(self, content: str):
         self.short_term.set_system_prompt(content)
+    
+    def get_system_prompt(self) -> str:
+        prompt = self.short_term.system_prompt
+        if not prompt:
+            return ""
+        return prompt.get("content", "")
+    
+    def get_usage_percent(self) -> int:
+        current, limit = self.short_term.get_usage()
+        if limit <= 0:
+            return 0
+        return min(100, int((current / limit) * 100))
 
     def add(self, role: str, content: Any, tool_calls: List = None, tool_call_id: str = None, name: str = None):
         """
@@ -70,7 +82,24 @@ class MemoryManager:
             # but we can also double check here or use the flag from write.
             self.short_term._check_overflow() # Will raise if full
         except MemoryOverflowError:
-            logger.warning("Memory overflow confirmed. Executing AU2 compression...")
+            logger.warning("Memory overflow detected. Applying Hybrid Memory Strategy...")
+            
+            # Strategy 1: FIFO Sliding Window (The "Safe" Approach)
+            # Use aggressive truncation to fit back into 80% of limit
+            truncated = self.short_term.truncate_to_fit(target_ratio=0.8)
+            
+            if truncated:
+                logger.info(f"Hybrid Strategy: Truncated {len(truncated)} oldest messages to free space.")
+                
+                # Check if we are still overflowing? (truncate_to_fit guarantees we are under target, unless context is empty)
+                # We trigger Auto-Save to persist the truncation
+                await self.auto_save()
+                return self.short_term.get_context()
+
+            # Strategy 2: AU2 Compression (The "Smart" Approach) - Fallback
+            # Only reached if FIFO didn't work (e.g. context is empty but system prompt is huge? unlikely)
+            # or if we explicitly want to compress.
+            logger.info("Hybrid Strategy: Falling back to AU2 Compression...")
             full_context = self.short_term.get_context()
             
             # Execute AU2
@@ -95,16 +124,16 @@ class MemoryManager:
     async def _extract_value_to_long_term(self, au2_data: Dict[str, Any]):
         """
         Heuristic check: If AU2 summary contains explicit decisions or preferences,
-        we might want to save them to CLAUDE.md.
+        we might want to save them to MEMORY.md.
         Real implementation would use an LLM call to filter 'Global vs Local' info.
         For MVP, we just append 'Decisions' if they look significant.
         """
         decisions = au2_data.get("decisions")
         if decisions and len(str(decisions)) > 10:
-             # We invoke the Archivist
-             # In a real agent, we'd ask: "Is this decision project-specific or global?"
-             # Here we just save it as a "Mid-Term Archive"
-             await self.long_term.update(key_decisions=f"[From Session] {decisions}")
+            # We invoke the Archivist
+            # In a real agent, we'd ask: "Is this decision project-specific or global?"
+            # Here we just save it as a "Mid-Term Archive"
+            await self.long_term.update(key_decisions=f"[From Session] {decisions}")
 
     async def save_insight(self, content: str):
         """Manual trigger to save something to long term memory."""

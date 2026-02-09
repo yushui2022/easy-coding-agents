@@ -8,7 +8,7 @@ class LongTermMemory:
     第三层：长期记忆 (The Archivist)
     管理跨越程序生命周期的“经验书” (CLAUDE.md)。
     """
-    def __init__(self, file_path="CLAUDE.md"):
+    def __init__(self, file_path="MEMORY.md"):
         self.file_path = file_path
         self._lock = asyncio.Lock() # Atomic write lock
 
