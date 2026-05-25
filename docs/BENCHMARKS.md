@@ -35,6 +35,30 @@ loader accepts the internal case schema and common LongMemEval-like records with
 `haystack_sessions` / `answer_session_ids`, plus LoCoMo-like `conversation` or
 `dialogue` records. It does not download public datasets automatically.
 
+Public-data helper:
+
+```powershell
+python benchmark\memory_eval\download_datasets.py --dataset locomo10
+python benchmark\memory_eval\download_datasets.py --dataset longmemeval_s
+```
+
+The downloaded files are stored under the ignored local directory:
+
+```text
+benchmark/memory_eval/datasets/
+```
+
+Real-data smoke tests:
+
+```powershell
+python benchmark\memory_eval\run.py --suite locomo_lite --baseline evidence_gated_memory --dataset benchmark\memory_eval\datasets\locomo10.json --limit 2
+python benchmark\memory_eval\run.py --suite longmemeval --baseline evidence_gated_memory --dataset benchmark\memory_eval\datasets\longmemeval_s_cleaned.json --limit 1
+```
+
+These runs verify adapter compatibility and evidence retrieval. They are not
+official scores until run against the intended split with answer generation and
+judge evaluation.
+
 Baselines:
 
 - `no_memory`

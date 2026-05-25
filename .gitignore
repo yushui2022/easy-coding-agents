@@ -8,6 +8,7 @@
 .agent_memory_gate_check/
 benchmark/coding_memory/results/
 benchmark/memory_eval/results/
+benchmark/memory_eval/datasets/
 __pycache__/
 *.py[cod]
 *.pyo

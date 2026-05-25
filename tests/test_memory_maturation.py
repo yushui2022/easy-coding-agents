@@ -3,7 +3,9 @@ from pathlib import Path
 
 from agent_memory_core import CodingMemory
 from agent_memory_core.entities import extract_entities
-from benchmark.memory_eval.adapters import normalize_record
+from agent_memory_core.retrieval import Retriever
+from benchmark.memory_eval.adapters import expand_records, normalize_record
+from benchmark.memory_eval.download_datasets import DATASETS
 from benchmark.memory_eval.run import load_cases, render_comparison_markdown, run_suite
 
 
@@ -147,3 +149,51 @@ def test_official_longmemeval_like_record_is_normalized():
     assert case["expected_evidence_terms"] == ["s2"]
     assert case["temporal_mode"] == "latest"
     assert any("session:s2" in session["content"] for session in case["sessions"])
+
+
+def test_locomo_group_record_expands_to_qa_cases():
+    records = expand_records(
+        [
+            {
+                "sample_id": "conv_test",
+                "qa": [
+                    {
+                        "question": "When did Caroline go to the support group?",
+                        "answer": "7 May 2023",
+                        "evidence": ["D1:3"],
+                    }
+                ],
+                "conversation": {
+                    "session_1_date_time": "1:56 pm on 8 May, 2023",
+                    "session_1": [
+                        {"speaker": "Caroline", "dia_id": "D1:3", "text": "I went to a support group yesterday."}
+                    ],
+                },
+            }
+        ],
+        suite="locomo",
+        limit=1,
+    )
+    case = normalize_record(records[0], suite="locomo")
+    assert case["case_id"] == "conv_test_0"
+    assert case["expected_answer_terms"] == ["7 May 2023"]
+    assert case["expected_evidence_terms"] == ["D1:3"]
+    assert len(case["sessions"]) == 1
+    assert "dia_id:D1:3" in case["sessions"][0]["content"]
+
+
+def test_public_dataset_download_specs_are_registered():
+    assert "longmemeval_s" in DATASETS
+    assert DATASETS["longmemeval_s"]["path"].endswith(".json")
+    assert "locomo10" in DATASETS
+
+
+def test_query_snippet_prefers_meaningful_query_terms():
+    text = (
+        "I need something more digital. "
+        + "filler " * 80
+        + "I graduated with a degree in Business Administration."
+    )
+    snippet = Retriever._query_snippet(text, "What degree did I graduate with?", max_chars=180)
+    assert "Business Administration" in snippet
+    assert not snippet.startswith("I need something more digital")

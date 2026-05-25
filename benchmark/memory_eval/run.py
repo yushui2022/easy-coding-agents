@@ -13,7 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from agent_memory_core import CodingMemory
-from benchmark.memory_eval.adapters import normalize_record
+from benchmark.memory_eval.adapters import expand_records, normalize_record
 
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
@@ -95,6 +95,7 @@ async def run_case(
         prompt = "\n".join(str(message.get("content") or "") for message in messages)
         retrieved = last_selected_results(memory)
     latency = time.perf_counter() - started
+    source_text = resolve_retrieved_sources(memory, retrieved) if memory is not None else render_retrieved_text(retrieved)
 
     if memory is not None:
         memory.storage.close()
@@ -105,7 +106,7 @@ async def run_case(
     should_abstain = bool(case.get("should_abstain"))
     answer_hit = term_coverage(prompt, expected_answer_terms)
     evidence_prompt_hit = term_coverage(prompt, expected_evidence_terms)
-    evidence_source_hit = term_coverage(render_retrieved_text(retrieved), expected_evidence_terms)
+    evidence_source_hit = term_coverage(source_text, expected_evidence_terms)
     entity_hit = term_coverage(prompt, expected_entities)
     has_false_fact = should_abstain and any_term(prompt, expected_answer_terms)
 
@@ -322,6 +323,60 @@ def render_retrieved_text(rows: List[Dict[str, Any]]) -> str:
     return "\n".join(parts)
 
 
+def resolve_retrieved_sources(memory: CodingMemory, rows: List[Dict[str, Any]]) -> str:
+    parts = [render_retrieved_text(rows)]
+    for row in rows:
+        source = str(row.get("source") or "")
+        source_id = str(row.get("source_id") or "")
+        metadata = row.get("metadata") or {}
+        if source == "event":
+            parts.append(read_event_text(memory, source_id))
+        elif source == "ref":
+            parts.append(read_ref_text(memory, source_id))
+        elif source == "memory_item":
+            parts.append(read_memory_item_text(memory, source_id))
+            for ref in metadata.get("source_refs") or []:
+                ref = str(ref)
+                if ref.startswith("refs/"):
+                    parts.append(read_ref_text(memory, ref))
+                elif ref.startswith("evt_"):
+                    parts.append(read_event_text(memory, ref))
+    return "\n".join(part for part in parts if part)
+
+
+def read_event_text(memory: CodingMemory, event_id: str) -> str:
+    row = memory.storage.conn.execute(
+        "SELECT content, summary FROM events WHERE event_id=?",
+        (event_id,),
+    ).fetchone()
+    if not row:
+        return ""
+    return f"{row['summary'] or ''}\n{row['content'] or ''}"
+
+
+def read_memory_item_text(memory: CodingMemory, item_id: str) -> str:
+    row = memory.storage.conn.execute(
+        "SELECT content, source_refs FROM memory_items WHERE item_id=?",
+        (item_id,),
+    ).fetchone()
+    if not row:
+        return ""
+    return f"{row['content'] or ''}\n{row['source_refs'] or ''}"
+
+
+def read_ref_text(memory: CodingMemory, ref_id: str) -> str:
+    rows = memory.storage.get_refs_by_ids([ref_id])
+    if not rows:
+        return ""
+    path = Path(rows[0].get("path") or "")
+    if not path.exists():
+        return rows[0].get("summary") or ""
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError:
+        return rows[0].get("summary") or ""
+
+
 def normalize_retrieved_row(row: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "source": row.get("source"),
@@ -409,7 +464,8 @@ def load_cases(path: str, limit: int = 20) -> List[Dict[str, Any]]:
     else:
         loaded = json.loads(text)
         records = loaded if isinstance(loaded, list) else loaded.get("cases", [])
-    return [normalize_record(record, suite=dataset_path.stem, index=index) for index, record in enumerate(records[:limit])]
+    expanded = expand_records(records, suite=dataset_path.stem, limit=limit)
+    return [normalize_record(record, suite=dataset_path.stem, index=index) for index, record in enumerate(expanded)]
 
 
 def default_fixture(suite: str) -> str:

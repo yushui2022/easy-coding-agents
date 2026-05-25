@@ -621,7 +621,7 @@ class MemoryStorage:
                 SELECT memory_items.* FROM memory_items_fts
                 JOIN memory_items ON memory_items.item_id = memory_items_fts.item_id
                 WHERE memory_items_fts MATCH ?
-                ORDER BY memory_items.goal_version DESC, memory_items.created_at DESC
+                ORDER BY bm25(memory_items_fts), memory_items.goal_version DESC, memory_items.created_at DESC
                 LIMIT ?
                 """,
                 (self._fts_query(query), limit),
@@ -649,7 +649,7 @@ class MemoryStorage:
                 SELECT entities.* FROM entities_fts
                 JOIN entities ON entities.entity_id = entities_fts.entity_id
                 WHERE entities_fts MATCH ?
-                ORDER BY entities.created_at DESC
+                ORDER BY bm25(entities_fts), entities.created_at DESC
                 LIMIT ?
                 """,
                 (self._fts_query(query), limit),
@@ -680,6 +680,7 @@ class MemoryStorage:
                     SELECT 'event' AS source, event_id AS source_id, kind AS title, summary, 1.0 AS score
                     FROM events_fts
                     WHERE events_fts MATCH ?
+                    ORDER BY bm25(events_fts)
                     LIMIT ?
                     """,
                     (safe_query, limit),
@@ -691,6 +692,7 @@ class MemoryStorage:
                     SELECT 'ref' AS source, ref_id AS source_id, kind AS title, summary, 1.0 AS score
                     FROM refs_fts
                     WHERE refs_fts MATCH ?
+                    ORDER BY bm25(refs_fts)
                     LIMIT ?
                     """,
                     (safe_query, limit),
@@ -702,6 +704,7 @@ class MemoryStorage:
                     SELECT 'memory' AS source, memory_id AS source_id, memory_type AS title, content AS summary, 1.0 AS score
                     FROM memories_fts
                     WHERE memories_fts MATCH ?
+                    ORDER BY bm25(memories_fts)
                     LIMIT ?
                     """,
                     (safe_query, limit),
@@ -713,6 +716,7 @@ class MemoryStorage:
                     SELECT 'memory_item' AS source, item_id AS source_id, item_type AS title, content AS summary, 1.0 AS score
                     FROM memory_items_fts
                     WHERE memory_items_fts MATCH ?
+                    ORDER BY bm25(memory_items_fts)
                     LIMIT ?
                     """,
                     (safe_query, limit),
@@ -782,10 +786,45 @@ class MemoryStorage:
 
     @staticmethod
     def _fts_query(query: str) -> str:
+        stopwords = {
+            "a",
+            "an",
+            "and",
+            "are",
+            "as",
+            "at",
+            "be",
+            "by",
+            "can",
+            "did",
+            "do",
+            "for",
+            "from",
+            "how",
+            "i",
+            "in",
+            "is",
+            "it",
+            "me",
+            "my",
+            "of",
+            "on",
+            "or",
+            "the",
+            "to",
+            "was",
+            "what",
+            "when",
+            "where",
+            "which",
+            "who",
+            "why",
+            "with",
+        }
         terms = []
         for raw in query.replace('"', " ").replace("'", " ").split():
             token = "".join(ch for ch in raw if ch.isalnum() or ch in "_-./:")
-            if token:
+            if token and len(token) > 1 and token.lower() not in stopwords:
                 terms.append(f'"{token}"')
         return " OR ".join(terms) if terms else '"memory"'
 

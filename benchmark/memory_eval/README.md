@@ -30,6 +30,27 @@ The loader also normalizes common official-style schemas:
 Official dataset files are not downloaded automatically. Pass local JSON/JSONL
 files with `--dataset`.
 
+## Download Public Data
+
+Use the helper script to download public benchmark files into the ignored local
+dataset directory:
+
+```powershell
+python benchmark\memory_eval\download_datasets.py --dataset locomo10
+python benchmark\memory_eval\download_datasets.py --dataset longmemeval_s
+```
+
+Then run small real-data smoke tests:
+
+```powershell
+python benchmark\memory_eval\run.py --suite locomo_lite --baseline evidence_gated_memory --dataset benchmark\memory_eval\datasets\locomo10.json --limit 2
+python benchmark\memory_eval\run.py --suite longmemeval --baseline evidence_gated_memory --dataset benchmark\memory_eval\datasets\longmemeval_s_cleaned.json --limit 1
+```
+
+These smoke runs verify adapter compatibility and evidence retrieval. They are
+not official dataset-level scores until run with the full split and answer
+generation / judge evaluation.
+
 Baselines:
 
 - `no_memory`

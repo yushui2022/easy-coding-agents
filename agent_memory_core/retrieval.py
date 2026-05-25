@@ -7,6 +7,40 @@ from agent_memory_core.models import RetrievalResult
 from agent_memory_core.storage import MemoryStorage
 
 
+SUMMARY_MAX_CHARS = 900
+QUERY_STOPWORDS = {
+    "about",
+    "and",
+    "can",
+    "did",
+    "does",
+    "for",
+    "from",
+    "had",
+    "has",
+    "have",
+    "how",
+    "the",
+    "what",
+    "when",
+    "where",
+    "which",
+    "who",
+    "why",
+    "with",
+}
+
+ENTITY_BASE_SCORES = {
+    "file": 1.55,
+    "function": 1.55,
+    "class": 1.55,
+    "test": 1.55,
+    "error": 1.55,
+    "command": 1.55,
+    "goal": 0.25,
+    "user_preference": 0.35,
+}
+
 TEMPORAL_MARKERS = {
     "现在",
     "最新",
@@ -130,8 +164,11 @@ class Retriever:
         normalized_query_entities = set(query_entity_norms)
         for row in self.storage.search_entities(query, limit=limit):
             normalized = row.get("normalized") or ""
+            entity_type = row.get("entity_type") or "unknown"
+            if entity_type in {"goal", "user_preference"} and normalized not in normalized_query_entities:
+                continue
             confidence = float(row.get("confidence") or 0.0)
-            score = 1.55 + confidence
+            score = ENTITY_BASE_SCORES.get(entity_type, 0.75) + confidence
             if normalized and normalized in normalized_query_entities:
                 score += 0.5
             if temporal_intent:
@@ -143,8 +180,8 @@ class Retriever:
                 results,
                 source=source,
                 source_id=source_id,
-                title=f"entity:{row.get('entity_type') or 'unknown'}",
-                summary=f"{row.get('entity_type')}: {row.get('entity_text')}",
+                title=f"entity:{entity_type}",
+                summary=f"{entity_type}: {row.get('entity_text')}",
                 score=score,
                 signal="entity_match",
                 metadata={
@@ -178,7 +215,7 @@ class Retriever:
                 source="memory_item",
                 source_id=item["item_id"],
                 title=item["item_type"],
-                summary=item["content"],
+                summary=self._query_snippet(item["content"], query),
                 score=score,
                 signal="memory_item",
                 metadata={
@@ -226,6 +263,13 @@ class Retriever:
         else:
             result = results[key]
             result.metadata.update(metadata or {})
+        if signal == "entity_match":
+            signals = result.metadata.setdefault("signals", {})
+            previous = float(signals.get(signal) or 0.0)
+            delta = max(0.0, float(score) - previous)
+            result.score += delta
+            signals[signal] = round(max(previous, float(score)), 4)
+            return
         result.score += score
         Retriever._add_signal(result, signal, score)
 
@@ -263,3 +307,33 @@ class Retriever:
             files.append(item)
             files.append(Path(item).name)
         return list(dict.fromkeys(files))
+
+    @staticmethod
+    def _query_snippet(text: str, query: str, max_chars: int = SUMMARY_MAX_CHARS) -> str:
+        text = str(text or "")
+        if len(text) <= max_chars:
+            return text
+        lowered = text.lower()
+        terms = list(
+            dict.fromkeys(
+                token.lower()
+                for token in re.findall(r"[A-Za-z0-9_./:-]+", query or "")
+                if len(token) > 2 and token.lower() not in QUERY_STOPWORDS
+            )
+        )
+        terms.sort(key=len, reverse=True)
+        positions = []
+        for term in terms:
+            pattern = rf"(?<![A-Za-z0-9_]){re.escape(term)}(?![A-Za-z0-9_])"
+            match = re.search(pattern, lowered)
+            if match:
+                positions.append(match.start())
+        if not positions:
+            return text[: max_chars - 3].rstrip() + "..."
+        center = min(positions)
+        start = max(0, center - max_chars // 3)
+        end = min(len(text), start + max_chars)
+        start = max(0, end - max_chars)
+        prefix = "..." if start else ""
+        suffix = "..." if end < len(text) else ""
+        return prefix + text[start:end].strip() + suffix

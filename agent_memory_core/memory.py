@@ -463,7 +463,10 @@ class CodingMemory:
         sections.extend(["</user_project_memories>", "", "<evidence_summaries>"])
         if retrieved:
             for item in retrieved:
-                sections.append(f"- [{item.source}:{item.source_id}] {item.summary}")
+                summary = summarize_text(item.summary, max_chars=700)
+                source_refs = item.metadata.get("source_refs") or []
+                refs = f" (sources: {', '.join(source_refs)})" if source_refs else ""
+                sections.append(f"- [{item.source}:{item.source_id}] {summary}{refs}")
         else:
             sections.append("- No retrieved evidence for the current query.")
         sections.extend(["</evidence_summaries>", "</evidence_gated_memory>"])
