@@ -1,9 +1,12 @@
 import argparse
 import asyncio
 import json
+import math
+import re
 import shutil
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 from statistics import mean, median
 from typing import Any, Dict, List, Optional
@@ -21,10 +24,12 @@ FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 BASELINES = [
     "no_memory",
     "summary_memory",
-    "rag_fts_memory",
-    "entity_temporal_memory",
+    "long_context_only",
+    "keyword_fts_memory",
+    "vector_rag_memory",
     "evidence_gated_memory",
 ]
+LEGACY_BASELINES = ["rag_fts_memory", "entity_temporal_memory"]
 SUITES = ["longmemeval", "locomo_lite", "beam_lite"]
 
 
@@ -34,9 +39,10 @@ async def run_suite(
     dataset: Optional[str] = None,
     limit: int = 20,
     beam_tokens: int = 100_000,
+    beam_cases: int = 1,
 ) -> Dict[str, Any]:
     if suite == "beam_lite":
-        return await run_beam_lite(baseline=baseline, beam_tokens=beam_tokens)
+        return await run_beam_lite(baseline=baseline, beam_tokens=beam_tokens, beam_cases=beam_cases)
 
     cases = load_cases(dataset or default_fixture(suite), limit=limit)
     workspace_name = f".agent_memory_eval_{suite}_{baseline}"
@@ -55,7 +61,14 @@ async def run_case(
 ) -> Dict[str, Any]:
     memory: Optional[CodingMemory] = None
     workspace = f"{workspace_name}/case_{index}"
-    if baseline in {"rag_fts_memory", "entity_temporal_memory", "evidence_gated_memory"}:
+    memory_baselines = {
+        "keyword_fts_memory",
+        "rag_fts_memory",
+        "vector_rag_memory",
+        "entity_temporal_memory",
+        "evidence_gated_memory",
+    }
+    if baseline in memory_baselines:
         memory = CodingMemory(
             project_root=str(ROOT),
             workspace=workspace,
@@ -79,11 +92,27 @@ async def run_case(
     elif baseline == "summary_memory":
         prompt = render_summary_prompt(case)
         retrieved = []
-    elif baseline == "rag_fts_memory":
+    elif baseline == "long_context_only":
+        prompt = render_long_context_prompt(case)
+        retrieved = [
+            {
+                "source": "event",
+                "source_id": "long_context",
+                "title": "long_context",
+                "summary": prompt[:1200],
+                "score": 1.0,
+                "metadata": {"source_refs": ["long_context"]},
+            }
+        ]
+    elif baseline in {"keyword_fts_memory", "rag_fts_memory"}:
         assert memory is not None
         rows = memory.storage.search(query, limit=8)
-        retrieved = [normalize_retrieved_row(row) for row in rows]
+        retrieved = [normalize_retrieved_row(row, memory=memory) for row in rows]
         prompt = render_rows_prompt("FTS Memory Results", retrieved)
+    elif baseline == "vector_rag_memory":
+        assert memory is not None
+        retrieved = vector_retrieve(memory, query, limit=8)
+        prompt = render_rows_prompt("Vector RAG Memory Results", retrieved)
     elif baseline == "entity_temporal_memory":
         assert memory is not None
         rows = memory.retriever.retrieve(query, limit=8)
@@ -95,7 +124,10 @@ async def run_case(
         prompt = "\n".join(str(message.get("content") or "") for message in messages)
         retrieved = last_selected_results(memory)
     latency = time.perf_counter() - started
-    source_text = resolve_retrieved_sources(memory, retrieved) if memory is not None else render_retrieved_text(retrieved)
+    if baseline == "long_context_only":
+        source_text = prompt
+    else:
+        source_text = resolve_retrieved_sources(memory, retrieved) if memory is not None else render_retrieved_text(retrieved)
 
     if memory is not None:
         memory.storage.close()
@@ -126,7 +158,7 @@ async def run_case(
         "latency": latency,
         "false_fact": int(has_false_fact),
         "retrieved_count": len(retrieved),
-        "context_wipe": baseline in {"rag_fts_memory", "entity_temporal_memory", "evidence_gated_memory"},
+        "context_wipe": baseline in memory_baselines,
         "retrieved_results": compact_retrieved(retrieved),
     }
 
@@ -148,26 +180,80 @@ async def ingest_case(memory: CodingMemory, case: Dict[str, Any]) -> None:
             )
 
 
-async def run_beam_lite(baseline: str, beam_tokens: int = 100_000) -> Dict[str, Any]:
-    query = "latest BEAM target anchor beam_fact_42"
-    expected = ["beam_fact_42", "final chunk keeps the target memory"]
+async def run_beam_lite(
+    baseline: str,
+    beam_tokens: int = 100_000,
+    beam_cases: int = 1,
+) -> Dict[str, Any]:
+    beam_cases = max(1, int(beam_cases or 1))
+    specs = [
+        {
+            "case_id": f"beam_lite_synthetic_{index:03d}",
+            "query": f"latest BEAM target anchor beam_fact_{index}",
+            "expected": [f"beam_fact_{index}", f"target memory case {index}"],
+        }
+        for index in range(beam_cases)
+    ]
+    documents = build_beam_documents(beam_tokens=beam_tokens, beam_cases=beam_cases)
     workspace_name = f".agent_memory_eval_beam_lite_{baseline}"
     reset_dir(ROOT / workspace_name)
 
     if baseline == "no_memory":
-        prompt = query
         return summarize_results(
             "beam_lite",
             baseline,
-            [single_beam_result(prompt, expected, latency=0.0, retrieved=[])],
+            [
+                single_beam_result(
+                    spec["case_id"],
+                    spec["query"],
+                    spec["expected"],
+                    latency=0.0,
+                    retrieved=[],
+                )
+                for spec in specs
+            ],
         )
     if baseline == "summary_memory":
-        prompt = "Summary: a long synthetic memory stream was processed."
         return summarize_results(
             "beam_lite",
             baseline,
-            [single_beam_result(prompt, expected, latency=0.0, retrieved=[])],
+            [
+                single_beam_result(
+                    spec["case_id"],
+                    "Summary: a long synthetic memory stream was processed.",
+                    spec["expected"],
+                    latency=0.0,
+                    retrieved=[],
+                )
+                for spec in specs
+            ],
         )
+    if baseline == "long_context_only":
+        prompt = "\n".join(doc["body"] for doc in documents)
+        case_results = []
+        for spec in specs:
+            started = time.perf_counter()
+            long_prompt = f"{prompt}\n\n[query]\n{spec['query']}"
+            case_results.append(
+                single_beam_result(
+                    spec["case_id"],
+                    long_prompt,
+                    spec["expected"],
+                    latency=time.perf_counter() - started,
+                    retrieved=[
+                        {
+                            "source": "event",
+                            "source_id": "long_context",
+                            "title": "long_context",
+                            "summary": long_prompt[:1200],
+                            "score": 1.0,
+                            "metadata": {"source_refs": ["long_context"]},
+                        }
+                    ],
+                    source_text=long_prompt,
+                )
+            )
+        return summarize_results("beam_lite", baseline, case_results)
 
     memory = CodingMemory(
         project_root=str(ROOT),
@@ -176,18 +262,11 @@ async def run_beam_lite(baseline: str, beam_tokens: int = 100_000) -> Dict[str, 
         recent_dialogue_limit=4,
     )
     await memory.record_user_message("Run BEAM-lite synthetic scale memory test.")
-    chunk_tokens = 1_000
-    chunks = max(1, beam_tokens // chunk_tokens)
-    filler_line = "beam filler token stream for retrieval stress and latency tracking\n"
-    for index in range(chunks):
-        target = ""
-        if index == chunks - 1:
-            target = "beam_fact_42: final chunk keeps the target memory for latest retrieval.\n"
-        body = target + (filler_line * 70)
+    for document in documents:
         await memory.record_tool_result(
             "read",
-            {"path": f"beam/chunk_{index:05d}.md"},
-            body,
+            {"path": document["path"]},
+            document["body"],
         )
     memory.storage.close()
     memory = CodingMemory(
@@ -197,49 +276,72 @@ async def run_beam_lite(baseline: str, beam_tokens: int = 100_000) -> Dict[str, 
         recent_dialogue_limit=0,
     )
 
-    prompts = []
-    latencies = []
-    retrieved_rows: List[Dict[str, Any]] = []
-    for _ in range(5):
+    case_results = []
+    for spec in specs:
+        query = spec["query"]
         started = time.perf_counter()
-        if baseline == "rag_fts_memory":
+        if baseline in {"keyword_fts_memory", "rag_fts_memory"}:
             rows = memory.storage.search(query, limit=8)
-            retrieved_rows = [normalize_retrieved_row(row) for row in rows]
-            prompt = render_rows_prompt("FTS Memory Results", retrieved_rows)
+            retrieved = [normalize_retrieved_row(row, memory=memory) for row in rows]
+            prompt = render_rows_prompt("FTS Memory Results", retrieved)
+        elif baseline == "vector_rag_memory":
+            retrieved = vector_retrieve(memory, query, limit=8)
+            prompt = render_rows_prompt("Vector RAG Memory Results", retrieved)
         elif baseline == "entity_temporal_memory":
             rows = memory.retriever.retrieve(query, limit=8)
-            retrieved_rows = [item.__dict__ for item in rows]
-            prompt = render_rows_prompt("Entity Temporal Memory Results", retrieved_rows)
+            retrieved = [item.__dict__ for item in rows]
+            prompt = render_rows_prompt("Entity Temporal Memory Results", retrieved)
         else:
             messages = await memory.build_prompt_context(query)
             prompt = "\n".join(str(message.get("content") or "") for message in messages)
-            retrieved_rows = last_selected_results(memory)
-        latencies.append(time.perf_counter() - started)
-        prompts.append(prompt)
+            retrieved = last_selected_results(memory)
+        case_result = single_beam_result(
+            spec["case_id"],
+            prompt,
+            spec["expected"],
+            latency=time.perf_counter() - started,
+            retrieved=retrieved,
+        )
+        case_result["beam_tokens"] = beam_tokens
+        case_result["beam_cases"] = beam_cases
+        case_results.append(case_result)
     memory.storage.close()
 
-    result = single_beam_result(
-        "\n".join(prompts[-1:]),
-        expected,
-        latency=median(latencies),
-        retrieved=retrieved_rows,
-    )
-    result["input_tokens"] = estimate_tokens(prompts[-1])
-    result["beam_tokens"] = beam_tokens
-    result["latency_samples"] = latencies
-    return summarize_results("beam_lite", baseline, [result])
+    return summarize_results("beam_lite", baseline, case_results)
+
+
+def build_beam_documents(beam_tokens: int, beam_cases: int) -> List[Dict[str, str]]:
+    chunk_tokens = 1_000
+    chunks = max(beam_cases, max(1, int(beam_tokens or 1) // chunk_tokens))
+    filler_line = "beam filler token stream for retrieval stress and latency tracking\n"
+    targets_by_chunk: Dict[int, List[int]] = {}
+    for case_index in range(beam_cases):
+        chunk_index = min(chunks - 1, int(case_index * chunks / beam_cases))
+        targets_by_chunk.setdefault(chunk_index, []).append(case_index)
+
+    documents = []
+    for index in range(chunks):
+        targets = "".join(
+            f"beam_fact_{case_index}: target memory case {case_index} remains available after context wipe.\n"
+            for case_index in targets_by_chunk.get(index, [])
+        )
+        body = targets + (filler_line * 70)
+        documents.append({"path": f"beam/chunk_{index:05d}.md", "body": body})
+    return documents
 
 
 def single_beam_result(
+    case_id: str,
     prompt: str,
     expected_terms: List[str],
     latency: float,
     retrieved: List[Dict[str, Any]],
+    source_text: Optional[str] = None,
 ) -> Dict[str, Any]:
     hit = term_coverage(prompt, expected_terms)
-    evidence_source_hit = term_coverage(render_retrieved_text(retrieved), expected_terms)
+    evidence_source_hit = term_coverage(source_text or render_retrieved_text(retrieved), expected_terms)
     return {
-        "case_id": "beam_lite_synthetic",
+        "case_id": case_id,
         "retrieval_hit": hit,
         "term_recall": hit,
         "evidence_precision": evidence_source_hit,
@@ -295,6 +397,24 @@ def render_summary_prompt(case: Dict[str, Any]) -> str:
     return "Summary Memory:\n" + "\n".join(snippet[:220] for snippet in snippets if snippet)
 
 
+def render_long_context_prompt(case: Dict[str, Any], max_chars: int = 220_000) -> str:
+    lines = ["Long Context Baseline"]
+    for session in case.get("sessions") or []:
+        role = str(session.get("role") or "user")
+        content = str(session.get("content") or "")
+        if content:
+            lines.append(f"\n[{role}]\n{content}")
+    query = str(case.get("query") or "")
+    if query:
+        lines.append(f"\n[query]\n{query}")
+    prompt = "\n".join(lines)
+    if len(prompt) <= max_chars:
+        return prompt
+    head = prompt[: max_chars // 2]
+    tail = prompt[-max_chars // 2 :]
+    return f"{head}\n\n[...long_context_truncated...]\n\n{tail}"
+
+
 def render_rows_prompt(title: str, rows: List[Dict[str, Any]]) -> str:
     lines = [title]
     if not rows:
@@ -305,6 +425,148 @@ def render_rows_prompt(title: str, rows: List[Dict[str, Any]]) -> str:
         summary = row.get("summary") or row.get("content") or ""
         lines.append(f"- [{source}:{source_id}] {summary}")
     return "\n".join(lines)
+
+
+def vector_retrieve(memory: CodingMemory, query: str, limit: int = 8) -> List[Dict[str, Any]]:
+    query_vector = text_vector(query)
+    if not query_vector:
+        return []
+    docs = vector_documents(memory)
+    scored = []
+    for doc in docs:
+        doc_vector = text_vector(doc["text"])
+        score = cosine(query_vector, doc_vector)
+        if score <= 0:
+            continue
+        scored.append((score, doc))
+    scored.sort(key=lambda item: item[0], reverse=True)
+    rows: List[Dict[str, Any]] = []
+    for score, doc in scored[:limit]:
+        rows.append(
+            {
+                "source": doc["source"],
+                "source_id": doc["source_id"],
+                "title": doc["title"],
+                "summary": memory.retriever._query_snippet(doc["text"], query, max_chars=900),
+                "score": round(score, 6),
+                "metadata": {
+                    "source_refs": doc.get("source_refs") or [],
+                    "signals": {"vector_cosine": round(score, 6)},
+                },
+            }
+        )
+    return rows
+
+
+def vector_documents(memory: CodingMemory) -> List[Dict[str, Any]]:
+    docs: List[Dict[str, Any]] = []
+    for row in memory.storage.conn.execute(
+        "SELECT event_id, kind, content, summary, ref_id FROM events"
+    ).fetchall():
+        text = f"{row['summary'] or ''}\n{row['content'] or ''}".strip()
+        if text:
+            docs.append(
+                {
+                    "source": "event",
+                    "source_id": row["event_id"],
+                    "title": row["kind"],
+                    "text": text,
+                    "source_refs": [row["ref_id"]] if row["ref_id"] else [],
+                }
+            )
+    for row in memory.storage.conn.execute(
+        "SELECT item_id, item_type, content, source_refs FROM memory_items"
+    ).fetchall():
+        refs = parse_json_list(row["source_refs"])
+        content = str(row["content"] or "")
+        if content and refs:
+            docs.append(
+                {
+                    "source": "memory_item",
+                    "source_id": row["item_id"],
+                    "title": row["item_type"],
+                    "text": content,
+                    "source_refs": refs,
+                }
+            )
+    for row in memory.storage.conn.execute(
+        "SELECT ref_id, kind, summary FROM refs"
+    ).fetchall():
+        summary = str(row["summary"] or "")
+        if summary:
+            docs.append(
+                {
+                    "source": "ref",
+                    "source_id": row["ref_id"],
+                    "title": row["kind"],
+                    "text": summary,
+                    "source_refs": [row["ref_id"]],
+                }
+            )
+    return docs
+
+
+def text_vector(text: str) -> Counter:
+    return Counter(tokenize_text(text))
+
+
+def tokenize_text(text: str) -> List[str]:
+    stopwords = {
+        "about",
+        "after",
+        "and",
+        "are",
+        "can",
+        "did",
+        "does",
+        "for",
+        "from",
+        "had",
+        "has",
+        "have",
+        "how",
+        "into",
+        "the",
+        "that",
+        "this",
+        "what",
+        "when",
+        "where",
+        "which",
+        "who",
+        "why",
+        "with",
+        "you",
+        "your",
+    }
+    return [
+        token.lower()
+        for token in re.findall(r"[A-Za-z0-9_./:-]+", str(text or ""))
+        if len(token) > 2 and token.lower() not in stopwords
+    ]
+
+
+def cosine(left: Counter, right: Counter) -> float:
+    if not left or not right:
+        return 0.0
+    dot = sum(value * right.get(key, 0) for key, value in left.items())
+    if not dot:
+        return 0.0
+    left_norm = math.sqrt(sum(value * value for value in left.values()))
+    right_norm = math.sqrt(sum(value * value for value in right.values()))
+    if not left_norm or not right_norm:
+        return 0.0
+    return dot / (left_norm * right_norm)
+
+
+def parse_json_list(value: Any) -> List[str]:
+    try:
+        loaded = json.loads(value or "[]")
+    except Exception:
+        return []
+    if not isinstance(loaded, list):
+        return []
+    return [str(item) for item in loaded]
 
 
 def render_retrieved_text(rows: List[Dict[str, Any]]) -> str:
@@ -377,14 +639,31 @@ def read_ref_text(memory: CodingMemory, ref_id: str) -> str:
         return rows[0].get("summary") or ""
 
 
-def normalize_retrieved_row(row: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_retrieved_row(row: Dict[str, Any], memory: Optional[CodingMemory] = None) -> Dict[str, Any]:
+    source = row.get("source")
+    source_id = row.get("source_id")
+    metadata: Dict[str, Any] = {}
+    if memory is not None and source == "memory_item" and source_id:
+        db_row = memory.storage.conn.execute(
+            "SELECT source_refs FROM memory_items WHERE item_id=?",
+            (source_id,),
+        ).fetchone()
+        if db_row:
+            metadata["source_refs"] = parse_json_list(db_row["source_refs"])
+    if memory is not None and source == "event" and source_id:
+        db_row = memory.storage.conn.execute(
+            "SELECT ref_id FROM events WHERE event_id=?",
+            (source_id,),
+        ).fetchone()
+        if db_row and db_row["ref_id"]:
+            metadata["source_refs"] = [db_row["ref_id"]]
     return {
-        "source": row.get("source"),
-        "source_id": row.get("source_id"),
+        "source": source,
+        "source_id": source_id,
         "title": row.get("title"),
         "summary": row.get("summary"),
         "score": row.get("score"),
-        "metadata": row.get("metadata") or {},
+        "metadata": metadata or row.get("metadata") or {},
     }
 
 
@@ -616,10 +895,11 @@ def render_comparison_markdown(results: List[Dict[str, Any]]) -> str:
 async def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--suite", choices=SUITES, default="longmemeval")
-    parser.add_argument("--baseline", choices=BASELINES + ["all"], default="evidence_gated_memory")
+    parser.add_argument("--baseline", choices=BASELINES + LEGACY_BASELINES + ["all"], default="evidence_gated_memory")
     parser.add_argument("--dataset", help="Path to a memory_eval JSONL/JSON dataset.")
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--beam-tokens", type=int, default=100_000)
+    parser.add_argument("--beam-cases", type=int, default=1)
     args = parser.parse_args()
 
     if args.baseline == "all":
@@ -632,6 +912,7 @@ async def main() -> None:
                 dataset=args.dataset,
                 limit=args.limit,
                 beam_tokens=args.beam_tokens,
+                beam_cases=args.beam_cases,
             )
             results.append(result)
             write_result_files(result, f"{args.suite}_{baseline}", args)
@@ -658,6 +939,7 @@ async def main() -> None:
         dataset=args.dataset,
         limit=args.limit,
         beam_tokens=args.beam_tokens,
+        beam_cases=args.beam_cases,
     )
     write_result_files(result, f"{args.suite}_{args.baseline}", args)
     print(json.dumps(result, ensure_ascii=False, indent=2))

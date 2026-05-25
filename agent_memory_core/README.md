@@ -19,6 +19,19 @@ Latest `evidence_gated_memory` smoke results:
 | LoCoMo10 | `locomo10.json` | 5 | 0.00 | 0.80 | 0.80 | 0.5671s | 0.00 |
 | BEAM-lite | synthetic 100K tokens | 1 | 1.00 | 1.00 | 1.00 | 0.0242s | 0.00 |
 
+LongMemEval-S `limit=100` partial baseline results already completed:
+
+| Baseline | Cases | Retrieval / Term Recall | Evidence Source Coverage | Input Tokens | Latency p50 | False Fact Rate |
+|---|---:|---:|---:|---:|---:|---:|
+| `no_memory` | 100 | 0.01 | 0.00 | 1,321 | 0.0000s | 0.00 |
+| `summary_memory` | 100 | 0.15 | 0.00 | 11,400 | 0.0000s | 0.00 |
+| `long_context_only` | 100 | 0.54 | 0.36 | 5,500,800 | 0.0007s | 0.00 |
+| `keyword_fts_memory` | 100 | 0.39 | 0.87 | 182,969 | 0.5088s | 0.00 |
+| `vector_rag_memory` | 100 | 0.38 | 0.67 | 184,067 | 0.7292s | 0.00 |
+
+The `evidence_gated_memory` row for `limit=100` is still pending; keep this as
+a partial comparison until that run completes.
+
 The main difference from a normal summary memory is quality gating:
 
 - no file-content claim without read/search/ref evidence

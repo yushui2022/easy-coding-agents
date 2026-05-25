@@ -4,6 +4,22 @@
 
 # Easy-Coding-Agent
 
+## Current Larger Benchmark Results
+
+Larger partial run already completed on LongMemEval-S `limit=100`:
+
+| Baseline | Cases | Retrieval / Term Recall | Evidence Source Coverage | Input Tokens | Latency p50 | False Fact Rate |
+|---|---:|---:|---:|---:|---:|---:|
+| `no_memory` | 100 | 0.01 | 0.00 | 1,321 | 0.0000s | 0.00 |
+| `summary_memory` | 100 | 0.15 | 0.00 | 11,400 | 0.0000s | 0.00 |
+| `long_context_only` | 100 | 0.54 | 0.36 | 5,500,800 | 0.0007s | 0.00 |
+| `keyword_fts_memory` | 100 | 0.39 | 0.87 | 182,969 | 0.5088s | 0.00 |
+| `vector_rag_memory` | 100 | 0.38 | 0.67 | 184,067 | 0.7292s | 0.00 |
+
+Status: LongMemEval-S `evidence_gated_memory` at `limit=100` has not completed
+yet. The comparable 100-case table above is partial until that row is available.
+The earlier `evidence_gated_memory` row is still only a 5-case smoke result.
+
 ## 项目状态：Agent + 记忆系统评测
 
 当前项目已经把记忆系统拆成可复用包 `agent_memory_core/`，并接入真实公开数据做 memory subsystem 评测。这里的结果是 **real-data smoke / evidence retrieval**，不是官方 LongMemEval 或 LoCoMo answer accuracy；官方分数还需要接 answer generation 和 judge。
@@ -23,7 +39,7 @@ python benchmark\memory_eval\download_datasets.py --dataset locomo10
 python benchmark\memory_eval\download_datasets.py --dataset longmemeval_s
 python benchmark\memory_eval\run.py --suite longmemeval --baseline evidence_gated_memory --dataset benchmark\memory_eval\datasets\longmemeval_s_cleaned.json --limit 5
 python benchmark\memory_eval\run.py --suite locomo_lite --baseline evidence_gated_memory --dataset benchmark\memory_eval\datasets\locomo10.json --limit 5
-python benchmark\memory_eval\run.py --suite beam_lite --baseline evidence_gated_memory --beam-tokens 100000
+python benchmark\memory_eval\run.py --suite beam_lite --baseline evidence_gated_memory --beam-tokens 100000 --beam-cases 50
 ```
 
 详细协议见 `docs/BENCHMARKS.md` 和 `benchmark/memory_eval/README.md`。

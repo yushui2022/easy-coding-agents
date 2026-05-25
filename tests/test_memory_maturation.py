@@ -111,6 +111,32 @@ def test_beam_lite_10k_runs_with_fast_retrieval():
     assert result["latency_p50"] <= 1.5
 
 
+def test_beam_lite_supports_multiple_cases():
+    result = run(
+        run_suite(
+            suite="beam_lite",
+            baseline="evidence_gated_memory",
+            beam_tokens=10_000,
+            beam_cases=3,
+        )
+    )
+    assert result["task_count"] == 3
+    assert result["retrieval_hit_rate"] == 1
+
+
+def test_memory_eval_additional_baselines_run():
+    fixture = "benchmark/memory_eval/fixtures/longmemeval_lite.jsonl"
+    vector = run(run_suite(suite="longmemeval", baseline="vector_rag_memory", dataset=fixture, limit=2))
+    long_context = run(run_suite(suite="longmemeval", baseline="long_context_only", dataset=fixture, limit=2))
+    keyword = run(run_suite(suite="longmemeval", baseline="keyword_fts_memory", dataset=fixture, limit=2))
+    assert vector["task_count"] == 2
+    assert long_context["task_count"] == 2
+    assert keyword["task_count"] == 2
+    assert vector["source_coverage"] > 0
+    assert long_context["source_coverage"] > 0
+    assert keyword["source_coverage"] > 0
+
+
 def test_baseline_comparison_markdown_renders():
     no_memory = run(run_suite(suite="longmemeval", baseline="no_memory", limit=2))
     evidence = run(run_suite(suite="longmemeval", baseline="evidence_gated_memory", limit=2))

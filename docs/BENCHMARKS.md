@@ -26,7 +26,7 @@ Run the included fixtures:
 ```powershell
 python benchmark\memory_eval\run.py --suite longmemeval --baseline evidence_gated_memory --dataset benchmark\memory_eval\fixtures\longmemeval_lite.jsonl --limit 20
 python benchmark\memory_eval\run.py --suite locomo_lite --baseline evidence_gated_memory --dataset benchmark\memory_eval\fixtures\locomo_lite.jsonl --limit 20
-python benchmark\memory_eval\run.py --suite beam_lite --baseline evidence_gated_memory --beam-tokens 100000
+python benchmark\memory_eval\run.py --suite beam_lite --baseline evidence_gated_memory --beam-tokens 100000 --beam-cases 50
 python benchmark\memory_eval\run.py --suite longmemeval --baseline all --dataset benchmark\memory_eval\fixtures\longmemeval_lite.jsonl --limit 20
 ```
 
@@ -53,7 +53,7 @@ Real-data smoke tests:
 ```powershell
 python benchmark\memory_eval\run.py --suite locomo_lite --baseline evidence_gated_memory --dataset benchmark\memory_eval\datasets\locomo10.json --limit 5
 python benchmark\memory_eval\run.py --suite longmemeval --baseline evidence_gated_memory --dataset benchmark\memory_eval\datasets\longmemeval_s_cleaned.json --limit 5
-python benchmark\memory_eval\run.py --suite beam_lite --baseline evidence_gated_memory --beam-tokens 100000
+python benchmark\memory_eval\run.py --suite beam_lite --baseline evidence_gated_memory --beam-tokens 100000 --beam-cases 50
 ```
 
 These runs verify adapter compatibility and evidence retrieval. They are not
@@ -68,6 +68,19 @@ Latest real-data smoke results for `evidence_gated_memory`:
 | LoCoMo10 | `locomo10.json` | 5 | 0.00 | 0.80 | 0.80 | 0.5671s | 0.00 |
 | BEAM-lite | synthetic 100K tokens | 1 | 1.00 | 1.00 | 1.00 | 0.0242s | 0.00 |
 
+Larger partial run already completed on LongMemEval-S `limit=100`:
+
+| Baseline | Cases | Retrieval / Term Recall | Evidence Source Coverage | Input Tokens | Latency p50 | False Fact Rate |
+|---|---:|---:|---:|---:|---:|---:|
+| `no_memory` | 100 | 0.01 | 0.00 | 1,321 | 0.0000s | 0.00 |
+| `summary_memory` | 100 | 0.15 | 0.00 | 11,400 | 0.0000s | 0.00 |
+| `long_context_only` | 100 | 0.54 | 0.36 | 5,500,800 | 0.0007s | 0.00 |
+| `keyword_fts_memory` | 100 | 0.39 | 0.87 | 182,969 | 0.5088s | 0.00 |
+| `vector_rag_memory` | 100 | 0.38 | 0.67 | 184,067 | 0.7292s | 0.00 |
+
+Status note: LongMemEval-S `evidence_gated_memory` at `limit=100` has not
+completed yet. Treat the table above as a partial baseline comparison.
+
 Publishing guidance:
 
 - These numbers are valid as reproducible smoke results for the memory
@@ -81,9 +94,15 @@ Baselines:
 
 - `no_memory`
 - `summary_memory`
+- `long_context_only`
+- `keyword_fts_memory`
+- `vector_rag_memory`
+- `evidence_gated_memory`
+
+Legacy aliases still accepted by the runner:
+
 - `rag_fts_memory`
 - `entity_temporal_memory`
-- `evidence_gated_memory`
 
 Metrics:
 
