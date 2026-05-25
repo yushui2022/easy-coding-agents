@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Easy-Coding-Agent icon</title>
+  <desc id="desc">A compact vector icon for Easy-Coding-Agent with code brackets, a check mark, and an agent core.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="0.58" stop-color="#1d4ed8"/>
+      <stop offset="1" stop-color="#16a34a"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#22c55e"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#020617" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="url(#bg)"/>
+  <path d="M28 47 L16 64 L28 81" fill="none" stroke="#e2e8f0" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M100 47 L112 64 L100 81" fill="none" stroke="#e2e8f0" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <g filter="url(#shadow)">
+    <circle cx="64" cy="55" r="22" fill="#f8fafc"/>
+    <circle cx="55" cy="51" r="4" fill="#0f172a"/>
+    <circle cx="73" cy="51" r="4" fill="#0f172a"/>
+    <path d="M55 63 C60 68 68 68 73 63" fill="none" stroke="#0f172a" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <path d="M42 87 L56 101 L88 70" fill="none" stroke="url(#mark)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M44 28 H84" stroke="#facc15" stroke-width="7" stroke-linecap="round"/>
+</svg>

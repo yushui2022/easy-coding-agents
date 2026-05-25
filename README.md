@@ -1,4 +1,6 @@
-![Easy-Coding-Agent](docs/assets/easy-coding-agent.svg)
+<p align="center">
+  <img src="docs/assets/easy-coding-agent-icon.svg" alt="Easy-Coding-Agent" width="96" height="96">
+</p>
 
 # Easy-Coding-Agent
 
