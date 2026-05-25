@@ -104,7 +104,8 @@ async def run_case(
     expected_entities = [str(item) for item in case.get("expected_entities") or []]
     should_abstain = bool(case.get("should_abstain"))
     answer_hit = term_coverage(prompt, expected_answer_terms)
-    evidence_hit = term_coverage(prompt, expected_evidence_terms)
+    evidence_prompt_hit = term_coverage(prompt, expected_evidence_terms)
+    evidence_source_hit = term_coverage(render_retrieved_text(retrieved), expected_evidence_terms)
     entity_hit = term_coverage(prompt, expected_entities)
     has_false_fact = should_abstain and any_term(prompt, expected_answer_terms)
 
@@ -112,8 +113,9 @@ async def run_case(
         "case_id": case.get("case_id") or f"case_{index}",
         "retrieval_hit": 0 if has_false_fact else answer_hit,
         "term_recall": 0 if has_false_fact else answer_hit,
-        "evidence_precision": evidence_hit,
-        "expected_evidence_term_coverage": evidence_hit,
+        "evidence_precision": evidence_source_hit,
+        "expected_evidence_term_coverage": evidence_prompt_hit,
+        "evidence_source_term_coverage": evidence_source_hit,
         "temporal_accuracy": answer_hit if case.get("temporal_mode") != "none" else None,
         "entity_link_hit": entity_hit,
         "abstention_accuracy": int(not has_false_fact) if should_abstain else 1,
@@ -234,12 +236,14 @@ def single_beam_result(
     retrieved: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     hit = term_coverage(prompt, expected_terms)
+    evidence_source_hit = term_coverage(render_retrieved_text(retrieved), expected_terms)
     return {
         "case_id": "beam_lite_synthetic",
         "retrieval_hit": hit,
         "term_recall": hit,
-        "evidence_precision": hit,
+        "evidence_precision": evidence_source_hit,
         "expected_evidence_term_coverage": hit,
+        "evidence_source_term_coverage": evidence_source_hit,
         "temporal_accuracy": hit,
         "entity_link_hit": 1,
         "abstention_accuracy": 1,
@@ -266,6 +270,9 @@ def summarize_results(suite: str, baseline: str, case_results: List[Dict[str, An
         "retrieval_hit_rate": rounded_mean(item["retrieval_hit"] for item in case_results),
         "expected_evidence_term_coverage": rounded_mean(
             item["expected_evidence_term_coverage"] for item in case_results
+        ),
+        "evidence_source_term_coverage": rounded_mean(
+            item["evidence_source_term_coverage"] for item in case_results
         ),
         "evidence_precision": rounded_mean(item["evidence_precision"] for item in case_results),
         "temporal_accuracy": rounded_mean(temporal_values) if temporal_values else 1.0,
@@ -297,6 +304,22 @@ def render_rows_prompt(title: str, rows: List[Dict[str, Any]]) -> str:
         summary = row.get("summary") or row.get("content") or ""
         lines.append(f"- [{source}:{source_id}] {summary}")
     return "\n".join(lines)
+
+
+def render_retrieved_text(rows: List[Dict[str, Any]]) -> str:
+    parts = []
+    for row in rows:
+        metadata = row.get("metadata") or {}
+        parts.extend(
+            [
+                str(row.get("source") or ""),
+                str(row.get("source_id") or ""),
+                str(row.get("title") or ""),
+                str(row.get("summary") or row.get("content") or ""),
+                " ".join(str(item) for item in metadata.get("source_refs") or []),
+            ]
+        )
+    return "\n".join(parts)
 
 
 def normalize_retrieved_row(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -441,6 +464,7 @@ def write_artifacts(result: Dict[str, Any], name: str, args: argparse.Namespace)
                     "memory_only": True,
                     "term_recall": item.get("term_recall"),
                     "retrieval_hit": item.get("retrieval_hit"),
+                    "evidence_source_term_coverage": item.get("evidence_source_term_coverage"),
                     "source_ref_coverage": item.get("source_ref_coverage"),
                     "input_tokens": item.get("input_tokens"),
                 },
@@ -497,14 +521,80 @@ def render_failures(failures: List[Dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def render_comparison_markdown(results: List[Dict[str, Any]]) -> str:
+    lines = ["# Memory Eval Baseline Comparison", ""]
+    if not results:
+        lines.append("No results.")
+        lines.append("")
+        return "\n".join(lines)
+    suite = results[0].get("suite", "unknown")
+    lines.append(f"Suite: `{suite}`")
+    lines.append("")
+    lines.append(
+        "| baseline | fixture_hit | term_recall | evidence_source | temporal | abstention | false_fact | tokens | latency_p50 |"
+    )
+    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+    for item in results:
+        lines.append(
+            "| {baseline} | {fixture:.3f} | {term:.3f} | {evidence:.3f} | {temporal:.3f} | "
+            "{abstention:.3f} | {false_fact:.3f} | {tokens} | {latency:.4f}s |".format(
+                baseline=item.get("baseline"),
+                fixture=float(item.get("fixture_retrieval_hit_rate") or 0.0),
+                term=float(item.get("term_recall_rate") or 0.0),
+                evidence=float(item.get("evidence_source_term_coverage") or 0.0),
+                temporal=float(item.get("temporal_accuracy") or 0.0),
+                abstention=float(item.get("abstention_accuracy") or 0.0),
+                false_fact=float(item.get("false_fact_rate") or 0.0),
+                tokens=item.get("input_tokens"),
+                latency=float(item.get("latency_p50") or 0.0),
+            )
+        )
+    lines.append("")
+    lines.append(
+        "Lite fixture metrics are term-level regression checks. They are not official LongMemEval or LoCoMo scores."
+    )
+    lines.append("")
+    return "\n".join(lines)
+
+
 async def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--suite", choices=SUITES, default="longmemeval")
-    parser.add_argument("--baseline", choices=BASELINES, default="evidence_gated_memory")
+    parser.add_argument("--baseline", choices=BASELINES + ["all"], default="evidence_gated_memory")
     parser.add_argument("--dataset", help="Path to a memory_eval JSONL/JSON dataset.")
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--beam-tokens", type=int, default=100_000)
     args = parser.parse_args()
+
+    if args.baseline == "all":
+        RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+        results = []
+        for baseline in BASELINES:
+            result = await run_suite(
+                suite=args.suite,
+                baseline=baseline,
+                dataset=args.dataset,
+                limit=args.limit,
+                beam_tokens=args.beam_tokens,
+            )
+            results.append(result)
+            write_result_files(result, f"{args.suite}_{baseline}", args)
+        comparison = {
+            "suite": args.suite,
+            "baseline": "all",
+            "results": [{key: value for key, value in item.items() if key != "cases"} for item in results],
+        }
+        name = f"{args.suite}_all"
+        (RESULTS_DIR / f"{name}_comparison.json").write_text(
+            json.dumps(comparison, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        (RESULTS_DIR / f"{name}_comparison.md").write_text(
+            render_comparison_markdown(results),
+            encoding="utf-8",
+        )
+        print(json.dumps(comparison, ensure_ascii=False, indent=2))
+        return
 
     result = await run_suite(
         suite=args.suite,
@@ -513,14 +603,17 @@ async def main() -> None:
         limit=args.limit,
         beam_tokens=args.beam_tokens,
     )
+    write_result_files(result, f"{args.suite}_{args.baseline}", args)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+def write_result_files(result: Dict[str, Any], name: str, args: argparse.Namespace) -> None:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    name = f"{args.suite}_{args.baseline}"
     json_path = RESULTS_DIR / f"{name}_result.json"
     md_path = RESULTS_DIR / f"{name}_result.md"
     json_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     md_path.write_text(render_markdown(result), encoding="utf-8")
     write_artifacts(result, name, args)
-    print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

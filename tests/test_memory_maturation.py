@@ -4,7 +4,7 @@ from pathlib import Path
 from agent_memory_core import CodingMemory
 from agent_memory_core.entities import extract_entities
 from benchmark.memory_eval.adapters import normalize_record
-from benchmark.memory_eval.run import load_cases, run_suite
+from benchmark.memory_eval.run import load_cases, render_comparison_markdown, run_suite
 
 
 def run(coro):
@@ -96,6 +96,7 @@ def test_memory_eval_fixtures_load_and_longmemeval_thresholds():
     )
     assert result["retrieval_hit_rate"] >= 0.75
     assert result["fixture_retrieval_hit_rate"] >= 0.75
+    assert result["evidence_source_term_coverage"] >= 0.75
     assert all(case["context_wipe"] for case in result["cases"])
     assert result["temporal_accuracy"] >= 0.70
     assert result["abstention_accuracy"] >= 0.80
@@ -106,6 +107,15 @@ def test_beam_lite_10k_runs_with_fast_retrieval():
     result = run(run_suite(suite="beam_lite", baseline="evidence_gated_memory", beam_tokens=10_000))
     assert result["retrieval_hit_rate"] == 1
     assert result["latency_p50"] <= 1.5
+
+
+def test_baseline_comparison_markdown_renders():
+    no_memory = run(run_suite(suite="longmemeval", baseline="no_memory", limit=2))
+    evidence = run(run_suite(suite="longmemeval", baseline="evidence_gated_memory", limit=2))
+    rendered = render_comparison_markdown([no_memory, evidence])
+    assert "| baseline |" in rendered
+    assert "no_memory" in rendered
+    assert "evidence_gated_memory" in rendered
 
 
 def test_official_longmemeval_like_record_is_normalized():

@@ -27,6 +27,7 @@ Run the included fixtures:
 python benchmark\memory_eval\run.py --suite longmemeval --baseline evidence_gated_memory --dataset benchmark\memory_eval\fixtures\longmemeval_lite.jsonl --limit 20
 python benchmark\memory_eval\run.py --suite locomo_lite --baseline evidence_gated_memory --dataset benchmark\memory_eval\fixtures\locomo_lite.jsonl --limit 20
 python benchmark\memory_eval\run.py --suite beam_lite --baseline evidence_gated_memory --beam-tokens 100000
+python benchmark\memory_eval\run.py --suite longmemeval --baseline all --dataset benchmark\memory_eval\fixtures\longmemeval_lite.jsonl --limit 20
 ```
 
 For official/local dataset files, pass `--dataset path\to\data.jsonl`. The
@@ -47,6 +48,7 @@ Metrics:
 - `fixture_retrieval_hit_rate`
 - `term_recall_rate`
 - `expected_evidence_term_coverage`
+- `evidence_source_term_coverage`
 - `temporal_accuracy`
 - `entity_link_hit_rate`
 - `abstention_accuracy`

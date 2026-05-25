@@ -62,6 +62,7 @@ For local lite fixtures:
 - `fixture_retrieval_hit_rate`
 - `term_recall_rate`
 - `expected_evidence_term_coverage`
+- `evidence_source_term_coverage`
 - `source_ref_coverage`
 - `temporal_accuracy`
 - `abstention_accuracy`
@@ -101,6 +102,14 @@ benchmark/memory_eval/results/<suite>_<baseline>/
 `predictions.jsonl` is memory-only in the current runner; `hypothesis` is left
 empty until answer generation is added. `retrieval_logs.jsonl` contains the
 selected memory rows and signal breakdowns.
+
+Use `--baseline all` to generate a comparison table across all built-in
+baselines. The comparison is written to:
+
+```text
+benchmark/memory_eval/results/<suite>_all_comparison.md
+benchmark/memory_eval/results/<suite>_all_comparison.json
+```
 
 ## Claiming Results
 

@@ -17,6 +17,7 @@ It supports three local suites:
 python benchmark\memory_eval\run.py --suite longmemeval --baseline evidence_gated_memory --dataset benchmark\memory_eval\fixtures\longmemeval_lite.jsonl --limit 20
 python benchmark\memory_eval\run.py --suite locomo_lite --baseline evidence_gated_memory --dataset benchmark\memory_eval\fixtures\locomo_lite.jsonl --limit 20
 python benchmark\memory_eval\run.py --suite beam_lite --baseline evidence_gated_memory --beam-tokens 100000
+python benchmark\memory_eval\run.py --suite longmemeval --baseline all --dataset benchmark\memory_eval\fixtures\longmemeval_lite.jsonl --limit 20
 ```
 
 The loader also normalizes common official-style schemas:
@@ -42,6 +43,7 @@ Baselines:
 - `fixture_retrieval_hit_rate`: expected answer terms are present in the built memory context.
 - `term_recall_rate`: term-level recall for lite regression fixtures.
 - `expected_evidence_term_coverage`: expected evidence terms are present.
+- `evidence_source_term_coverage`: expected evidence terms are present in retrieved source summaries.
 - `temporal_accuracy`: temporal cases return the expected current or historical fact.
 - `entity_link_hit_rate`: expected entity terms are preserved in context.
 - `abstention_accuracy`: unknown facts are not hallucinated.
