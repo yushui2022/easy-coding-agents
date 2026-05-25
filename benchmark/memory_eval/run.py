@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from agent_memory_core import CodingMemory
+from benchmark.memory_eval.adapters import normalize_record
 
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
@@ -53,14 +54,22 @@ async def run_case(
     index: int,
 ) -> Dict[str, Any]:
     memory: Optional[CodingMemory] = None
+    workspace = f"{workspace_name}/case_{index}"
     if baseline in {"rag_fts_memory", "entity_temporal_memory", "evidence_gated_memory"}:
         memory = CodingMemory(
             project_root=str(ROOT),
-            workspace=f"{workspace_name}/case_{index}",
+            workspace=workspace,
             offload_threshold_chars=500,
             recent_dialogue_limit=6,
         )
         await ingest_case(memory, case)
+        memory.storage.close()
+        memory = CodingMemory(
+            project_root=str(ROOT),
+            workspace=workspace,
+            offload_threshold_chars=500,
+            recent_dialogue_limit=0,
+        )
 
     query = str(case.get("query") or "")
     started = time.perf_counter()
@@ -102,15 +111,20 @@ async def run_case(
     return {
         "case_id": case.get("case_id") or f"case_{index}",
         "retrieval_hit": 0 if has_false_fact else answer_hit,
+        "term_recall": 0 if has_false_fact else answer_hit,
         "evidence_precision": evidence_hit,
+        "expected_evidence_term_coverage": evidence_hit,
         "temporal_accuracy": answer_hit if case.get("temporal_mode") != "none" else None,
         "entity_link_hit": entity_hit,
         "abstention_accuracy": int(not has_false_fact) if should_abstain else 1,
         "source_coverage": source_coverage(retrieved, should_abstain=should_abstain),
+        "source_ref_coverage": source_coverage(retrieved, should_abstain=should_abstain),
         "input_tokens": estimate_tokens(prompt),
         "latency": latency,
         "false_fact": int(has_false_fact),
         "retrieved_count": len(retrieved),
+        "context_wipe": baseline in {"rag_fts_memory", "entity_temporal_memory", "evidence_gated_memory"},
+        "retrieved_results": compact_retrieved(retrieved),
     }
 
 
@@ -172,6 +186,13 @@ async def run_beam_lite(baseline: str, beam_tokens: int = 100_000) -> Dict[str, 
             {"path": f"beam/chunk_{index:05d}.md"},
             body,
         )
+    memory.storage.close()
+    memory = CodingMemory(
+        project_root=str(ROOT),
+        workspace=workspace_name,
+        offload_threshold_chars=700,
+        recent_dialogue_limit=0,
+    )
 
     prompts = []
     latencies = []
@@ -216,15 +237,20 @@ def single_beam_result(
     return {
         "case_id": "beam_lite_synthetic",
         "retrieval_hit": hit,
+        "term_recall": hit,
         "evidence_precision": hit,
+        "expected_evidence_term_coverage": hit,
         "temporal_accuracy": hit,
         "entity_link_hit": 1,
         "abstention_accuracy": 1,
         "source_coverage": source_coverage(retrieved),
+        "source_ref_coverage": source_coverage(retrieved),
         "input_tokens": estimate_tokens(prompt),
         "latency": latency,
         "false_fact": 0 if hit else 1,
         "retrieved_count": len(retrieved),
+        "context_wipe": True,
+        "retrieved_results": compact_retrieved(retrieved),
     }
 
 
@@ -235,11 +261,17 @@ def summarize_results(suite: str, baseline: str, case_results: List[Dict[str, An
         "suite": suite,
         "baseline": baseline,
         "task_count": len(case_results),
+        "fixture_retrieval_hit_rate": rounded_mean(item["retrieval_hit"] for item in case_results),
+        "term_recall_rate": rounded_mean(item["term_recall"] for item in case_results),
         "retrieval_hit_rate": rounded_mean(item["retrieval_hit"] for item in case_results),
+        "expected_evidence_term_coverage": rounded_mean(
+            item["expected_evidence_term_coverage"] for item in case_results
+        ),
         "evidence_precision": rounded_mean(item["evidence_precision"] for item in case_results),
         "temporal_accuracy": rounded_mean(temporal_values) if temporal_values else 1.0,
         "entity_link_hit_rate": rounded_mean(item["entity_link_hit"] for item in case_results),
         "abstention_accuracy": rounded_mean(item["abstention_accuracy"] for item in case_results),
+        "source_ref_coverage": rounded_mean(item["source_ref_coverage"] for item in case_results),
         "source_coverage": rounded_mean(item["source_coverage"] for item in case_results),
         "input_tokens": int(sum(int(item["input_tokens"]) for item in case_results)),
         "latency_p50": round(median(latencies), 4) if latencies else 0.0,
@@ -276,6 +308,24 @@ def normalize_retrieved_row(row: Dict[str, Any]) -> Dict[str, Any]:
         "score": row.get("score"),
         "metadata": row.get("metadata") or {},
     }
+
+
+def compact_retrieved(rows: List[Dict[str, Any]], limit: int = 8) -> List[Dict[str, Any]]:
+    compact = []
+    for row in rows[:limit]:
+        metadata = row.get("metadata") or {}
+        compact.append(
+            {
+                "source": row.get("source"),
+                "source_id": row.get("source_id"),
+                "title": row.get("title"),
+                "summary": str(row.get("summary") or "")[:500],
+                "score": row.get("score"),
+                "signals": metadata.get("signals") or {},
+                "source_refs": metadata.get("source_refs") or [],
+            }
+        )
+    return compact
 
 
 def last_selected_results(memory: CodingMemory) -> List[Dict[str, Any]]:
@@ -336,7 +386,7 @@ def load_cases(path: str, limit: int = 20) -> List[Dict[str, Any]]:
     else:
         loaded = json.loads(text)
         records = loaded if isinstance(loaded, list) else loaded.get("cases", [])
-    return records[:limit]
+    return [normalize_record(record, suite=dataset_path.stem, index=index) for index, record in enumerate(records[:limit])]
 
 
 def default_fixture(suite: str) -> str:
@@ -370,6 +420,83 @@ def render_markdown(result: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def write_artifacts(result: Dict[str, Any], name: str, args: argparse.Namespace) -> None:
+    artifact_dir = RESULTS_DIR / name
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    cases = result.get("cases") or []
+    (artifact_dir / "metrics.json").write_text(
+        json.dumps({key: value for key, value in result.items() if key != "cases"}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    (artifact_dir / "cases.jsonl").write_text(
+        "\n".join(json.dumps(item, ensure_ascii=False) for item in cases) + ("\n" if cases else ""),
+        encoding="utf-8",
+    )
+    (artifact_dir / "predictions.jsonl").write_text(
+        "\n".join(
+            json.dumps(
+                {
+                    "case_id": item["case_id"],
+                    "hypothesis": "",
+                    "memory_only": True,
+                    "term_recall": item.get("term_recall"),
+                    "retrieval_hit": item.get("retrieval_hit"),
+                    "source_ref_coverage": item.get("source_ref_coverage"),
+                    "input_tokens": item.get("input_tokens"),
+                },
+                ensure_ascii=False,
+            )
+            for item in cases
+        )
+        + ("\n" if cases else ""),
+        encoding="utf-8",
+    )
+    (artifact_dir / "retrieval_logs.jsonl").write_text(
+        "\n".join(
+            json.dumps(
+                {
+                    "case_id": item["case_id"],
+                    "retrieved_count": item.get("retrieved_count"),
+                    "retrieved_results": item.get("retrieved_results") or [],
+                },
+                ensure_ascii=False,
+            )
+            for item in cases
+        )
+        + ("\n" if cases else ""),
+        encoding="utf-8",
+    )
+    failures = [
+        item
+        for item in cases
+        if not item.get("retrieval_hit")
+        or not item.get("evidence_precision")
+        or item.get("false_fact")
+        or item.get("abstention_accuracy") == 0
+    ]
+    (artifact_dir / "failures.md").write_text(render_failures(failures), encoding="utf-8")
+    (artifact_dir / "run_config.json").write_text(
+        json.dumps(vars(args), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def render_failures(failures: List[Dict[str, Any]]) -> str:
+    lines = ["# Memory Eval Failures", ""]
+    if not failures:
+        lines.append("No failures under the current term-level regression checks.")
+        lines.append("")
+        return "\n".join(lines)
+    for item in failures:
+        lines.append(f"## {item['case_id']}")
+        lines.append(f"- retrieval_hit: {item.get('retrieval_hit')}")
+        lines.append(f"- evidence_precision: {item.get('evidence_precision')}")
+        lines.append(f"- abstention_accuracy: {item.get('abstention_accuracy')}")
+        lines.append(f"- false_fact: {item.get('false_fact')}")
+        lines.append("")
+    return "\n".join(lines)
+
+
 async def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--suite", choices=SUITES, default="longmemeval")
@@ -392,6 +519,7 @@ async def main() -> None:
     md_path = RESULTS_DIR / f"{name}_result.md"
     json_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     md_path.write_text(render_markdown(result), encoding="utf-8")
+    write_artifacts(result, name, args)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

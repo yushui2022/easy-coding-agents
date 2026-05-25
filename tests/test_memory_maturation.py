@@ -3,6 +3,7 @@ from pathlib import Path
 
 from agent_memory_core import CodingMemory
 from agent_memory_core.entities import extract_entities
+from benchmark.memory_eval.adapters import normalize_record
 from benchmark.memory_eval.run import load_cases, run_suite
 
 
@@ -94,6 +95,8 @@ def test_memory_eval_fixtures_load_and_longmemeval_thresholds():
         )
     )
     assert result["retrieval_hit_rate"] >= 0.75
+    assert result["fixture_retrieval_hit_rate"] >= 0.75
+    assert all(case["context_wipe"] for case in result["cases"])
     assert result["temporal_accuracy"] >= 0.70
     assert result["abstention_accuracy"] >= 0.80
     assert result["false_fact_rate"] <= 0.10
@@ -103,3 +106,34 @@ def test_beam_lite_10k_runs_with_fast_retrieval():
     result = run(run_suite(suite="beam_lite", baseline="evidence_gated_memory", beam_tokens=10_000))
     assert result["retrieval_hit_rate"] == 1
     assert result["latency_p50"] <= 1.5
+
+
+def test_official_longmemeval_like_record_is_normalized():
+    case = normalize_record(
+        {
+            "question_id": "q1",
+            "question_type": "knowledge-update",
+            "question": "What is the current database?",
+            "answer": "SQLite",
+            "answer_session_ids": ["s2"],
+            "haystack_sessions": [
+                {
+                    "session_id": "s1",
+                    "date": "2026-01-01",
+                    "messages": [{"role": "user", "content": "The database was Redis."}],
+                },
+                {
+                    "session_id": "s2",
+                    "date": "2026-01-02",
+                    "messages": [{"role": "user", "content": "The current database is SQLite."}],
+                },
+            ],
+        },
+        suite="longmemeval",
+    )
+    assert case["case_id"] == "q1"
+    assert case["query"] == "What is the current database?"
+    assert case["expected_answer_terms"] == ["SQLite"]
+    assert case["expected_evidence_terms"] == ["s2"]
+    assert case["temporal_mode"] == "latest"
+    assert any("session:s2" in session["content"] for session in case["sessions"])

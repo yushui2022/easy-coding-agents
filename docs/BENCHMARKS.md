@@ -17,6 +17,10 @@ subsystem. It does not evaluate generated patches. It checks whether the memory
 module can recover facts, evidence, entities, temporal updates, and abstention
 behavior with controlled local fixtures.
 
+Memory baselines simulate context wipe: sessions are ingested, the memory object
+is closed, the same SQLite database is reopened, and query-time context is built
+with `recent_dialogue_limit=0`.
+
 Run the included fixtures:
 
 ```powershell
@@ -24,6 +28,11 @@ python benchmark\memory_eval\run.py --suite longmemeval --baseline evidence_gate
 python benchmark\memory_eval\run.py --suite locomo_lite --baseline evidence_gated_memory --dataset benchmark\memory_eval\fixtures\locomo_lite.jsonl --limit 20
 python benchmark\memory_eval\run.py --suite beam_lite --baseline evidence_gated_memory --beam-tokens 100000
 ```
+
+For official/local dataset files, pass `--dataset path\to\data.jsonl`. The
+loader accepts the internal case schema and common LongMemEval-like records with
+`haystack_sessions` / `answer_session_ids`, plus LoCoMo-like `conversation` or
+`dialogue` records. It does not download public datasets automatically.
 
 Baselines:
 
@@ -35,12 +44,13 @@ Baselines:
 
 Metrics:
 
-- `retrieval_hit_rate`
-- `evidence_precision`
+- `fixture_retrieval_hit_rate`
+- `term_recall_rate`
+- `expected_evidence_term_coverage`
 - `temporal_accuracy`
 - `entity_link_hit_rate`
 - `abstention_accuracy`
-- `source_coverage`
+- `source_ref_coverage`
 - `input_tokens`
 - `latency_p50`
 - `false_fact_rate`
@@ -52,6 +62,20 @@ Acceptance targets for local fixtures:
 - `abstention_accuracy >= 0.80`
 - `false_fact_rate <= 0.10`
 - `BEAM-lite 100K latency_p50 <= 1.5s`
+
+Raw artifacts are written to:
+
+```text
+benchmark/memory_eval/results/<suite>_<baseline>/
+  metrics.json
+  cases.jsonl
+  predictions.jsonl
+  retrieval_logs.jsonl
+  failures.md
+  run_config.json
+```
+
+See `docs/EVAL_PROTOCOL.md` before publishing any benchmark claim.
 
 ## SWE-bench Memory Probe
 
