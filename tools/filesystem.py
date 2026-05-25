@@ -9,6 +9,19 @@ from rich.panel import Panel
 from rich.text import Text
 from rich import box
 
+
+def _resolve_read_path(path: str) -> str:
+    if not os.path.isabs(path):
+        return os.path.join(os.getcwd(), path)
+    if os.path.exists(path):
+        return path
+    basename = os.path.basename(path)
+    if basename:
+        cwd_candidate = os.path.join(os.getcwd(), basename)
+        if os.path.exists(cwd_candidate):
+            return cwd_candidate
+    return path
+
 def _render_diff(path: str, old_content: str, new_content: str):
     old_lines = old_content.splitlines()
     new_lines = new_content.splitlines()
@@ -103,8 +116,7 @@ def _render_diff(path: str, old_content: str, new_content: str):
     }
 )
 async def read_file(path: str, offset: int = 0, limit: int = 200) -> str:
-    if not os.path.isabs(path):
-        path = os.path.join(os.getcwd(), path)
+    path = _resolve_read_path(path)
     if not os.path.exists(path):
         return f"Error: File {path} not found."
     

@@ -1,0 +1,106 @@
+# Benchmarks
+
+## Local Regression Benchmark
+
+Fast sanity check:
+
+```powershell
+python benchmark\coding_memory\run.py --suite synthetic --baseline evidence_gated_memory
+```
+
+This validates the memory package without Docker or remote datasets.
+
+## Memory Eval Benchmarks
+
+`benchmark/memory_eval` is the current main proof layer for the memory
+subsystem. It does not evaluate generated patches. It checks whether the memory
+module can recover facts, evidence, entities, temporal updates, and abstention
+behavior with controlled local fixtures.
+
+Run the included fixtures:
+
+```powershell
+python benchmark\memory_eval\run.py --suite longmemeval --baseline evidence_gated_memory --dataset benchmark\memory_eval\fixtures\longmemeval_lite.jsonl --limit 20
+python benchmark\memory_eval\run.py --suite locomo_lite --baseline evidence_gated_memory --dataset benchmark\memory_eval\fixtures\locomo_lite.jsonl --limit 20
+python benchmark\memory_eval\run.py --suite beam_lite --baseline evidence_gated_memory --beam-tokens 100000
+```
+
+Baselines:
+
+- `no_memory`
+- `summary_memory`
+- `rag_fts_memory`
+- `entity_temporal_memory`
+- `evidence_gated_memory`
+
+Metrics:
+
+- `retrieval_hit_rate`
+- `evidence_precision`
+- `temporal_accuracy`
+- `entity_link_hit_rate`
+- `abstention_accuracy`
+- `source_coverage`
+- `input_tokens`
+- `latency_p50`
+- `false_fact_rate`
+
+Acceptance targets for local fixtures:
+
+- `LongMemEval-lite retrieval_hit_rate >= 0.75`
+- `temporal_accuracy >= 0.70`
+- `abstention_accuracy >= 0.80`
+- `false_fact_rate <= 0.10`
+- `BEAM-lite 100K latency_p50 <= 1.5s`
+
+## SWE-bench Memory Probe
+
+SWE-bench is a mature benchmark built around real GitHub issues. The official
+evaluation checks whether a generated patch passes repository tests inside a
+Docker harness. This project now supports SWE-bench-format records for memory
+evaluation before patch generation.
+
+Expected fields:
+
+- `instance_id`
+- `repo`
+- `base_commit`
+- `problem_statement`
+- `patch`
+- `test_patch`
+- `FAIL_TO_PASS`
+- `PASS_TO_PASS`
+
+Run the included tiny fixture:
+
+```powershell
+python benchmark\coding_memory\run.py --suite swe_bench_memory --baseline evidence_gated_memory --dataset benchmark\coding_memory\fixtures\swe_bench_mini.jsonl
+python benchmark\coding_memory\run.py --suite swe_bench_memory --baseline summary_memory --dataset benchmark\coding_memory\fixtures\swe_bench_mini.jsonl
+```
+
+Outputs:
+
+```text
+benchmark/coding_memory/results/
+```
+
+For official SWE-bench harness integration, fill `model_patch` in:
+
+```text
+benchmark/coding_memory/results/swe_bench_predictions.jsonl
+```
+
+Then pass that predictions file to the official SWE-bench evaluation harness.
+
+## What This Measures
+
+The SWE-bench memory probe measures:
+
+- whether failing tests and issue context survive context construction
+- whether the task state can recover after failure logs
+- whether false-DONE is blocked without test evidence
+- whether state transitions like `DEBUGGING` require evidence refs
+- prompt token cost of the memory context
+
+It does not claim patch correctness by itself. Patch correctness must be
+measured by the official SWE-bench Docker harness.

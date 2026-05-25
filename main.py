@@ -259,7 +259,7 @@ async def interactive_loop(engine: AgentEngine, session: PromptSession):
                 pass
             except KeyboardInterrupt:
                 # User pressed Ctrl+C during execution
-                console.print("\n[bold yellow]⚠️ 检测到中断信号 (Ctrl+C)...[/bold yellow]")
+                console.print("\n[bold yellow][WARN] 检测到中断信号 (Ctrl+C)...[/bold yellow]")
                 engine.interrupt()
                 
                 # Cancel the join task if it's still waiting

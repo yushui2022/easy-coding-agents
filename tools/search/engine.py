@@ -65,7 +65,8 @@ class RipgrepSearcher:
             else:
                 return f"rg 执行错误: {result.stderr}"
         except Exception as e:
-            return f"运行 ripgrep 时发生异常: {str(e)}"
+            logger.warning(f"ripgrep failed, falling back to Python search: {e}")
+            return self._search_fallback(pattern, path, include)
 
     def _search_fallback(self, pattern: str, path: str, include: str = "**/*") -> str:
         """
