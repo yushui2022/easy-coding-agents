@@ -1,4 +1,30 @@
-=# Easy-Coding-Agent
+![Easy-Coding-Agent](docs/assets/easy-coding-agent.svg)
+
+# Easy-Coding-Agent
+
+## 项目状态：Agent + 记忆系统评测
+
+当前项目已经把记忆系统拆成可复用包 `agent_memory_core/`，并接入真实公开数据做 memory subsystem 评测。这里的结果是 **real-data smoke / evidence retrieval**，不是官方 LongMemEval 或 LoCoMo answer accuracy；官方分数还需要接 answer generation 和 judge。
+
+最新已提交结果来自 `evidence_gated_memory`：
+
+| Suite | Dataset | Limit | Retrieval / Term Recall | Evidence Source Coverage | Evidence Precision | Latency p50 | False Fact Rate |
+|---|---|---:|---:|---:|---:|---:|---:|
+| LongMemEval-S | `longmemeval_s_cleaned.json` | 5 | 0.40 | 1.00 | 1.00 | 0.9048s | 0.00 |
+| LoCoMo10 | `locomo10.json` | 5 | 0.00 | 0.80 | 0.80 | 0.5671s | 0.00 |
+| BEAM-lite | synthetic 100K tokens | 1 | 1.00 | 1.00 | 1.00 | 0.0242s | 0.00 |
+
+复现命令：
+
+```powershell
+python benchmark\memory_eval\download_datasets.py --dataset locomo10
+python benchmark\memory_eval\download_datasets.py --dataset longmemeval_s
+python benchmark\memory_eval\run.py --suite longmemeval --baseline evidence_gated_memory --dataset benchmark\memory_eval\datasets\longmemeval_s_cleaned.json --limit 5
+python benchmark\memory_eval\run.py --suite locomo_lite --baseline evidence_gated_memory --dataset benchmark\memory_eval\datasets\locomo10.json --limit 5
+python benchmark\memory_eval\run.py --suite beam_lite --baseline evidence_gated_memory --beam-tokens 100000
+```
+
+详细协议见 `docs/BENCHMARKS.md` 和 `benchmark/memory_eval/README.md`。
 
 一个基于 Python 的高性能、任务驱动型自主 AI 编程助手。架构设计深度对标 Claude Code，并针对 Windows 环境进行了极致优化。
 

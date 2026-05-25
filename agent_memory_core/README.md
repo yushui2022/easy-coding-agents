@@ -4,6 +4,21 @@ Evidence-Gated Coding Memory is a reusable memory module for coding agents.
 It combines TencentDB-Agent-Memory-style context offloading and task maps with
 OpenViking-style filesystem organization and SQLite/FTS retrieval.
 
+## Benchmark Status
+
+The current benchmark layer evaluates the memory subsystem after context wipe.
+It is a retrieval and evidence smoke test, not an official LongMemEval or
+LoCoMo answer-accuracy score yet. Official-style answer accuracy still requires
+an answer generator and judge.
+
+Latest `evidence_gated_memory` smoke results:
+
+| Suite | Dataset | Limit | Retrieval / Term Recall | Evidence Source Coverage | Evidence Precision | Latency p50 | False Fact Rate |
+|---|---|---:|---:|---:|---:|---:|---:|
+| LongMemEval-S | `longmemeval_s_cleaned.json` | 5 | 0.40 | 1.00 | 1.00 | 0.9048s | 0.00 |
+| LoCoMo10 | `locomo10.json` | 5 | 0.00 | 0.80 | 0.80 | 0.5671s | 0.00 |
+| BEAM-lite | synthetic 100K tokens | 1 | 1.00 | 1.00 | 1.00 | 0.0242s | 0.00 |
+
 The main difference from a normal summary memory is quality gating:
 
 - no file-content claim without read/search/ref evidence

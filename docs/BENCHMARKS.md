@@ -51,13 +51,31 @@ benchmark/memory_eval/datasets/
 Real-data smoke tests:
 
 ```powershell
-python benchmark\memory_eval\run.py --suite locomo_lite --baseline evidence_gated_memory --dataset benchmark\memory_eval\datasets\locomo10.json --limit 2
-python benchmark\memory_eval\run.py --suite longmemeval --baseline evidence_gated_memory --dataset benchmark\memory_eval\datasets\longmemeval_s_cleaned.json --limit 1
+python benchmark\memory_eval\run.py --suite locomo_lite --baseline evidence_gated_memory --dataset benchmark\memory_eval\datasets\locomo10.json --limit 5
+python benchmark\memory_eval\run.py --suite longmemeval --baseline evidence_gated_memory --dataset benchmark\memory_eval\datasets\longmemeval_s_cleaned.json --limit 5
+python benchmark\memory_eval\run.py --suite beam_lite --baseline evidence_gated_memory --beam-tokens 100000
 ```
 
 These runs verify adapter compatibility and evidence retrieval. They are not
 official scores until run against the intended split with answer generation and
 judge evaluation.
+
+Latest real-data smoke results for `evidence_gated_memory`:
+
+| Suite | Dataset | Limit | Retrieval / Term Recall | Evidence Source Coverage | Evidence Precision | Latency p50 | False Fact Rate |
+|---|---|---:|---:|---:|---:|---:|---:|
+| LongMemEval-S | `longmemeval_s_cleaned.json` | 5 | 0.40 | 1.00 | 1.00 | 0.9048s | 0.00 |
+| LoCoMo10 | `locomo10.json` | 5 | 0.00 | 0.80 | 0.80 | 0.5671s | 0.00 |
+| BEAM-lite | synthetic 100K tokens | 1 | 1.00 | 1.00 | 1.00 | 0.0242s | 0.00 |
+
+Publishing guidance:
+
+- These numbers are valid as reproducible smoke results for the memory
+  subsystem.
+- Do not describe them as official LongMemEval / LoCoMo leaderboard scores.
+- `Evidence Source Coverage` is currently more meaningful than final answer
+  accuracy because this runner has not yet attached an answer generator or
+  judge.
 
 Baselines:
 
