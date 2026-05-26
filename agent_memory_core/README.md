@@ -19,7 +19,7 @@ Latest `evidence_gated_memory` smoke results:
 | LoCoMo10 | `locomo10.json` | 5 | 0.00 | 0.80 | 0.80 | 0.5671s | 0.00 |
 | BEAM-lite | synthetic 100K tokens | 1 | 1.00 | 1.00 | 1.00 | 0.0242s | 0.00 |
 
-LongMemEval-S `limit=100` partial baseline results already completed:
+LongMemEval-S `limit=100` baseline results:
 
 | Baseline | Cases | Retrieval / Term Recall | Evidence Source Coverage | Input Tokens | Latency p50 | False Fact Rate |
 |---|---:|---:|---:|---:|---:|---:|
@@ -28,9 +28,10 @@ LongMemEval-S `limit=100` partial baseline results already completed:
 | `long_context_only` | 100 | 0.54 | 0.36 | 5,500,800 | 0.0007s | 0.00 |
 | `keyword_fts_memory` | 100 | 0.39 | 0.87 | 182,969 | 0.5088s | 0.00 |
 | `vector_rag_memory` | 100 | 0.38 | 0.67 | 184,067 | 0.7292s | 0.00 |
+| `evidence_gated_memory` | 100 | 0.40 | 0.87 | 178,117 | 0.9138s | 0.00 |
 
-The `evidence_gated_memory` row for `limit=100` is still pending; keep this as
-a partial comparison until that run completes.
+LoCoMo10 `limit=100` and BEAM-lite `100K tokens / 50 cases` are documented in
+`benchmark/memory_eval/README.md`.
 
 The main difference from a normal summary memory is quality gating:
 

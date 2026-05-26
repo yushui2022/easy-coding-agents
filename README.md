@@ -6,7 +6,11 @@
 
 ## Current Larger Benchmark Results
 
-Larger partial run already completed on LongMemEval-S `limit=100`:
+These are memory-subsystem results after context wipe. They are still not
+official LongMemEval / LoCoMo answer-accuracy scores because the runner does not
+yet attach an answer generator or judge.
+
+LongMemEval-S `limit=100`:
 
 | Baseline | Cases | Retrieval / Term Recall | Evidence Source Coverage | Input Tokens | Latency p50 | False Fact Rate |
 |---|---:|---:|---:|---:|---:|---:|
@@ -15,10 +19,29 @@ Larger partial run already completed on LongMemEval-S `limit=100`:
 | `long_context_only` | 100 | 0.54 | 0.36 | 5,500,800 | 0.0007s | 0.00 |
 | `keyword_fts_memory` | 100 | 0.39 | 0.87 | 182,969 | 0.5088s | 0.00 |
 | `vector_rag_memory` | 100 | 0.38 | 0.67 | 184,067 | 0.7292s | 0.00 |
+| `evidence_gated_memory` | 100 | 0.40 | 0.87 | 178,117 | 0.9138s | 0.00 |
 
-Status: LongMemEval-S `evidence_gated_memory` at `limit=100` has not completed
-yet. The comparable 100-case table above is partial until that row is available.
-The earlier `evidence_gated_memory` row is still only a 5-case smoke result.
+LoCoMo10 `limit=100`:
+
+| Baseline | Cases | Retrieval / Term Recall | Evidence Source Coverage | Input Tokens | Latency p50 | False Fact Rate |
+|---|---:|---:|---:|---:|---:|---:|
+| `no_memory` | 100 | 0.01 | 0.02 | 1,141 | 0.0000s | 0.00 |
+| `summary_memory` | 100 | 0.02 | 0.02 | 11,400 | 0.0000s | 0.00 |
+| `long_context_only` | 100 | 0.19 | 0.99 | 1,792,483 | 0.0000s | 0.00 |
+| `keyword_fts_memory` | 100 | 0.06 | 0.74 | 110,028 | 0.0241s | 0.00 |
+| `vector_rag_memory` | 100 | 0.06 | 0.58 | 187,057 | 0.0411s | 0.00 |
+| `evidence_gated_memory` | 100 | 0.06 | 0.74 | 182,886 | 0.0943s | 0.00 |
+
+BEAM-lite `100K tokens / 50 cases`:
+
+| Baseline | Cases | Retrieval / Term Recall | Evidence Source Coverage | Input Tokens | Latency p50 | False Fact Rate |
+|---|---:|---:|---:|---:|---:|---:|
+| `no_memory` | 50 | 0.00 | 0.00 | 450 | 0.0000s | 1.00 |
+| `summary_memory` | 50 | 0.00 | 0.00 | 650 | 0.0000s | 1.00 |
+| `long_context_only` | 50 | 1.00 | 1.00 | 5,910,300 | 0.0000s | 0.00 |
+| `keyword_fts_memory` | 50 | 1.00 | 1.00 | 70,940 | 0.0131s | 0.00 |
+| `vector_rag_memory` | 50 | 0.16 | 0.16 | 71,200 | 0.0308s | 0.84 |
+| `evidence_gated_memory` | 50 | 1.00 | 1.00 | 109,140 | 0.0242s | 0.00 |
 
 ## 项目状态：Agent + 记忆系统评测
 

@@ -11,6 +11,12 @@ from pathlib import Path
 from statistics import mean, median
 from typing import Any, Dict, List, Optional
 
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -40,6 +46,7 @@ async def run_suite(
     limit: int = 20,
     beam_tokens: int = 100_000,
     beam_cases: int = 1,
+    progress_every: int = 0,
 ) -> Dict[str, Any]:
     if suite == "beam_lite":
         return await run_beam_lite(baseline=baseline, beam_tokens=beam_tokens, beam_cases=beam_cases)
@@ -48,7 +55,12 @@ async def run_suite(
     workspace_name = f".agent_memory_eval_{suite}_{baseline}"
     reset_dir(ROOT / workspace_name)
     case_results = []
+    total = len(cases)
     for index, case in enumerate(cases):
+        if progress_every and (
+            index == 0 or (index + 1) % progress_every == 0 or index + 1 == total
+        ):
+            print(f"[{suite}/{baseline}] case {index + 1}/{total}", file=sys.stderr, flush=True)
         case_results.append(await run_case(case, baseline, workspace_name, index))
     return summarize_results(suite, baseline, case_results)
 
@@ -900,12 +912,14 @@ async def main() -> None:
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--beam-tokens", type=int, default=100_000)
     parser.add_argument("--beam-cases", type=int, default=1)
+    parser.add_argument("--progress-every", type=int, default=10)
     args = parser.parse_args()
 
     if args.baseline == "all":
         RESULTS_DIR.mkdir(parents=True, exist_ok=True)
         results = []
         for baseline in BASELINES:
+            print(f"[{args.suite}/all] starting {baseline}", file=sys.stderr, flush=True)
             result = await run_suite(
                 suite=args.suite,
                 baseline=baseline,
@@ -913,6 +927,7 @@ async def main() -> None:
                 limit=args.limit,
                 beam_tokens=args.beam_tokens,
                 beam_cases=args.beam_cases,
+                progress_every=args.progress_every,
             )
             results.append(result)
             write_result_files(result, f"{args.suite}_{baseline}", args)
@@ -940,6 +955,7 @@ async def main() -> None:
         limit=args.limit,
         beam_tokens=args.beam_tokens,
         beam_cases=args.beam_cases,
+        progress_every=args.progress_every,
     )
     write_result_files(result, f"{args.suite}_{args.baseline}", args)
     print(json.dumps(result, ensure_ascii=False, indent=2))
