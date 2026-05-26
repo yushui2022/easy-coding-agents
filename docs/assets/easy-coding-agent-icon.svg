@@ -1,29 +1,40 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
   <title id="title">Easy-Coding-Agent icon</title>
-  <desc id="desc">A compact vector icon for Easy-Coding-Agent with code brackets, a check mark, and an agent core.</desc>
+  <desc id="desc">A compact vector icon combining code brackets, a task-memory graph, and an evidence check mark.</desc>
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0f172a"/>
-      <stop offset="0.58" stop-color="#1d4ed8"/>
-      <stop offset="1" stop-color="#16a34a"/>
+    <linearGradient id="badge-bg" x1="18" y1="12" x2="112" y2="118" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#111827"/>
+      <stop offset="0.55" stop-color="#164e63"/>
+      <stop offset="1" stop-color="#0f766e"/>
     </linearGradient>
-    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="panel-fill" x1="36" y1="26" x2="94" y2="98" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#dbeafe"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="34" y1="84" x2="92" y2="84" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#38bdf8"/>
       <stop offset="1" stop-color="#22c55e"/>
     </linearGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#020617" flood-opacity="0.35"/>
+    <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="8" flood-color="#020617" flood-opacity="0.28"/>
     </filter>
   </defs>
-  <rect x="8" y="8" width="112" height="112" rx="28" fill="url(#bg)"/>
-  <path d="M28 47 L16 64 L28 81" fill="none" stroke="#e2e8f0" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M100 47 L112 64 L100 81" fill="none" stroke="#e2e8f0" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-  <g filter="url(#shadow)">
-    <circle cx="64" cy="55" r="22" fill="#f8fafc"/>
-    <circle cx="55" cy="51" r="4" fill="#0f172a"/>
-    <circle cx="73" cy="51" r="4" fill="#0f172a"/>
-    <path d="M55 63 C60 68 68 68 73 63" fill="none" stroke="#0f172a" stroke-width="4" stroke-linecap="round"/>
+
+  <rect x="10" y="10" width="108" height="108" rx="28" fill="url(#badge-bg)"/>
+  <path d="M25 46 14 64l11 18" fill="none" stroke="#c7d2fe" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M103 46 114 64l-11 18" fill="none" stroke="#c7d2fe" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <g filter="url(#soft-shadow)">
+    <rect x="32" y="27" width="64" height="74" rx="16" fill="url(#panel-fill)"/>
+    <rect x="42" y="39" width="44" height="6" rx="3" fill="#1e293b" opacity="0.88"/>
+
+    <path d="M64 54v15M64 69H49M64 69h15" fill="none" stroke="#64748b" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="64" cy="53" r="8" fill="#2563eb"/>
+    <circle cx="49" cy="70" r="8" fill="#0f766e"/>
+    <circle cx="79" cy="70" r="8" fill="#7c3aed"/>
+
+    <path d="M43 88 56 99 86 82" fill="none" stroke="url(#accent)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
-  <path d="M42 87 L56 101 L88 70" fill="none" stroke="url(#mark)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M44 28 H84" stroke="#facc15" stroke-width="7" stroke-linecap="round"/>
+
+  <path d="M42 22h44" stroke="#facc15" stroke-width="6" stroke-linecap="round"/>
 </svg>
