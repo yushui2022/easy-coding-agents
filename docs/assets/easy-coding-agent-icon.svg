@@ -1,21 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
   <title id="title">Easy-Coding-Agent icon</title>
-  <desc id="desc">A warm minimal vector mark for Easy-Coding-Agent, combining code brackets, memory nodes, and an evidence check.</desc>
-  <rect width="128" height="128" rx="28" fill="#f3eadc"/>
+  <desc id="desc">A warm minimal vector mark for Easy-Coding-Agent with code brackets and a memory core.</desc>
+  <rect width="128" height="128" rx="30" fill="#f3eadc"/>
 
-  <g fill="none" stroke="#211a14" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M50 33 29 64l21 31" stroke-width="10"/>
-    <path d="M78 33 99 64 78 95" stroke-width="10"/>
-    <path d="M64 30v68" stroke-width="8"/>
-    <path d="M45 64h38" stroke-width="8"/>
+  <g fill="none" stroke="#211a14" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M48 36 28 64l20 28"/>
+    <path d="M80 36 100 64 80 92"/>
   </g>
 
-  <g fill="#211a14">
-    <circle cx="64" cy="30" r="7"/>
-    <circle cx="45" cy="64" r="7"/>
-    <circle cx="83" cy="64" r="7"/>
-    <circle cx="64" cy="98" r="7"/>
-  </g>
-
-  <path d="M43 82 57 96 87 55" fill="none" stroke="#b86b2b" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="64" cy="64" r="10" fill="#b86b2b"/>
 </svg>
