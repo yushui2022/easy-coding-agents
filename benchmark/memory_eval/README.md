@@ -52,17 +52,11 @@ These smoke runs verify adapter compatibility and evidence retrieval. They are
 not official dataset-level scores until run with the full split and answer
 generation / judge evaluation.
 
-## Latest Real-Data Smoke Results
+## Development Smoke Tests
 
-These results were produced with `evidence_gated_memory` after ingesting the
-sessions, closing memory, reopening the same SQLite database, and querying with
-`recent_dialogue_limit=0`.
-
-| Suite | Dataset | Limit | Retrieval / Term Recall | Evidence Source Coverage | Evidence Precision | Latency p50 | False Fact Rate |
-|---|---|---:|---:|---:|---:|---:|---:|
-| LongMemEval-S | `longmemeval_s_cleaned.json` | 5 | 0.40 | 1.00 | 1.00 | 0.9048s | 0.00 |
-| LoCoMo10 | `locomo10.json` | 5 | 0.00 | 0.80 | 0.80 | 0.5671s | 0.00 |
-| BEAM-lite | synthetic 100K tokens | 1 | 1.00 | 1.00 | 1.00 | 0.0242s | 0.00 |
+The 5-case runs are useful only for checking adapter compatibility during
+development. They should not be used as headline results because the larger
+baseline tables below are more representative.
 
 ## Larger Results
 
@@ -112,6 +106,11 @@ Interpretation:
   built memory context. It is not a judged final-answer metric.
 - LoCoMo10 currently exposes a real gap: the memory system can often recover
   evidence ids, but the runner does not yet generate or judge final answers.
+- BEAM-lite is synthetic. It is useful for stress-testing token cost and
+  retrieval latency, but it should not be used as a real-world accuracy claim.
+- LongMemEval-S is the strongest current public-data signal: evidence-gated
+  memory beats summary memory and roughly matches keyword FTS, but it does not
+  beat long-context-only on raw term recall.
 
 Baselines:
 

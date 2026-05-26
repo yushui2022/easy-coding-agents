@@ -7,17 +7,9 @@ OpenViking-style filesystem organization and SQLite/FTS retrieval.
 ## Benchmark Status
 
 The current benchmark layer evaluates the memory subsystem after context wipe.
-It is a retrieval and evidence smoke test, not an official LongMemEval or
+It is a retrieval and evidence evaluation, not an official LongMemEval or
 LoCoMo answer-accuracy score yet. Official-style answer accuracy still requires
 an answer generator and judge.
-
-Latest `evidence_gated_memory` smoke results:
-
-| Suite | Dataset | Limit | Retrieval / Term Recall | Evidence Source Coverage | Evidence Precision | Latency p50 | False Fact Rate |
-|---|---|---:|---:|---:|---:|---:|---:|
-| LongMemEval-S | `longmemeval_s_cleaned.json` | 5 | 0.40 | 1.00 | 1.00 | 0.9048s | 0.00 |
-| LoCoMo10 | `locomo10.json` | 5 | 0.00 | 0.80 | 0.80 | 0.5671s | 0.00 |
-| BEAM-lite | synthetic 100K tokens | 1 | 1.00 | 1.00 | 1.00 | 0.0242s | 0.00 |
 
 LongMemEval-S `limit=100` baseline results:
 
@@ -32,6 +24,12 @@ LongMemEval-S `limit=100` baseline results:
 
 LoCoMo10 `limit=100` and BEAM-lite `100K tokens / 50 cases` are documented in
 `benchmark/memory_eval/README.md`.
+
+The honest interpretation is that LongMemEval-S is the strongest current signal:
+`evidence_gated_memory` is much better than summary memory and roughly matches
+keyword FTS while keeping source-backed evidence constraints. LoCoMo10 remains a
+known weakness because answer-term recall is still low for relationship-heavy
+long dialogue.
 
 The main difference from a normal summary memory is quality gating:
 

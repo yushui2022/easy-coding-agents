@@ -56,17 +56,10 @@ python benchmark\memory_eval\run.py --suite longmemeval --baseline evidence_gate
 python benchmark\memory_eval\run.py --suite beam_lite --baseline evidence_gated_memory --beam-tokens 100000 --beam-cases 50
 ```
 
-These runs verify adapter compatibility and evidence retrieval. They are not
+These runs verify adapter compatibility and evidence retrieval. They are useful
+as development checks, but they are not headline benchmark results. They are not
 official scores until run against the intended split with answer generation and
 judge evaluation.
-
-Latest real-data smoke results for `evidence_gated_memory`:
-
-| Suite | Dataset | Limit | Retrieval / Term Recall | Evidence Source Coverage | Evidence Precision | Latency p50 | False Fact Rate |
-|---|---|---:|---:|---:|---:|---:|---:|
-| LongMemEval-S | `longmemeval_s_cleaned.json` | 5 | 0.40 | 1.00 | 1.00 | 0.9048s | 0.00 |
-| LoCoMo10 | `locomo10.json` | 5 | 0.00 | 0.80 | 0.80 | 0.5671s | 0.00 |
-| BEAM-lite | synthetic 100K tokens | 1 | 1.00 | 1.00 | 1.00 | 0.0242s | 0.00 |
 
 Larger memory-subsystem runs:
 
@@ -105,12 +98,17 @@ BEAM-lite `100K tokens / 50 cases`:
 
 Publishing guidance:
 
-- These numbers are valid as reproducible smoke results for the memory
-  subsystem.
+- These numbers are valid as reproducible memory-subsystem retrieval and
+  evidence results.
 - Do not describe them as official LongMemEval / LoCoMo leaderboard scores.
 - `Evidence Source Coverage` is currently more meaningful than final answer
   accuracy because this runner has not yet attached an answer generator or
   judge.
+- LoCoMo10 should be described as a current weakness, not a win: answer-term
+  recall remains low even though evidence source coverage is better than vector
+  RAG in this runner.
+- BEAM-lite is synthetic and should be described as a stress test, not as a
+  real-world accuracy benchmark.
 
 Baselines:
 
