@@ -1,48 +1,104 @@
 <p align="center">
-  <img src="docs/assets/banner.svg" alt="Easy-Coding-Agent — Evidence-gated memory for long-running coding agents" width="100%">
+  <img src="docs/assets/mark.svg" alt="Easy-Coding-Agent" width="200" height="200">
 </p>
 
 # Easy-Coding-Agent
 
-Easy-Coding-Agent is a Python coding-agent project with a reusable memory
-module, `agent_memory_core`. The current research focus is not to claim a full
-SWE-bench resolved rate yet. The focus is narrower and easier to verify:
+**Evidence-gated memory infrastructure for long-running coding agents.**
 
-- Can the memory subsystem recover useful facts after context is wiped?
-- Can retrieved facts point back to source evidence?
-- Can the system avoid treating unsupported memories as facts?
-- Can coding-agent state, tool logs, failures, and refs survive long tasks with
-  lower token cost than long-context-only prompts?
+Easy-Coding-Agent is a Python coding-agent project centered on a reusable
+memory subsystem, `agent_memory_core`. The goal is not to make another
+short-context chatbot wrapper. The goal is to let coding agents survive long
+tasks, recover after context loss, keep source evidence attached to every
+important claim, and avoid saying "done" without verification.
 
-The memory module combines:
+At the system level, the project turns raw agent traces into a compact,
+auditable prompt context:
 
-- tool-result offloading to Markdown refs
-- SQLite/FTS retrieval
-- coding-oriented entity extraction
-- temporal and goal-version aware ranking
-- task-state tracking
-- evidence-gated quality rules
+```text
+user / assistant / tool events
+        |
+        v
+refs/*.md raw evidence  +  SQLite event/index tables
+        |
+        v
+task state + task map + sourced memories + retrieval logs
+        |
+        v
+quality-gated prompt context for the next agent step
+```
+
+## Why This Exists
+
+Long-running coding agents fail in predictable ways:
+
+- They lose the failing test log after the prompt window moves on.
+- They remember summaries but cannot point back to the exact file, command, or
+  tool output that supports the summary.
+- They mark a task as complete without test evidence.
+- They repeat old debugging paths because failure state was compressed away.
+- They mix current facts, stale facts, and unsupported guesses in the same
+  memory channel.
+
+`agent_memory_core` is designed around the opposite rule: **store evidence
+first, retrieve from evidence, and gate claims before they enter memory or
+prompt context.**
+
+## Technical Highlights
+
+| Layer | What it does |
+|---|---|
+| Tool-result offloading | Large command outputs, searches, diffs, and logs are written to `refs/*.md`; prompt context carries summaries plus stable `result_ref` pointers. |
+| SQLite memory store | Events, refs metadata, task nodes, task state, claims, sourced memories, extracted entities, memory items, source links, and retrieval logs are stored locally. |
+| Coding entity extraction | The memory index extracts files, functions, classes, tests, errors, commands, goals, and user preferences from dialogue and tool traces. |
+| Multi-signal retrieval | Retrieval combines exact ref hits, FTS/BM25, entity matches, file matches, task focus, failure priority, source confidence, recency, and temporal intent. |
+| Evidence gates | File claims require read/search/ref evidence; error diagnoses require command/test evidence; DONE requires verification evidence or an explicit unverified reason. |
+| Soft task state machine | Agent state is tracked across `UNDERSTANDING`, `GATHERING_CONTEXT`, `PLANNING`, `EDITING`, `TESTING`, `DEBUGGING`, `WAITING_USER`, and `DONE`. |
+| Append-only memory maturation | New facts are inserted as new rows instead of overwriting old rows, so stale or conflicting facts can be traced back to their sources. |
+| Benchmark harness | The repo includes memory-subsystem evaluations for LongMemEval-style data, LoCoMo-style dialogue, BEAM-lite synthetic stress, and SWE-bench-format coding memory probes. |
+
+## Architecture
+
+```mermaid
+flowchart TD
+    A["Agent messages and tool results"] --> B["RefStore: refs/*.md raw evidence"]
+    A --> C["MemoryStorage: SQLite event log"]
+    B --> D["Retriever"]
+    C --> D
+    C --> E["Task state and task map"]
+    C --> F["Claims, memories, entities"]
+    D --> G["Evidence summaries"]
+    E --> H["Quality gates"]
+    F --> H
+    G --> H
+    H --> I["build_prompt_context()"]
+    I --> J["Next coding-agent step"]
+```
+
+The important design choice is that the memory system does not treat a summary
+as truth by default. Summaries are only useful when they stay connected to raw
+evidence and can be audited later.
 
 ## What Is Measured
 
-The benchmark results below are **memory-subsystem retrieval and evidence
-results after context wipe**. They are not official LongMemEval or LoCoMo answer
-accuracy scores, and they are not SWE-bench patch correctness scores.
+The benchmark layer currently measures **memory-subsystem retrieval and
+evidence recovery after context wipe**. It is not claiming an official
+LongMemEval score, LoCoMo leaderboard score, or SWE-bench resolved rate.
 
-Current runner flow:
+The runner flow is intentionally strict:
 
 1. Ingest benchmark sessions into memory.
 2. Close the memory object.
 3. Reopen the same SQLite database.
 4. Build context with `recent_dialogue_limit=0`.
-5. Score whether the memory context contains expected answer/evidence terms and
-   source refs.
+5. Score whether the rebuilt memory context contains expected answer terms,
+   evidence terms, and source refs.
 
-This means the numbers are useful for evaluating retrieval, source coverage,
-token cost, and false unsupported facts. They do not yet prove final answer
-quality because the runner does not attach an answer generator or judge.
+This makes the numbers useful for comparing memory strategies under context
+loss. It does not yet prove final answer quality because the runner does not
+attach an answer generator or judge.
 
-## Larger Memory-Subsystem Results
+## Benchmark Snapshot
 
 LongMemEval-S `limit=100`:
 
@@ -77,42 +133,23 @@ BEAM-lite `100K tokens / 50 cases`:
 | `vector_rag_memory` | 50 | 0.16 | 0.16 | 71,200 | 0.0308s | 0.84 |
 | `evidence_gated_memory` | 50 | 1.00 | 1.00 | 109,140 | 0.0242s | 0.00 |
 
-## Honest Interpretation
+### Reading These Results
 
-The strongest current result is LongMemEval-S. `evidence_gated_memory` is much
-better than plain summary memory and roughly matches keyword FTS retrieval while
-keeping source-backed evidence constraints. It does not beat `long_context_only`
-on raw term recall, but `long_context_only` uses about 5.5M input tokens in this
-100-case run, which is not a practical memory strategy.
+LongMemEval-S is the strongest current signal: `evidence_gated_memory` is far
+stronger than plain summary memory and roughly matches keyword FTS while keeping
+source-backed evidence constraints. It does not beat `long_context_only` on raw
+term recall, but the long-context baseline uses about 5.5M input tokens in this
+100-case run.
 
-LoCoMo10 is a weakness. `evidence_gated_memory` improves evidence source
-coverage compared with vector RAG in this runner, but answer-term recall remains
-low and matches keyword FTS. This suggests the current entity and temporal
-retrieval layer is still not strong enough for complex social dialogue and
-relationship reasoning.
+LoCoMo10 is a known weakness. The current system can often recover source
+evidence, but answer-term recall remains low for relationship-heavy long
+dialogue. That is a retrieval and reasoning gap to improve, not a win to
+overstate.
 
-BEAM-lite is a synthetic stress test. It shows that the system can recover
-target evidence from a 100K-token synthetic corpus with low latency and far less
+BEAM-lite is a synthetic scale stress test. It shows that the memory layer can
+recover target evidence from a 100K-token synthetic corpus with much lower
 prompt cost than long-context-only. It should not be treated as a real-world
 answer-accuracy benchmark.
-
-## Current Claims
-
-Reasonable claims:
-
-- The project now has a reusable memory package, `agent_memory_core`.
-- The memory runner can evaluate context-wipe retrieval on public-style data.
-- Evidence-gated memory improves substantially over plain summary memory on
-  LongMemEval-S retrieval/evidence metrics.
-- The system keeps source refs and can block unsupported memory claims from
-  entering prompt context.
-
-Claims not supported yet:
-
-- Official LongMemEval or LoCoMo leaderboard accuracy.
-- SWE-bench patch resolved rate.
-- General superiority over vector RAG or long-context-only across all tasks.
-- Strong long-dialogue reasoning on LoCoMo-style relationship questions.
 
 ## Reproduce
 
@@ -123,14 +160,28 @@ pip install -r requirements.txt
 pip install -r requirements-dev.txt
 ```
 
-Download public data used by the memory eval adapters:
+Run the test suite:
+
+```powershell
+python -m pytest tests -q
+```
+
+Run fixture benchmarks:
+
+```powershell
+python benchmark\memory_eval\run.py --suite longmemeval --baseline all --dataset benchmark\memory_eval\fixtures\longmemeval_lite.jsonl --limit 20
+python benchmark\memory_eval\run.py --suite locomo_lite --baseline all --dataset benchmark\memory_eval\fixtures\locomo_lite.jsonl --limit 20
+python benchmark\memory_eval\run.py --suite beam_lite --baseline all --beam-tokens 100000 --beam-cases 50
+```
+
+Download public data used by the memory-eval adapters:
 
 ```powershell
 python benchmark\memory_eval\download_datasets.py --dataset locomo10
 python benchmark\memory_eval\download_datasets.py --dataset longmemeval_s
 ```
 
-Run the larger memory-subsystem comparisons:
+Run larger memory-subsystem comparisons:
 
 ```powershell
 python benchmark\memory_eval\run.py --suite longmemeval --baseline all --dataset benchmark\memory_eval\datasets\longmemeval_s_cleaned.json --limit 100 --progress-every 10
@@ -138,11 +189,16 @@ python benchmark\memory_eval\run.py --suite locomo_lite --baseline all --dataset
 python benchmark\memory_eval\run.py --suite beam_lite --baseline all --beam-tokens 100000 --beam-cases 50 --progress-every 10
 ```
 
-Run tests:
+Run the SWE-bench-format memory probe:
 
 ```powershell
-python -m pytest tests -q
+python benchmark\coding_memory\run.py --suite swe_bench_memory --baseline evidence_gated_memory --dataset benchmark\coding_memory\fixtures\swe_bench_mini.jsonl --limit 5
+python benchmark\coding_memory\run.py --suite swe_bench_memory --baseline summary_memory --dataset benchmark\coding_memory\fixtures\swe_bench_mini.jsonl --limit 5
 ```
+
+The SWE-bench probe tests whether issue context, failing-test evidence, task
+state, and false-DONE prevention survive memory reconstruction. It does not
+replace the official SWE-bench Docker harness for patch correctness.
 
 ## Memory Package Usage
 
@@ -162,18 +218,73 @@ messages = await memory.build_prompt_context("What should I inspect next?")
 gate = await memory.check_quality_gate({"to": "DONE", "evidence_refs": []})
 ```
 
+Public interface:
+
+```text
+record_user_message(text)
+record_assistant_message(text, tool_calls=None)
+record_tool_result(name, args, result, tool_call_id=None)
+build_prompt_context(current_user_request=None)
+check_quality_gate(proposal)
+commit_task_outcome(result)
+add_memory(content, memory_type="Decision", source_refs=None)
+save_session()
+```
+
+## Storage Layout
+
+```text
+.agent_memory/
+  memory.db
+  refs/
+  sessions/
+  task_maps/
+  exports/
+```
+
+Core tables include:
+
+- `events`: user, assistant, tool, state, file, and test evidence.
+- `refs`: Markdown ref metadata for large logs, outputs, searches, and diffs.
+- `task_nodes`: task-map nodes with status, files, summaries, and refs.
+- `task_state`: current state, current goal, and goal version.
+- `claims`: important assistant claims with support status.
+- `memories` and `memory_items`: sourced long-term memory and append-only facts.
+- `entities`: coding-oriented entity index.
+- `memory_sources`: links from memories back to events or refs.
+- `retrieval_logs`: selected context rows and signal breakdowns.
+
 ## Repository Layout
 
 ```text
-agent_memory_core/          reusable memory module
-benchmark/memory_eval/      memory-subsystem benchmark runner
+agent_memory_core/          reusable evidence-gated memory module
+benchmark/memory_eval/      context-wipe retrieval and evidence benchmark
 benchmark/coding_memory/    coding-memory and SWE-bench-format probes
-core/                       agent engine
+core/                       interactive coding-agent engine
 memory/                     compatibility layer for older memory APIs
-tools/                      filesystem, shell, search, and interaction tools
-docs/                       benchmark protocol and project notes
+tools/                      filesystem, shell, search, todo, and interaction tools
+docs/                       benchmark protocol, evidence model, setup notes
 tests/                      unit and integration tests
 ```
+
+## Current Claims
+
+Reasonable claims:
+
+- The project contains a reusable local memory package for coding agents.
+- The memory system can rebuild prompt context after context wipe.
+- Retrieved facts preserve links back to source refs and event rows.
+- Quality gates can block unsupported DONE, file, and error claims from being
+  treated as verified memory.
+- The benchmark harness compares summary memory, long-context-only, keyword FTS,
+  vector RAG, and evidence-gated memory under the same runner.
+
+Claims not supported yet:
+
+- Official LongMemEval or LoCoMo leaderboard accuracy.
+- SWE-bench patch resolved rate.
+- General superiority over vector RAG or long-context-only across all tasks.
+- Strong long-dialogue relationship reasoning on LoCoMo-style questions.
 
 ## Next Work
 
@@ -182,5 +293,7 @@ tests/                      unit and integration tests
 - Improve LoCoMo-style entity linking, relationship tracking, and temporal
   reasoning.
 - Preserve per-case retrieval artifacts for easier third-party audit.
+- Add adapters for external memory systems to make the benchmark comparison
+  more independent.
 - Connect generated `model_patch` outputs to the official SWE-bench Docker
-  harness only after the memory benchmarks are stable.
+  harness after the memory benchmarks are stable.
