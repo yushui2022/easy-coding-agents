@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/easy-coding-agent-icon.svg" alt="Easy-Coding-Agent" width="96" height="96">
+  <img src="docs/assets/banner.svg" alt="Easy-Coding-Agent — Evidence-gated memory for long-running coding agents" width="100%">
 </p>
 
 # Easy-Coding-Agent
