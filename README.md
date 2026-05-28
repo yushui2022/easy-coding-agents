@@ -2,103 +2,187 @@
   <img src="docs/assets/mark.svg" alt="Easy-Coding-Agent" width="200" height="200">
 </p>
 
-# Easy-Coding-Agent
+<h1 align="center">Easy-Coding-Agent</h1>
 
-**Evidence-gated memory infrastructure for long-running coding agents.**
+<p align="center">
+  <strong>An autonomous terminal coding agent with tools, modes, custom agents, task control, and evidence-gated long-task memory.</strong>
+</p>
 
-Easy-Coding-Agent is a Python coding-agent project centered on a reusable
-memory subsystem, `agent_memory_core`. The goal is not to make another
-short-context chatbot wrapper. The goal is to let coding agents survive long
-tasks, recover after context loss, keep source evidence attached to every
-important claim, and avoid saying "done" without verification.
+Easy-Coding-Agent is a Python coding-agent runtime designed around a real
+autonomous development loop: understand the codebase, plan the current phase,
+execute tools, edit files, run commands, ask the user when needed, preserve task
+state, and continue until the work is verified or explicitly blocked.
 
-At the system level, the project turns raw agent traces into a compact,
-auditable prompt context:
+This repo is not just a memory demo. The memory system is one reliability layer
+inside a broader coding-agent platform.
 
-```text
-user / assistant / tool events
-        |
-        v
-refs/*.md raw evidence  +  SQLite event/index tables
-        |
-        v
-task state + task map + sourced memories + retrieval logs
-        |
-        v
-quality-gated prompt context for the next agent step
-```
+## What The Agent Can Do
 
-## Why This Exists
-
-Long-running coding agents fail in predictable ways:
-
-- They lose the failing test log after the prompt window moves on.
-- They remember summaries but cannot point back to the exact file, command, or
-  tool output that supports the summary.
-- They mark a task as complete without test evidence.
-- They repeat old debugging paths because failure state was compressed away.
-- They mix current facts, stale facts, and unsupported guesses in the same
-  memory channel.
-
-`agent_memory_core` is designed around the opposite rule: **store evidence
-first, retrieve from evidence, and gate claims before they enter memory or
-prompt context.**
-
-## Technical Highlights
-
-| Layer | What it does |
+| Capability | Implementation |
 |---|---|
-| Tool-result offloading | Large command outputs, searches, diffs, and logs are written to `refs/*.md`; prompt context carries summaries plus stable `result_ref` pointers. |
-| SQLite memory store | Events, refs metadata, task nodes, task state, claims, sourced memories, extracted entities, memory items, source links, and retrieval logs are stored locally. |
-| Coding entity extraction | The memory index extracts files, functions, classes, tests, errors, commands, goals, and user preferences from dialogue and tool traces. |
-| Multi-signal retrieval | Retrieval combines exact ref hits, FTS/BM25, entity matches, file matches, task focus, failure priority, source confidence, recency, and temporal intent. |
-| Evidence gates | File claims require read/search/ref evidence; error diagnoses require command/test evidence; DONE requires verification evidence or an explicit unverified reason. |
-| Soft task state machine | Agent state is tracked across `UNDERSTANDING`, `GATHERING_CONTEXT`, `PLANNING`, `EDITING`, `TESTING`, `DEBUGGING`, `WAITING_USER`, and `DONE`. |
-| Append-only memory maturation | New facts are inserted as new rows instead of overwriting old rows, so stale or conflicting facts can be traced back to their sources. |
-| Benchmark harness | The repo includes memory-subsystem evaluations for LongMemEval-style data, LoCoMo-style dialogue, BEAM-lite synthetic stress, and SWE-bench-format coding memory probes. |
+| Interactive terminal agent | `main.py` provides a `prompt_toolkit` CLI with streaming output, slash commands, bottom toolbar state, and `Shift+Tab` mode switching. |
+| Plan / Code / Chat modes | `core.prompts.get_system_prompt()` changes behavior between planning, implementation, and Q&A modes. |
+| Autonomous execution loop | `core.engine.AgentEngine` runs a task-driven loop that keeps calling the model and tools until the task settles. |
+| Task planning and progress | `core.task.TaskManager` maintains pending, in-progress, completed, and skipped tasks; tool calls update the active todo list. |
+| Codebase exploration | `glob`, `grep`, `smart_search`, and `read` let the agent inspect files before editing. |
+| File editing and generation | `read`, `write`, and `edit` support line-aware reads, new file generation, and targeted string replacement. |
+| Command execution | `bash` executes shell / PowerShell commands and feeds results back into the agent loop. |
+| Human-in-the-loop decisions | `ask_user` and `ask_selection` let the agent pause for clarification, phase approval, or loop recovery. |
+| Custom agents | `/agent create`, `/agent use`, `/agent list`, `/agent edit`, `/agent preview`, and `@AgentName` support local specialist agents. |
+| Loop and budget guards | The engine detects repeated tool calls, repeated user questions, simple-task over-exploration, and empty model responses. |
+| Long-task continuity | Evidence-gated memory preserves refs, tool logs, task state, claims, and source-backed memories across context loss. |
 
-## Architecture
+## Agent Runtime
 
 ```mermaid
 flowchart TD
-    A["Agent messages and tool results"] --> B["RefStore: refs/*.md raw evidence"]
-    A --> C["MemoryStorage: SQLite event log"]
-    B --> D["Retriever"]
-    C --> D
-    C --> E["Task state and task map"]
-    C --> F["Claims, memories, entities"]
-    D --> G["Evidence summaries"]
-    E --> H["Quality gates"]
-    F --> H
-    G --> H
-    H --> I["build_prompt_context()"]
-    I --> J["Next coding-agent step"]
+    U["User input / slash command"] --> CLI["CLI: prompt_toolkit + rich UI"]
+    CLI --> Q1["input_queue"]
+    Q1 --> Q2["processing_queue"]
+    Q2 --> E["AgentEngine autonomous loop"]
+    E --> P["Dynamic prompt: mode + todo + memory + completion boundary"]
+    P --> LLM["LLM streaming call"]
+    LLM --> TC{"Tool calls?"}
+    TC -->|yes| T["Tool registry"]
+    T --> FS["files / search / shell / todo / interaction / custom agents"]
+    FS --> M["Memory + task state update"]
+    M --> E
+    TC -->|no| G["Final-answer quality gate"]
+    G --> OUT["Answer user / ask next step"]
 ```
 
-The important design choice is that the memory system does not treat a summary
-as truth by default. Summaries are only useful when they stay connected to raw
-evidence and can be audited later.
+The engine uses a double-buffered async queue:
 
-## What Is Measured
+```text
+input_queue -> processing_queue -> AgentEngine._run_autonomous_loop()
+```
 
-The benchmark layer currently measures **memory-subsystem retrieval and
-evidence recovery after context wipe**. It is not claiming an official
-LongMemEval score, LoCoMo leaderboard score, or SWE-bench resolved rate.
+That design separates external user events from internal execution tasks. It
+also lets the CLI stay responsive while the agent streams model output, runs
+tools, updates memory, and waits for interactive choices.
 
-The runner flow is intentionally strict:
+## Built-in Toolchain
+
+| Tool | Purpose |
+|---|---|
+| `read` | Read file content with line numbers and offset / limit support. |
+| `write` | Create or overwrite files. |
+| `edit` | Replace a unique string in a file. |
+| `smart_search` | Precise code search using ripgrep-style search, syntax templates, and tree-sitter support. |
+| `glob` | Find files by pattern. |
+| `grep` | Regex search for legacy/simple search cases. |
+| `bash` | Execute shell commands and return command output to the agent. |
+| `todo_add` | Add a task to the current todo list. |
+| `todo_update` | Mark a task pending, in progress, completed, or skipped. |
+| `todo_list` | Render current task state. |
+| `ask_user` | Ask the user for free-form input. |
+| `ask_selection` | Ask the user to choose from options. |
+| `agent_create` / `agent_use` / `agent_update` | Create, activate, edit, and manage local custom agents. |
+
+The tool registry is decorator-based, so new tools can be added by registering a
+function in `tools/` and importing it from `core/engine.py`.
+
+## Modes
+
+Easy-Coding-Agent has three runtime modes:
+
+| Mode | Behavior |
+|---|---|
+| `Plan` | Reads and analyzes code, builds a task plan, and avoids writing code until the user approves. |
+| `Code` | Default autonomous implementation mode. Plans the current phase, executes tools, edits files, and verifies work. |
+| `Chat` | Q&A and explanation mode. Avoids file changes and command execution unless explicitly requested. |
+
+The terminal prompt and bottom toolbar show the current mode. `Shift+Tab`
+cycles modes without restarting the agent.
+
+## Custom Agents
+
+The project includes local custom-agent management, stored in
+`memory/agents.json`.
+
+Examples:
+
+```text
+/agent create
+/agent list
+/agent use BackendExpert
+/agent preview <id>
+/agent edit <id>
+/agent delete <id>
+@BackendExpert inspect the API layer and propose a fix
+```
+
+Each custom agent can carry a name, color, role definition, capabilities,
+behavior rules, dialogue style, constraints, scenarios, and notes. Activating
+an agent injects that definition into the runtime context so the same engine can
+behave like a specialized coding assistant.
+
+## Execution Controls
+
+The agent runtime includes several control mechanisms that matter for real
+coding work:
+
+- **Phase workflow**: plan one major phase, ask for confirmation, execute,
+  checkpoint, then propose the next phase.
+- **Todo discipline**: complex tasks must become explicit todos before
+  execution; finished tasks are marked completed to avoid repeated work.
+- **Simple-task boundary**: read / explain / summarize requests use smaller
+  tool budgets and stop after direct evidence is collected.
+- **Repeated-tool guard**: identical repeated tool calls trigger loop recovery.
+- **Repeated-question guard**: repeated `ask_user` / `ask_selection` calls are
+  blocked when the agent appears stuck.
+- **Final-answer gate**: unsupported completion claims can be rejected and
+  converted into a repair instruction.
+
+## Evidence-Gated Memory
+
+The memory system is the reliability layer for long tasks. It is built as a
+reusable package, `agent_memory_core`, and used by the agent through the memory
+manager.
+
+It records:
+
+- user, assistant, tool, state, file, and test events
+- large tool outputs in `refs/*.md`
+- task nodes and current task state
+- claims and whether they are supported
+- long-term memories with source links
+- coding entities such as files, functions, classes, tests, errors, commands,
+  goals, and preferences
+- retrieval logs with signal breakdowns
+
+The key rule is: **important memories must stay connected to evidence.**
+
+```text
+tool result -> refs/*.md raw evidence
+tool summary -> SQLite events / refs metadata
+task progress -> task_nodes + task_state
+retrieval -> FTS + entities + refs + temporal signals
+prompt -> task state + sourced memories + evidence summaries
+```
+
+Quality gates enforce boundaries such as:
+
+- file-content claims require read/search/ref evidence
+- error explanations require command or test log evidence
+- DONE requires verification evidence or an explicit unverified reason
+- long-term memory facts require source refs
+- conflicting or stale memories remain traceable to original events
+
+## Memory Benchmark Snapshot
+
+The benchmark layer measures **memory-subsystem retrieval and evidence recovery
+after context wipe**. It is not an official LongMemEval score, LoCoMo
+leaderboard score, or SWE-bench resolved rate.
+
+Runner flow:
 
 1. Ingest benchmark sessions into memory.
 2. Close the memory object.
 3. Reopen the same SQLite database.
 4. Build context with `recent_dialogue_limit=0`.
-5. Score whether the rebuilt memory context contains expected answer terms,
-   evidence terms, and source refs.
-
-This makes the numbers useful for comparing memory strategies under context
-loss. It does not yet prove final answer quality because the runner does not
-attach an answer generator or judge.
-
-## Benchmark Snapshot
+5. Score whether rebuilt context contains expected answer terms, evidence
+   terms, and source refs.
 
 LongMemEval-S `limit=100`:
 
@@ -133,23 +217,15 @@ BEAM-lite `100K tokens / 50 cases`:
 | `vector_rag_memory` | 50 | 0.16 | 0.16 | 71,200 | 0.0308s | 0.84 |
 | `evidence_gated_memory` | 50 | 1.00 | 1.00 | 109,140 | 0.0242s | 0.00 |
 
-### Reading These Results
+Reading the results:
 
-LongMemEval-S is the strongest current signal: `evidence_gated_memory` is far
-stronger than plain summary memory and roughly matches keyword FTS while keeping
-source-backed evidence constraints. It does not beat `long_context_only` on raw
-term recall, but the long-context baseline uses about 5.5M input tokens in this
-100-case run.
-
-LoCoMo10 is a known weakness. The current system can often recover source
-evidence, but answer-term recall remains low for relationship-heavy long
-dialogue. That is a retrieval and reasoning gap to improve, not a win to
-overstate.
-
-BEAM-lite is a synthetic scale stress test. It shows that the memory layer can
-recover target evidence from a 100K-token synthetic corpus with much lower
-prompt cost than long-context-only. It should not be treated as a real-world
-answer-accuracy benchmark.
+- LongMemEval-S is the strongest current memory signal: evidence-gated memory
+  is far stronger than plain summary memory and roughly matches keyword FTS
+  while preserving source refs.
+- LoCoMo10 is a known weakness: relationship-heavy long dialogue still needs
+  stronger entity linking and temporal reasoning.
+- BEAM-lite is a synthetic stress test for prompt cost and retrieval latency,
+  not a real-world answer-accuracy benchmark.
 
 ## Reproduce
 
@@ -160,7 +236,13 @@ pip install -r requirements.txt
 pip install -r requirements-dev.txt
 ```
 
-Run the test suite:
+Run the interactive agent:
+
+```powershell
+python main.py
+```
+
+Run tests:
 
 ```powershell
 python -m pytest tests -q
@@ -218,19 +300,6 @@ messages = await memory.build_prompt_context("What should I inspect next?")
 gate = await memory.check_quality_gate({"to": "DONE", "evidence_refs": []})
 ```
 
-Public interface:
-
-```text
-record_user_message(text)
-record_assistant_message(text, tool_calls=None)
-record_tool_result(name, args, result, tool_call_id=None)
-build_prompt_context(current_user_request=None)
-check_quality_gate(proposal)
-commit_task_outcome(result)
-add_memory(content, memory_type="Decision", source_refs=None)
-save_session()
-```
-
 ## Storage Layout
 
 ```text
@@ -242,27 +311,16 @@ save_session()
   exports/
 ```
 
-Core tables include:
-
-- `events`: user, assistant, tool, state, file, and test evidence.
-- `refs`: Markdown ref metadata for large logs, outputs, searches, and diffs.
-- `task_nodes`: task-map nodes with status, files, summaries, and refs.
-- `task_state`: current state, current goal, and goal version.
-- `claims`: important assistant claims with support status.
-- `memories` and `memory_items`: sourced long-term memory and append-only facts.
-- `entities`: coding-oriented entity index.
-- `memory_sources`: links from memories back to events or refs.
-- `retrieval_logs`: selected context rows and signal breakdowns.
-
 ## Repository Layout
 
 ```text
-agent_memory_core/          reusable evidence-gated memory module
+main.py                     interactive terminal entrypoint
+core/                       engine, prompts, task state, streaming, config
+tools/                      filesystem, shell, search, todo, interaction, agent tools
+agent_memory_core/          reusable evidence-gated memory package
+memory/                     compatibility layer and local long-term memory files
 benchmark/memory_eval/      context-wipe retrieval and evidence benchmark
 benchmark/coding_memory/    coding-memory and SWE-bench-format probes
-core/                       interactive coding-agent engine
-memory/                     compatibility layer for older memory APIs
-tools/                      filesystem, shell, search, todo, and interaction tools
 docs/                       benchmark protocol, evidence model, setup notes
 tests/                      unit and integration tests
 ```
@@ -271,11 +329,13 @@ tests/                      unit and integration tests
 
 Reasonable claims:
 
-- The project contains a reusable local memory package for coding agents.
-- The memory system can rebuild prompt context after context wipe.
-- Retrieved facts preserve links back to source refs and event rows.
-- Quality gates can block unsupported DONE, file, and error claims from being
-  treated as verified memory.
+- The repo implements an interactive terminal coding agent, not only a memory
+  package.
+- The agent supports mode switching, autonomous task execution, tool calls,
+  project search, file editing, shell commands, human-in-the-loop decisions,
+  custom local agents, and loop guards.
+- The memory layer can rebuild prompt context after context wipe and preserve
+  source refs for retrieved facts.
 - The benchmark harness compares summary memory, long-context-only, keyword FTS,
   vector RAG, and evidence-gated memory under the same runner.
 
@@ -284,16 +344,16 @@ Claims not supported yet:
 - Official LongMemEval or LoCoMo leaderboard accuracy.
 - SWE-bench patch resolved rate.
 - General superiority over vector RAG or long-context-only across all tasks.
-- Strong long-dialogue relationship reasoning on LoCoMo-style questions.
+- Full production sandboxing or enterprise permission control.
 
 ## Next Work
 
+- Add a formal demo script that showcases the full coding-agent loop from
+  project search to edit to verification.
+- Improve custom-agent import/export and reusable specialist templates.
 - Add answer generation and judge evaluation for LongMemEval / LoCoMo style
   answer accuracy.
 - Improve LoCoMo-style entity linking, relationship tracking, and temporal
   reasoning.
-- Preserve per-case retrieval artifacts for easier third-party audit.
-- Add adapters for external memory systems to make the benchmark comparison
-  more independent.
 - Connect generated `model_patch` outputs to the official SWE-bench Docker
   harness after the memory benchmarks are stable.
