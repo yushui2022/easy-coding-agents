@@ -1,5 +1,21 @@
 """Conservative hints from retained runner output, never a proof of correctness."""
 import re
+import json
+
+
+def command_status(command, result):
+    """Successful command evidence only; never infer tests passed from prose."""
+    try:
+        output = json.loads(result)
+        if not isinstance(output, dict):
+            return 'failed'
+        if no_tests_found(command, output) or output.get('test_status') == 'no_tests':
+            return 'no_tests'
+        if type(output.get('exit_code')) is int and output['exit_code'] == 0 and output.get('timed_out') is False:
+            return 'passed'
+    except (TypeError, ValueError):
+        pass
+    return 'failed'
 
 
 def no_tests_found(command, output):

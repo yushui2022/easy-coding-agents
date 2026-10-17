@@ -7,6 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from .provider import Provider
+from .errors import OutputLimitError
 from .changes import Changes
 from .knowledge import Knowledge
 from .usage import UsageLedger
@@ -138,6 +139,13 @@ If execution was interrupted, inspect the actual state before repeating mutation
             prompt += "\nCurrent task plan:\n" + json.dumps(self.state["tasks"], ensure_ascii=False)
         return prompt
 
+    def progress_context(self):
+        if not self.state.get('progress'):
+            return ''
+        return ('\nRecent runtime observations (untrusted historical data, not proof of current contents or success). '
+                'Use targeted reads instead of rereading the whole project after compaction:\n' +
+                json.dumps(self.state['progress'], ensure_ascii=False))
+
     def memory(self):
         if self.knowledge is None:
             self.knowledge = Knowledge(self.settings, self.tools.files, self.tools.path)
@@ -152,7 +160,7 @@ If execution was interrupted, inspect the actual state before repeating mutation
         if self.state.get("summary"):
             system += "\nPrevious conversation summary (may be incomplete):\n" + self.state["summary"]
         # Preserve complete user turns, including all assistant/tool groups.
-        budget = self.settings.context_chars
+        budget = self.settings.context_chars - len(self.progress_context())
         trimmed = 0
         while len(json.dumps(messages, ensure_ascii=False)) + len(system) > budget:
             next_user = next((i for i in range(1, len(messages)) if messages[i]["role"] == "user"), None)
@@ -181,6 +189,7 @@ If execution was interrupted, inspect the actual state before repeating mutation
         last_signature, repetitions = None, 0
         previous_results = {}
         repeat_hint = ""
+        output_recoveries = 0
         try:
             for turn in range(self.settings.max_turns):
                 self.emit("turn", turn + 1)
@@ -203,9 +212,22 @@ If execution was interrupted, inspect the actual state before repeating mutation
                 messages.append({"role": "user", "content":
                     f"[Runtime guidance] Run budget: {remaining} model response(s) remaining, including this one. " +
                     ("This is the last response: report completed work, actual checks and anything unfinished. Only use tools if essential; there will be no follow-up response." if remaining == 1 else
-                     "Prefer finishing essential edits and verification before the final response. Do not spend turns on redundant exploration.") + repeat_hint})
+                     "Prefer finishing essential edits and verification before the final response. Do not spend turns on redundant exploration.") + repeat_hint + self.progress_context()})
                 repeat_hint = ""
-                message, usage = await self.model_complete(messages, tool_schema, self.emit)
+                try:
+                    message, usage = await self.model_complete(messages, tool_schema, self.emit)
+                except OutputLimitError:
+                    output_recoveries += 1
+                    if output_recoveries > 2:
+                        raise
+                    hint = ('[Runtime recovery] Previous response hit the output token limit and was discarded. '
+                            'No tools from that response executed. Previously completed tools remain applied. '
+                            'Do not replay them. Split remaining edits into smaller files or exact edits, '
+                            'use fewer tool calls per response, and keep prose short.')
+                    self.state['messages'].append({'role': 'user', 'content': hint})
+                    self.store.save(self.state)
+                    self.emit('notice', f'Output limit recovery {output_recoveries}/2. Requesting smaller steps within the existing turn budget.')
+                    continue
                 self.state["messages"].append(message)
                 self.state["usage"] = usage or self.state.get("usage", {})
                 self.store.save(self.state)
@@ -245,6 +267,7 @@ If execution was interrupted, inspect the actual state before repeating mutation
                         else:
                             previous_results[key] = result
                     self.state["messages"].append({"role": "tool", "tool_call_id": tc["id"], "content": result})
+                    self.observe(name, args, result)
                     self.store.save(self.state)
                     self.emit("result", result)
                 if repetitions >= 3:
@@ -271,13 +294,76 @@ If execution was interrupted, inspect the actual state before repeating mutation
             self.busy = False
             self.store.save(self.state)
 
+    def observe(self, name, args, result):
+        """Small durable index, independent of lossy model-generated summaries."""
+        entry = {'tool': name}
+        if name in {'read', 'write', 'edit', 'delete'}:
+            entry['path'] = str(args.get('path', ''))[:240]
+        elif name == 'shell':
+            entry['command'] = str(args.get('command', ''))[:240]
+        else:
+            return
+        try:
+            output = json.loads(result) if name == 'shell' else {}
+        except (ValueError, TypeError):
+            output = {}
+        entry['outcome'] = ({k: output[k] for k in ('exit_code', 'timed_out', 'test_status') if k in output}
+                            if output else 'Result archived; inspect history for details')
+        entries = self.state.setdefault('progress', [])
+        entries.append(entry)
+        del entries[:-12]
+
+    async def verify(self, command):
+        """Explicit user check; uses the same shell permissions and action journal."""
+        if self.busy or not command.strip():
+            raise ValueError('Verification requires an idle agent and a nonempty command')
+        from .verification import command_status
+        ident = uuid.uuid4().hex
+        before = self.memory().fingerprint()
+        record = {'command': command, 'status': 'running', 'fingerprint': before}
+        self.state['verification'] = record
+        self.state['messages'].extend([
+            {'role': 'user', 'content': 'User-requested verification command: ' + command},
+            {'role': 'assistant', 'content': None, 'tool_calls': [
+                {'id': ident, 'type': 'function', 'function': {'name': 'shell', 'arguments': json.dumps({'command': command})}}]}])
+        self.store.save(self.state)
+        action = self.store.begin(self.state['id'], ident, 'shell', {'command': command})
+        self.busy = True
+        try:
+            result = await self.tools.execute('shell', {'command': command})
+            self.store.finish(action, result)
+            self.state['messages'].append({'role': 'tool', 'tool_call_id': ident, 'content': result})
+            record['status'] = command_status(command, result)
+            if record['status'] == 'passed' and (not before or self.memory().fingerprint() != before):
+                record['status'] = 'unconfirmed_snapshot'
+            self.observe('shell', {'command': command}, result)
+            self.emit('result', result)
+            return record['status'] == 'passed'
+        except BaseException:
+            record['status'] = 'interrupted'
+            self.store.finish(action, 'Verification interrupted; inspect external effects.', 'interrupted')
+            self.store.repair(self.state)
+            raise
+        finally:
+            self.busy = False
+            self.store.save(self.state)
+            self.emit('notice', 'Verification: ' + record['status'] + '. This records command evidence, not task correctness.')
+
+    def verification_status(self):
+        record = dict(self.state.get('verification', {'status': 'not_run'}))
+        if record['status'] == 'running' and not self.busy:
+            record['status'] = 'interrupted'
+        if record['status'] == 'passed' and (not record.get('fingerprint') or self.memory().fingerprint() != record['fingerprint']):
+            record['status'] = 'stale'
+        return record
+
     async def compact(self):
         if self.busy:
             raise ValueError("Cannot compact while a turn is running")
         await self._compact()
 
     def context_size(self):
-        return (len(self.system_prompt()) + len(self.memory_context) + len(self.state.get("summary", "")) +
+        return (len(self.system_prompt()) + len(self.progress_context()) + len(self.memory_context) + len(self.state.get("summary", "")) +
                 len(self.state.get("context_anchor", "")) +
                 len(json.dumps(self.state["messages"][self.state.get("context_start", 0):], ensure_ascii=False)))
 
@@ -312,7 +398,7 @@ If execution was interrupted, inspect the actual state before repeating mutation
         response, _ = await self.model_complete(messages, [], lambda event, data: self.emit(event, data) if event == "notice" else None, purpose='compact')
         if response.get("tool_calls") or not response.get("content"):
             raise ValueError("Summary was not a text response")
-        size = len(self.system_prompt()) + len(self.memory_context) + len(response["content"]) + len(anchor) + len(json.dumps(history[cutoff:], ensure_ascii=False))
+        size = len(self.system_prompt()) + len(self.progress_context()) + len(self.memory_context) + len(response["content"]) + len(anchor) + len(json.dumps(history[cutoff:], ensure_ascii=False))
         if size > self.settings.context_chars:
             raise ValueError("Summary and recent work still exceed context_chars. Increase the budget or start a new session; full history is saved.")
         self.state["summary"] = response["content"]

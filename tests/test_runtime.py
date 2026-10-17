@@ -236,6 +236,22 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ProviderTests(unittest.IsolatedAsyncioTestCase):
+    async def test_output_limit_is_typed_and_usage_survives_partial_tool(self):
+        from eca.errors import OutputLimitError
+        provider = await self.make([{'choices': [{'index': 0, 'delta': {'tool_calls': [
+            {'index': 0, 'id': 'partial', 'type': 'function', 'function': {'name': 'write', 'arguments': '{'}}]},
+            'finish_reason': 'length'}], 'usage': {'prompt_tokens': 10, 'completion_tokens': 8, 'total_tokens': 18}}])
+        events = []
+        try:
+            with self.assertRaises(OutputLimitError):
+                await provider.complete([], [], lambda *event: events.append(event))
+            ends = [data for event, data in events if event == 'request_end']
+            self.assertEqual(len(ends), 1)
+            self.assertEqual(ends[0]['status'], 'failed')
+            self.assertEqual(ends[0]['usage']['completion_tokens'], 8)
+        finally:
+            await provider.close()
+
     async def make(self, chunks):
         events = "".join("data: " + json.dumps(c) + "\n\n" for c in chunks) + "data: [DONE]\n\n"
         async def handler(request):

@@ -1,6 +1,7 @@
 """Stateless Responses adapter preserving reasoning items and tool identities."""
 import json
 import hashlib
+from .errors import OutputLimitError
 
 
 def input_items(messages, scope=None):
@@ -41,6 +42,9 @@ async def complete(client, settings, messages, tools, emit, usage_callback):
                                         prompt_tokens_details=u.get('input_tokens_details', {})))
     finally:
         await stream.close()
+    if (response is not None and response.status == 'incomplete' and
+            getattr(getattr(response, 'incomplete_details', None), 'reason', None) == 'max_output_tokens'):
+        raise OutputLimitError()
     if response is None or response.status != 'completed':
         raise RuntimeError('Incomplete Responses result; no tools executed')
     calls, text, items, ids = [], [], [], set()

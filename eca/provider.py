@@ -6,6 +6,7 @@ from urllib.parse import urlsplit
 import httpx
 from openai import AsyncOpenAI
 from .retry import retryable
+from .errors import OutputLimitError
 
 
 class Provider:
@@ -96,6 +97,8 @@ class Provider:
                         call["function"]["arguments"] += tc.function.arguments or ""
         finally:
             await stream.close()
+        if finish == 'length':
+            raise OutputLimitError()
         if finish not in {"stop", "tool_calls"}:
             raise RuntimeError(f"Incomplete model response ({finish or 'disconnected'}); no tools were executed.")
         if not content and not calls:

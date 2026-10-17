@@ -190,6 +190,10 @@ while True:
         response.status = 'incomplete'
         with self.assertRaisesRegex(RuntimeError, 'Incomplete'):
             await complete(client, self.settings, [], [], lambda *_:None, lambda _:None)
+        from eca.errors import OutputLimitError
+        response.incomplete_details = NS(reason='max_output_tokens')
+        with self.assertRaises(OutputLimitError):
+            await complete(client, self.settings, [], [], lambda *_:None, lambda _:None)
 
     async def test_responses_sdk_http_stream_and_ledger(self):
         import httpx

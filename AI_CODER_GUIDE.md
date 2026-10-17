@@ -1,4 +1,4 @@
-# Developer guide — v0.8.2
+# Developer guide — v0.9.0
 
 The default runtime is `eca/`. Start with `docs/UPGRADE-v0.2.md` for architecture, permissions, persistence semantics and limitations. The former guide is retained at `docs/legacy/AI_CODER_GUIDE-v0.1.md`.
 
@@ -11,6 +11,10 @@ Keep CLI/UI separate from engine and tool behavior. Do not import legacy modules
 File mutations must persist their before/after image before touching disk. Undo may only restore a matching recorded result; never use Git reset to implement it. Preserve the user's original uncommitted bytes and the Git index. Shell effects are outside snapshot coverage.
 
 Retry model transport failures only before visible text output and never replay tools. Auto-compaction must keep a complete recent assistant/tool exchange and preserve the full archive. Persist stop reasons without copying provider error bodies or credentials.
+
+Protocol-confirmed output limits may start at most two recovery requests within the existing task turn budget. Discard incomplete responses entirely; preserve failed-attempt usage. This is a new request with smaller-step guidance, not transport retry or tool replay. Never recover an unexplained disconnection this way. Runtime progress is bounded historical metadata, not evidence of successful writes. Keep it in the transient suffix to preserve prompt-prefix caching.
+
+Explicit verification uses the normal shell execution policy, approval and durable journal. Idle does not imply verified. Exit code 0 only establishes command evidence against a matching bounded source fingerprint; unavailable or changed fingerprints cannot pass. It does not establish test coverage or task correctness. Do not automatically repeat user verification commands, which may have external effects.
 
 Project memory uses the existing memory-core storage/search behind `eca/knowledge.py`. Only explicit user constraints and actual command evidence may enter it. Keep source provenance and fail closed when fingerprints are unavailable. Never promote assistant prose into facts. Do not import the old research database automatically. File guidance must reach the model before any mutation that depends on it; a later call in the same tool batch is insufficient.
 

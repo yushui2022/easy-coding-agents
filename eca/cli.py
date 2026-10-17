@@ -27,6 +27,8 @@ from .usage import UsageLedger
 
 
 HELP = {
+    "/progress": "Show recent runtime observations retained across compaction",
+    "/verify COMMAND": "Run a user-selected check with normal shell approval",
     "/usage": "Show durable usage and priced subtotals, including child agents",
     "/agents": "List child sessions; resume one to inspect its changes",
     "/models": "List configured model profiles; /model @NAME selects one",
@@ -54,6 +56,7 @@ def parser():
     p.add_argument("--cwd", type=Path, default=Path.cwd(), help="Project directory")
     p.add_argument("-p", "--prompt", help="Run a single task and exit")
     p.add_argument("--json", action="store_true", help="JSONL events for --prompt")
+    p.add_argument("--verify-command", help="Run this check after an idle one-shot task; requires --allow-shell; failure exits 3")
     p.add_argument("--model")
     p.add_argument("--model-profile", help="Select [model_profiles.NAME] with its own endpoint and credential variable")
     p.add_argument("--base-url")
@@ -167,7 +170,12 @@ class App:
             raise asyncio.CancelledError
 
     async def run_task(self, text):
-        task = asyncio.create_task(self.agent.run(text))
+        async def workflow():
+            await self.agent.run(text)
+            if self.state['status'] == 'idle' and self.args.verify_command:
+                return await self.agent.verify(self.args.verify_command)
+            return True
+        task = asyncio.create_task(workflow())
         loop = asyncio.get_running_loop()
         previous = signal.getsignal(signal.SIGINT)
         def interrupt(*_):
@@ -176,7 +184,7 @@ class App:
                 loop.call_soon_threadsafe(task.cancel)
         signal.signal(signal.SIGINT, interrupt)
         try:
-            await task
+            verified = await task
         except asyncio.CancelledError:
             return 130
         except Exception as exc:
@@ -187,7 +195,7 @@ class App:
             if self.streaming:
                 self.console.print()
                 self.streaming = False
-        return 0 if self.state["status"] == "idle" else 2
+        return (0 if verified else 3) if self.state["status"] == "idle" else 2
 
     def show_sessions(self):
         rows = self.store.list()
@@ -206,6 +214,7 @@ class App:
         data['usage'] = self.agent.ledger.summary(self.state)
         data['children'] = self.state.get('children',[])
         data["stop_reason"] = self.state.get("stop_reason")
+        data['verification'] = self.agent.verification_status()
         if self.args.json:
             self.emit("status", data)
         else:
@@ -233,6 +242,12 @@ class App:
             self.store.save(self.state)
             self.agent = self.make_agent()
             self.status()
+        elif command == '/progress':
+            self.emit('notice', json.dumps({'observations': self.state.get('progress', []),
+                'tasks': self.state['tasks'], 'changes': self.agent.changes.list(),
+                'verification': self.agent.verification_status()}, ensure_ascii=False))
+        elif command == '/verify':
+            await self.agent.verify(arg)
         elif command == "/sessions":
             self.show_sessions()
         elif command == "/mode":
@@ -430,6 +445,8 @@ class App:
 
 
 async def async_main(args):
+    if args.verify_command is not None and (args.prompt is None or not args.allow_shell or not args.verify_command.strip()):
+        raise ValueError('--verify-command requires --prompt, --allow-shell and a nonempty command')
     if args.usage:
         if args.prompt is not None or args.doctor or args.list_sessions or args.changes is not None or args.undo is not None or args.accept_change is not None:
             raise ValueError('--usage cannot be combined with other actions')

@@ -67,9 +67,10 @@ class CLITests(unittest.TestCase):
                    "ECA_BASE_URL": f"http://127.0.0.1:{server.server_port}/v1", "ECA_API_FORMAT": api_format}
             command = [sys.executable, "-B", "-m", "eca", "--cwd", tmp, "--json"]
             try:
-                first = subprocess.run([*command, "--accept-edits", "-p", "Create hello.py"], env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
+                first = subprocess.run([*command, "--accept-edits", "--allow-shell", "--verify-command", 'python -B hello.py', "-p", "Create hello.py"], env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
                 self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
                 events = [json.loads(line) for line in first.stdout.splitlines()]
+                self.assertEqual(next(e['data'] for e in events if e['event'] == 'status')['verification']['status'], 'passed')
                 self.assertTrue(any(e["event"] == "result" for e in events))
                 self.assertNotIn("fixture-secret", first.stdout)
                 self.assertEqual((Path(tmp) / "hello.py").read_text(), "print('hello')\n")
