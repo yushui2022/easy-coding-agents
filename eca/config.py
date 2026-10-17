@@ -16,6 +16,8 @@ class Settings:
     api_key: str = field(default="", repr=False)
     api_format: str = "openai"
     max_output_tokens: int = 8192
+    network_retries: int = 2
+    auto_compact: bool = True
     mode: str = "code"
     permission: str = "ask"
     max_turns: int = 40
@@ -50,7 +52,7 @@ class Settings:
                       api_format=api_format,
                       model=env.get("ECA_MODEL") or env.get("MODEL_NAME") or cfg.get("model", "" if native else cls.model),
                       base_url=env.get("ECA_BASE_URL") or env.get("ANTHROPIC_BASE_URL" if native else "OPENAI_BASE_URL") or cfg.get("base_url", default_url))
-        for name in ("mode", "permission", "max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens"):
+        for name in ("mode", "permission", "max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "network_retries", "auto_compact"):
             if name in cfg:
                 values[name] = cfg[name]
         values.update({k: v for k, v in overrides.items() if v is not None})
@@ -59,6 +61,10 @@ class Settings:
         return settings
 
     def validate(self):
+        if type(self.network_retries) is not int or not 0 <= self.network_retries <= 5:
+            raise ValueError("network_retries must be an integer from 0 to 5")
+        if type(self.auto_compact) is not bool:
+            raise ValueError("auto_compact must be true or false")
         if self.api_format not in {"openai", "anthropic"}:
             raise ValueError("api_format must be openai or anthropic")
         if self.mode not in {"code", "plan", "chat"}:

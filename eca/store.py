@@ -107,6 +107,7 @@ class Store:
         state["messages"] = repaired
         if state["status"] == "running":
             state["status"] = "interrupted"
+            state["stop_reason"] = "Previous process stopped unexpectedly. Inspect /changes and uncertain shell effects before /continue."
         self.save(state)
 
     def close(self):

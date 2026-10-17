@@ -134,7 +134,35 @@ ANTHROPIC_BASE_URL=https://api.anthropic.com/v1
 先运行 `python -B -m eca --doctor` 检查协议、地址和密钥是否配置（不会发起 API 请求）。
 
 支持文本流、工具调用、多个工具结果回传、会话恢复与 `/compact`。`[agent].max_output_tokens` 控制原生接口响应预算，默认 8192。
-断流、输出截断、损坏的工具参数或错误事件不会交给工具执行。原生接口暂不自动重试，不启用 Thinking、服务端工具、图片或订阅 OAuth。
+断流、输出截断、损坏的工具参数或错误事件不会交给工具执行。临时网络错误在输出文本前可有限重试；不启用 Thinking、服务端工具、图片或订阅 OAuth。
 
 CI 模板保存在 [docs/ci-workflow.yml](docs/ci-workflow.yml)。当前 GitHub 凭据缺少 `workflow` 权限，尚未启用 Actions；取得权限后将模板放入 `.github/workflows/tests.yml`。
 协议实现依据 [Anthropic 流式协议文档](https://platform.claude.com/docs/en/build-with-claude/streaming)，验证记录见 [v0.3 验证说明](docs/VALIDATION-v0.3.md)。
+
+## v0.4：检查、撤销与长任务恢复
+
+每次 `write` / `edit` 都会在落盘前保存修改前后内容，独立于 Git，包含新建文件。写入前仍沿用逐次差异确认；`--accept-edits` 才会跳过该确认。
+
+| 操作 | 交互命令 | 脚本命令（默认最近会话） |
+| --- | --- | --- |
+| 查看最近 100 次文件编辑 | `/changes` | `eca --changes --json` |
+| 查看单次编辑的差异 | `/changes 12` | `eca --changes 12 --json` |
+| 标记已审阅接受 | `/accept 12` | `eca --accept-change 12 --json` |
+| 撤销单次文件编辑 | `/undo 12` | `eca --undo 12 --json` |
+| 继续未完成工作 | `/continue` | `eca --resume latest -p "继续之前的任务，先检查中断状态"` |
+
+ID 对应一次文件编辑，同一文件多次修改应按 ID 从新到旧撤销。`/accept` 是对已经写入的修改标记审阅完成，不会提交 Git，也不会阻止后续撤销。
+撤销将文件恢复到本次编辑前的内容，保留用户原有未提交修改及 Git 暂存区；新文件会被删除。如果当前内容已经不同于记录结果，撤销会拒绝覆盖。
+撤销结果也会写入会话，提醒模型重新读取文件，避免直接重新应用被撤销的修改。
+
+快照位于 `.eca/sessions.sqlite3`，只覆盖新版文件工具，不覆盖 Shell、外部编辑器、文件权限或目录结构变更。不要删除 `.eca` 后再期待撤销历史可用。
+写入中崩溃可能留下 `prepared`，撤销中崩溃可能留下 `undoing`；检查文件后对该 ID 执行 `/undo`，仅在内容与记录一致时恢复，不会自动重放工具。
+
+长任务新增：
+
+- 上下文达到字符预算约 85% 时，自动摘要较早内容，保留完整磁盘历史和最近的完整工具调用组。摘要会消耗模型请求；可在 `[agent]` 设置 `auto_compact = false`。
+- 不足以安全压缩或摘要后仍超限时明确停止，不丢弃存档。摘要不是无损记忆，需要时仍应重新读文件核实。
+- 临时网络错误最多重试 2 次（`network_retries = 0..5`），退避等待可中断；已经显示部分文本、参数错误和认证失败不自动重试。重试模型请求不会重放之前的工具。重试可能产生额外 API 费用。
+- `/status` 显示持久化的停止原因和恢复建议。`/continue` 根据现有会话继续推理，并要求先检查不确定的副作用。
+
+详见 [v0.4 验证记录](docs/VALIDATION-v0.4.md)。

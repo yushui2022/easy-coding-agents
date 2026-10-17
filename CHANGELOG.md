@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0 — 2026-10-17
+
+- Persist before/after snapshots before file-tool writes; review, accept and undo individual edits without resetting the Git index or overwriting later edits.
+- Add interactive and headless review commands; undo updates conversation context and supports interrupted write/undo records.
+- Automatically summarize older context while retaining recent complete tool exchanges and the full archive.
+- Add bounded, cancellable transient model retries before text output, persisted stop reasons and `/continue`.
+- Keep shell side effects outside file undo; document snapshot scope and model usage costs.
+
 ## 0.3.0 — 2026-10-17
 
 - Native Anthropic Messages streaming and normalized tool-use history, selected by config/environment/CLI.

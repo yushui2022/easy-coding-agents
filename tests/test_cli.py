@@ -81,6 +81,17 @@ class CLITests(unittest.TestCase):
                 else:
                     self.assertIn("tool", [m["role"] for m in requests[-1]["messages"]])
                     self.assertEqual(requests[-1]["messages"][-1]["content"], "Continue with summary")
+                review = subprocess.run([*command, "--changes"], env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
+                self.assertEqual(review.returncode, 0, review.stdout + review.stderr)
+                changes = json.loads(review.stdout)["data"]
+                self.assertEqual(changes[0]["path"], "hello.py")
+                ident = str(changes[0]["id"])
+                accepted = subprocess.run([*command, "--accept-change", ident], env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
+                self.assertEqual(accepted.returncode, 0, accepted.stdout + accepted.stderr)
+                undo = subprocess.run([*command, "--undo", ident], env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
+                self.assertEqual(undo.returncode, 0, undo.stdout + undo.stderr)
+                self.assertFalse((Path(tmp) / "hello.py").exists())
+                self.assertEqual(len(requests), 3, "Review and undo must not call the model")
             finally:
                 server.shutdown()
                 server.server_close()

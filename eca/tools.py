@@ -125,6 +125,7 @@ class Tools:
     def __init__(self, settings, state, approve, ask, emit):
         self.settings, self.state = settings, state
         self.approve, self.question, self.emit = approve, ask, emit
+        self.changes = None
 
     def path(self, value):
         path = (self.settings.root / value).resolve()
@@ -223,6 +224,8 @@ class Tools:
         return "\n".join(results) or "No matches."
 
     async def change(self, path, before, content):
+        if len(content.encode("utf-8")) > 2_000_000:
+            raise ValueError("Change exceeds 2 MB limit")
         old = before.decode("utf-8") if before is not None else ""
         diff = "".join(difflib.unified_diff(old.splitlines(True), content.splitlines(True), fromfile=f"a/{path.relative_to(self.settings.root)}", tofile=f"b/{path.relative_to(self.settings.root)}"))
         if before is not None and old == content:
@@ -236,8 +239,13 @@ class Tools:
         # Resolve again: a directory symlink might have changed while approval was open.
         if self.path(str(path)) != path:
             raise ValueError("File path changed while awaiting approval")
+        relative = path.relative_to(self.settings.root).as_posix()
+        ident = self.changes.prepare(relative, before, content.encode("utf-8")) if self.changes else None
         atomic_write(path, content)
-        return f"Saved {path.relative_to(self.settings.root)}. This is not a test result; run appropriate checks."
+        if ident is not None:
+            self.changes.mark(ident, "applied")
+        review = f" Change #{ident}; review with /changes {ident}, undo with /undo {ident}." if ident is not None else ""
+        return f"Saved {relative}.{review} This is not a test result; run appropriate checks."
 
     async def write(self, path, content):
         target = self.path(path)

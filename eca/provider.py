@@ -1,8 +1,10 @@
 """Native asynchronous streaming; partial responses are never executed."""
+import asyncio
 import json
 from urllib.parse import urlsplit
 import httpx
 from openai import AsyncOpenAI
+from .retry import retryable
 
 
 class Provider:
@@ -12,6 +14,23 @@ class Provider:
         self.native = None
 
     async def complete(self, messages, tools, emit):
+        for attempt in range(self.settings.network_retries + 1):
+            emitted = False
+            def forward(event, data):
+                nonlocal emitted
+                if event == "text" and data:
+                    emitted = True
+                emit(event, data)
+            try:
+                return await self._complete(messages, tools, forward)
+            except Exception as exc:
+                if emitted or not retryable(exc) or attempt == self.settings.network_retries:
+                    raise
+                delay = min(2 ** attempt, 8)
+                emit("notice", f"Transient model request failure. Retry {attempt + 1}/{self.settings.network_retries} in {delay}s; no tools have run for this request.")
+                await asyncio.sleep(delay)
+
+    async def _complete(self, messages, tools, emit):
         if self.settings.api_format == "anthropic":
             from .anthropic import AnthropicProvider
             if self.native is None:
@@ -23,7 +42,7 @@ class Provider:
             # Loopback model servers must not be routed through an OS HTTP proxy.
             local = urlsplit(self.settings.base_url).hostname in {"localhost", "127.0.0.1", "::1"}
             self.client = AsyncOpenAI(api_key=self.settings.api_key, base_url=self.settings.base_url,
-                                      timeout=self.settings.request_timeout, max_retries=2,
+                                      timeout=self.settings.request_timeout, max_retries=0,
                                       http_client=httpx.AsyncClient(trust_env=not local))
         kwargs = {"model": self.settings.model, "messages": messages, "stream": True}
         if tools:

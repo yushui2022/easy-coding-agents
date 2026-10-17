@@ -31,6 +31,10 @@ HELP = {
     "/agent NAME": "Select an eca.toml profile (off resets)", "/compact": "Summarize context (one API request)",
     "/tasks": "Show the task plan", "/status": "Show session and configuration", "/diff": "Show Git diff",
     "/export": "Export full session to Markdown", "/exit": "Save and quit",
+    "/changes [ID]": "List recent file edits or inspect one saved diff",
+    "/accept ID": "Mark a file edit reviewed (does not commit Git)",
+    "/undo ID": "Undo one file edit if no newer edits would be overwritten",
+    "/continue": "Continue saved work; inspect uncertain effects before retrying",
 }
 
 
@@ -49,6 +53,10 @@ def parser():
     p.add_argument("--resume", nargs="?", const="latest", help="Resume session ID prefix, or latest")
     p.add_argument("--list-sessions", action="store_true")
     p.add_argument("--doctor", action="store_true", help="Check local configuration without an API request")
+    review = p.add_mutually_exclusive_group()
+    review.add_argument("--changes", nargs="?", const="all", metavar="ID", help="Review saved file edits; defaults to latest session")
+    review.add_argument("--undo", type=int, metavar="ID", help="Undo a recorded file edit without overwriting newer edits")
+    review.add_argument("--accept-change", type=int, metavar="ID", help="Mark a recorded edit reviewed")
     return p
 
 
@@ -160,6 +168,7 @@ class App:
         data = {"project": str(self.settings.root), "session": self.state["id"], "status": self.state["status"],
                 "model": self.settings.model, "api_format": self.settings.api_format, "mode": self.settings.mode, "permission": self.settings.permission,
                 "messages": len(self.state["messages"]), "last_reported_usage": self.state.get("usage", {})}
+        data["stop_reason"] = self.state.get("stop_reason")
         if self.args.json:
             self.emit("status", data)
         else:
@@ -216,6 +225,34 @@ class App:
             self.emit("tasks", self.state["tasks"])
         elif command == "/status":
             self.status()
+        elif command == "/continue":
+            await self.run_task("Continue the unfinished task. First inspect actual state for any interrupted or uncertain tool actions; do not blindly repeat mutations.")
+        elif command == "/changes":
+            if arg and arg != "all":
+                self.emit("diff", self.agent.changes.diff(int(arg)))
+            else:
+                rows = self.agent.changes.list()
+                if self.args.json:
+                    self.emit("changes", rows)
+                else:
+                    table = Table("ID", "File", "Status", title="File-tool edits · newest first · last 100")
+                    for row in rows:
+                        table.add_row(str(row["id"]), row["path"], row["status"])
+                    self.console.print(table)
+                    self.emit("notice", "Inspect /changes ID; /accept ID marks reviewed; /undo ID restores the pre-edit file. Shell edits are not recorded.")
+        elif command in {"/accept", "/undo"}:
+            if not arg.isdigit():
+                raise ValueError(f"Usage: {command} ID (from /changes)")
+            ident = int(arg)
+            if command == "/undo":
+                self.agent.changes.undo(ident)
+                # Inform the next model turn that its earlier tool result is obsolete.
+                path = self.agent.changes.get(ident)[1]
+                self.state["messages"].append({"role": "user", "content": f"I undid file change #{ident} ({path}). Re-read current files before making further changes; do not automatically reapply it."})
+                self.store.save(self.state)
+            else:
+                self.agent.changes.accept(ident)
+            self.emit("notice", f"Change #{ident}: {'undone' if command == '/undo' else 'accepted'}. Git index unchanged.")
         elif command == "/diff":
             result = json.loads(await run_process(["git", "--no-pager", "diff", "--no-ext-diff", "--no-textconv", "HEAD", "--", ".", ":(exclude).env", ":(exclude).env.*", ":(exclude).eca", ":(exclude)venv", ":(exclude)*.pyc"], self.settings.root, 20))
             self.console.print(Syntax(result["stdout"] or result["stderr"] or "No tracked changes. New untracked files are not included.", "diff"))
@@ -277,8 +314,13 @@ class App:
 
 
 async def async_main(args):
-    if args.json and args.prompt is None and not args.list_sessions and not args.doctor:
-        raise ValueError("--json requires --prompt, --list-sessions or --doctor")
+    review = args.changes is not None or args.undo is not None or args.accept_change is not None
+    if review and (args.prompt is not None or args.list_sessions or args.doctor):
+        raise ValueError("Review actions cannot be combined with prompt, doctor or session listing")
+    if review and args.resume is None:
+        args.resume = "latest"
+    if args.json and args.prompt is None and not args.list_sessions and not args.doctor and not review:
+        raise ValueError("--json requires a one-shot, review, session listing or doctor action")
     if args.allow_shell and args.prompt is None:
         raise ValueError("--allow-shell is only for explicit one-shot tasks")
     settings = Settings.load(args.cwd, model=args.model, base_url=args.base_url, api_format=args.api_format, mode=args.mode,
@@ -298,6 +340,11 @@ async def async_main(args):
         return 0
     app = App(settings, args)
     try:
+        if review:
+            command = f"/changes {args.changes}" if args.changes is not None else (
+                f"/undo {args.undo}" if args.undo is not None else f"/accept {args.accept_change}")
+            await app.command(command)
+            return 0
         if args.prompt is not None:
             code = await app.run_task(args.prompt)
             app.status()

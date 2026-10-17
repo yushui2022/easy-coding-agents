@@ -7,6 +7,7 @@ import json
 from urllib.parse import urlsplit
 
 import httpx
+from .retry import TransientResponseError
 
 
 def messages_payload(messages, tools, settings):
@@ -87,10 +88,14 @@ class AnthropicProvider:
                 json=messages_payload(messages, tools, settings)) as response:
             if response.status_code != 200:
                 # Provider bodies can echo request data; avoid persisting secrets.
+                if response.status_code in {408, 429, 500, 502, 503, 504, 529}:
+                    raise TransientResponseError(f"Anthropic HTTP {response.status_code}")
                 raise RuntimeError(f"Anthropic HTTP {response.status_code}; check credentials, model and endpoint.")
             async for event in sse_events(response):
                 kind = event.get("type")
                 if kind == "error":
+                    if event.get("error", {}).get("type") in {"overloaded_error", "rate_limit_error", "api_error"}:
+                        raise TransientResponseError("Anthropic stream reported an error; no tools were executed.")
                     raise RuntimeError("Anthropic stream reported an error; no tools were executed.")
                 if kind == "message_start":
                     if started:
