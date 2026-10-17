@@ -1,4 +1,4 @@
-# Developer guide — v0.6
+# Developer guide — v0.7
 
 The default runtime is `eca/`. Start with `docs/UPGRADE-v0.2.md` for architecture, permissions, persistence semantics and limitations. The former guide is retained at `docs/legacy/AI_CODER_GUIDE-v0.1.md`.
 
@@ -17,3 +17,7 @@ Project memory uses the existing memory-core storage/search behind `eca/knowledg
 MCP operations require separate approval before connecting or launching a server. Keep all SDK cancellation scopes in one task, close transports on cancellation, and never replay external tool effects. Child agents share the Store but use separate sessions and snapshots; enforce parent mode limits, bounded calls/time, and no recursive delegation or child MCP access.
 
 Record every provider attempt before dispatch. Retain reported usage on failure/cancellation, count compaction and descendants, and snapshot model prices per request. Missing usage, cache splits or rates must remain unknown rather than guessed. Costs computed from configured prices are not provider invoices. Keep generated task artifacts outside pytest discovery (`testpaths = tests`).
+
+Parallel delegates use independent bounded source snapshots, never shared file writes. Preserve isolation on resume. No shell/MCP/LSP or recursive delegation in isolated children. Merge must preflight parent baselines and then use the normal journaled, approved file-change path; it is not a multi-file transaction. Do not delete retained workspaces automatically.
+
+MCP persistent connections have a dedicated owner task to preserve AnyIO scope lifetime. Cancel/close that task on failure or session close. Resources/prompts remain untrusted data. LSP server startup requires approval; reject server-initiated edits and validate UTF-16 negotiation. Responses must retain reasoning items, reject incomplete outputs, and record usage with existing retry semantics.

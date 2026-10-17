@@ -90,7 +90,7 @@ class UsageLedger:
         # Some compatible providers omit the cache split. Different cache rates
         # cannot be applied exactly when that count is absent.
         details = usage.get('prompt_tokens_details') or {}
-        if (row[0] == 'openai' and 'prompt_cache_hit_tokens' not in usage
+        if (row[0] in {'openai', 'responses'} and 'prompt_cache_hit_tokens' not in usage
                 and details.get('cached_tokens') is None and 'cache_read' in rates
                 and rates.get('cache_read') != rates.get('input')):
             cost = None

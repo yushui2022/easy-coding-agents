@@ -204,3 +204,7 @@ eca --cwd ./your-project --resume SESSION_ID --undo CHANGE_ID --json
 ```
 
 空项目的会话列表返回 `[]`，不会创建状态目录。已有会话的恢复仍受项目锁和快照冲突检查保护。诊断不会修改 Git 索引或忽略文件。
+
+## v0.7 扩展
+
+并行隔离子任务、文件合并、MCP 连接/资源/提示词、Responses 模型与 LSP 配置见 [v0.7 升级手册](UPGRADE-v0.7.md)。`/mcp disconnect NAME` 可断开指定服务。

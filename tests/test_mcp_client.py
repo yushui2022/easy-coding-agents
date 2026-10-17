@@ -65,6 +65,40 @@ for line in sys.stdin:
         self.assertNotIn('test-private-token',result)
         self.assertIn('[redacted]',result)
 
+    async def test_persistent_transport_reused_and_closed(self):
+        client=MCPTools(self.settings,yes,persistent=True)
+        try:
+            first=json.loads(await client.invoke('fixture'))
+            worker=client.workers['fixture'][1]
+            result=json.loads(await client.invoke('fixture','echo',{'text':'kept alive'}))
+            self.assertIs(client.workers['fixture'][1],worker)
+            self.assertEqual(result['content'][0]['text'],'kept alive')
+            self.assertEqual(first['tools'][0]['name'],'echo')
+        finally:
+            await client.close()
+        self.assertTrue(worker.done())
+        self.assertEqual(client.workers,{})
+
+    async def test_resource_prompt_operations_with_real_stdio(self):
+        script=self.root/'fixture.py'
+        text=script.read_text('utf-8').replace("    else: result={}", """    elif method=='resources/list': result={'resources':[{'uri':'fixture://doc','name':'doc'}]}
+    elif method=='resources/templates/list': result={'resourceTemplates':[{'uriTemplate':'fixture://{name}','name':'template'}]}
+    elif method=='resources/read': result={'contents':[{'uri':m['params']['uri'],'text':'resource text'}]}
+    elif method=='prompts/list': result={'prompts':[{'name':'review'}]}
+    elif method=='prompts/get': result={'messages':[{'role':'user','content':{'type':'text','text':'untrusted prompt'}}]}
+    else: result={}""")
+        script.write_text(text,encoding='utf-8')
+        client=MCPTools(self.settings,yes,persistent=True)
+        try:
+            self.assertEqual(json.loads(await client.invoke('fixture','@resources'))['resources'][0]['name'],'doc')
+            self.assertEqual(json.loads(await client.invoke('fixture','@read',{'uri':'fixture://doc'}))['contents'][0]['text'],'resource text')
+            self.assertEqual(json.loads(await client.invoke('fixture','@templates'))['resourceTemplates'][0]['name'],'template')
+            self.assertEqual(json.loads(await client.invoke('fixture','@prompts'))['prompts'][0]['name'],'review')
+            result=json.loads(await client.invoke('fixture','@prompt',{'name':'review'}))
+            self.assertIn('untrusted',result['notice'])
+        finally:
+            await client.close()
+
     async def test_denial_and_plan_mode_do_not_connect(self):
         client=MCPTools(self.settings,no)
         with patch.object(client,'_operate',new_callable=AsyncMock) as operation:

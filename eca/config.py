@@ -32,6 +32,8 @@ class Settings:
     subagent_timeout: int = 180
     mcp_servers: dict = field(default_factory=dict, repr=False)
     pricing: dict = field(default_factory=dict)
+    lsp_servers: dict = field(default_factory=dict)
+    reasoning_effort: str = ""
 
     @property
     def state_dir(self):
@@ -48,7 +50,7 @@ class Settings:
         cfg = data.get("agent", {})
         if not isinstance(cfg, dict):
             raise ValueError("[agent] must be a TOML table")
-        supported = set(cls.__dataclass_fields__) - {"root", "api_key", "mcp_servers", "pricing"} | {"api_key_env"}
+        supported = set(cls.__dataclass_fields__) - {"root", "api_key", "mcp_servers", "pricing", "lsp_servers"} | {"api_key_env"}
         if "api_key" in cfg:
             raise ValueError("Use api_key_env instead of storing a secret in eca.toml")
         if set(cfg) - supported:
@@ -61,13 +63,13 @@ class Settings:
         key = env.get(key_name, "") if key_name else (env.get("ECA_API_KEY") or
             (env.get("ANTHROPIC_API_KEY") if native else (env.get("OPENAI_API_KEY") or env.get("MODELSCOPE_API_KEY"))) or "")
         default_url = "https://api.anthropic.com/v1" if native else (
-            "https://api.openai.com/v1" if env.get("OPENAI_API_KEY") and not env.get("MODELSCOPE_API_KEY") else cls.base_url)
+            "https://api.openai.com/v1" if api_format == "responses" or (env.get("OPENAI_API_KEY") and not env.get("MODELSCOPE_API_KEY")) else cls.base_url)
         values = dict(root=root, api_key=key,
                       api_format=api_format,
                       model=env.get("ECA_MODEL") or env.get("MODEL_NAME") or cfg.get("model", "" if native else cls.model),
                       base_url=env.get("ECA_BASE_URL") or env.get("ANTHROPIC_BASE_URL" if native else "OPENAI_BASE_URL") or cfg.get("base_url", default_url))
-        values.update(mcp_servers=data.get("mcp_servers", {}), pricing=data.get("pricing", {}))
-        for name in ("mode", "permission", "max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "network_retries", "auto_compact", "project_memory", "stream_usage", "subagent_max_turns", "subagent_max_calls", "subagent_timeout"):
+        values.update(mcp_servers=data.get("mcp_servers", {}), pricing=data.get("pricing", {}), lsp_servers=data.get("lsp_servers", {}))
+        for name in ("reasoning_effort", "mode", "permission", "max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "network_retries", "auto_compact", "project_memory", "stream_usage", "subagent_max_turns", "subagent_max_calls", "subagent_timeout"):
             if name in cfg:
                 values[name] = cfg[name]
         values.update({k: v for k, v in overrides.items() if v is not None})
@@ -90,8 +92,12 @@ class Settings:
             raise ValueError("auto_compact must be true or false")
         if type(self.project_memory) is not bool:
             raise ValueError("project_memory must be true or false")
-        if self.api_format not in {"openai", "anthropic"}:
-            raise ValueError("api_format must be openai or anthropic")
+        from .lsp import validate_servers as validate_lsp
+        validate_lsp(self.lsp_servers)
+        if self.reasoning_effort not in {"", "none", "minimal", "low", "medium", "high", "xhigh"}:
+            raise ValueError("Invalid reasoning_effort")
+        if self.api_format not in {"openai", "anthropic", "responses"}:
+            raise ValueError("api_format must be openai, responses or anthropic")
         if self.mode not in {"code", "plan", "chat"}:
             raise ValueError("mode must be code, plan or chat")
         if self.permission not in {"ask", "accept-edits"}:

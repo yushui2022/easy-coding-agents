@@ -59,8 +59,14 @@ class Provider:
             self.client = AsyncOpenAI(api_key=self.settings.api_key, base_url=self.settings.base_url,
                                       timeout=self.settings.request_timeout, max_retries=0,
                                       http_client=httpx.AsyncClient(trust_env=not local))
-        kwargs = {"model": self.settings.model, "messages": messages, "stream": True,
+        if self.settings.api_format == "responses":
+            from .responses import complete
+            return await complete(self.client, self.settings, messages, tools, emit,
+                                  lambda usage: setattr(self, 'last_usage', usage))
+        kwargs = {"model": self.settings.model, "messages": [{k: v for k, v in m.items() if k in {"role", "content", "tool_calls", "tool_call_id"}} for m in messages], "stream": True,
                   "max_tokens": self.settings.max_output_tokens}
+        if self.settings.reasoning_effort:
+            kwargs["reasoning_effort"] = self.settings.reasoning_effort
         if tools:
             kwargs["tools"] = tools
         if self.settings.stream_usage:

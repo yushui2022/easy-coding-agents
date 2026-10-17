@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.0 — 2026-10-17
+
+- 新增有数量/轮数/超时限制的并行子任务，独立源码快照、冲突检查与可撤销文件合并。
+- 隔离子任务在执行层禁用 Shell/MCP/LSP 与递归委派，恢复后保持隔离。
+- MCP 连接所有者任务、显式断开、资源/模板读取和提示词获取，保留逐次审批与无重放原则。
+- 新增 Responses 流式协议、reasoning 项回传和请求用量统计；支持可选 reasoning_effort。
+- 新增经审批的 stdio LSP 定义、引用、悬停、符号及 pull diagnostics 查询。
+- 边界：无 OS 沙箱、OAuth、Git worktree 合并或 LSP 自动重命名。见 docs/UPGRADE-v0.7.md。
+
+
 ## 0.6.0 — 2026-10-17
 
 - Add optional official-SDK MCP stdio/Streamable HTTP tool discovery and invocation with per-operation approval, bounded timeouts, schema validation and no automatic replay.

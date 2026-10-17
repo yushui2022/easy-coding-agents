@@ -48,3 +48,14 @@ builder = "Implement the requested change using existing project conventions, th
 # cache_write = "1.25"
 # cache_write_5m = "1.25"
 # cache_write_1h = "2.00"
+
+# v0.7: choose api_format = "responses" and reasoning_effort = "low"
+# inside [agent], with an endpoint/model that supports them.
+# Parallel delegates use subagent_max_calls/turns/timeout above.
+
+# Install a language server yourself, then enable its stdio command:
+# [lsp_servers.python]
+# command = "pyright-langserver"
+# args = ["--stdio"]
+# language_id = "python"
+# timeout = 30

@@ -54,10 +54,11 @@ def parser():
     p.add_argument("--json", action="store_true", help="JSONL events for --prompt")
     p.add_argument("--model")
     p.add_argument("--base-url")
-    p.add_argument("--api-format", choices=["openai", "anthropic"], help="Model wire protocol")
+    p.add_argument("--api-format", choices=["openai", "anthropic", "responses"], help="Model wire protocol")
     p.add_argument("--mode", choices=["code", "plan", "chat"])
     p.add_argument("--accept-edits", action="store_true", help="Approve file edits inside project; shell still requires approval")
     p.add_argument("--allow-shell", action="store_true", help="Explicitly approve ALL shell commands (including outside project); for trusted one-shot tasks only")
+    p.add_argument("--allow-lsp", action="append", default=[], metavar="SERVER", help="Approve startup of one configured language server in one-shot mode")
     p.add_argument("--allow-mcp", action="append", default=[], metavar="SERVER", help="Approve MCP operations for one configured server in one-shot mode; repeat per server")
     p.add_argument("--usage", action="store_true", help="Show saved usage without contacting the model; defaults to latest session")
     p.add_argument("--resume", nargs="?", const="latest", help="Resume session ID prefix, or latest")
@@ -115,10 +116,16 @@ class App:
         elif event == "tasks":
             for task in data:
                 self.console.print(f"  [{task['status']}] {task['content']}", markup=False)
+        elif event == 'subagent_progress' and data['event'] in {'turn', 'tool', 'error'}:
+            value = data['data']
+            label = value.get('name', '') if isinstance(value, dict) else str(value)
+            self.console.print(f"  Agent {data['session'][:8]} · {data['event']} · {self.redact(label)}", markup=False)
         elif event in {"notice", "error"}:
             self.console.print(self.redact(str(data)), style="yellow" if event == "notice" else "red", markup=False)
 
     async def approve(self, message, detail):
+        if message.startswith('Start language server') and self.args.prompt is not None:
+            return json.loads(detail)['server'] in self.args.allow_lsp
         if message.startswith('Run MCP') and self.args.prompt is not None:
             return json.loads(detail)['server'] in self.args.allow_mcp
         if message.startswith("Run shell") and self.args.allow_shell:
@@ -127,7 +134,7 @@ class App:
             self.emit("notice", "Approval unavailable in one-shot mode; action denied. Use --accept-edits / --allow-shell explicitly if appropriate.")
             return False
         self.console.print(message, style="yellow", markup=False)
-        if message.startswith(("Run shell", "Run MCP")):
+        if message.startswith(("Run shell", "Run MCP", "Start language server")):
             self.console.print(detail, markup=False)
         try:
             answer = await self.prompt.prompt_async("Allow once? [y/N] ", completer=None, bottom_toolbar=None)
@@ -178,7 +185,7 @@ class App:
         self.console.print(table)
 
     def status(self):
-        data = {"project": str(self.settings.root), "session": self.state["id"], "status": self.state["status"],
+        data = {"project": str(self.agent.settings.root), "session": self.state["id"], "status": self.state["status"],
                 "model": self.settings.model, "api_format": self.settings.api_format, "mode": self.settings.mode, "permission": self.settings.permission,
                 "messages": len(self.state["messages"]), "last_reported_usage": self.state.get("usage", {})}
         data['usage'] = self.agent.ledger.summary(self.state)
@@ -211,16 +218,16 @@ class App:
         elif command == "/mode":
             if arg not in {"code", "plan", "chat"}:
                 raise ValueError("Usage: /mode code|plan|chat")
-            self.settings.mode = self.state["mode"] = arg
+            self.agent.settings.mode = self.settings.mode = self.state["mode"] = arg
             self.store.save(self.state)
         elif command == "/permission":
             if arg not in {"ask", "accept-edits"}:
                 raise ValueError("Usage: /permission ask|accept-edits")
-            self.settings.permission = arg
+            self.agent.settings.permission = self.settings.permission = arg
         elif command == "/model":
             if not arg:
                 raise ValueError("Usage: /model MODEL_NAME")
-            self.settings.model = arg
+            self.agent.settings.model = self.settings.model = arg
         elif command == "/agent":
             path = self.settings.root / "eca.toml"
             profiles = tomllib.loads(path.read_text("utf-8")).get("profiles", {}) if path.exists() else {}
@@ -247,7 +254,16 @@ class App:
             else:
                 self.console.print(json.dumps(data,ensure_ascii=False,indent=2),markup=False)
         elif command == '/mcp':
-            self.emit('notice',json.dumps({k:v.get('transport','stdio') for k,v in self.settings.mcp_servers.items()}))
+            if arg:
+                if not arg.startswith('disconnect '):
+                    raise ValueError('Usage: /mcp [disconnect SERVER]')
+                if self.agent.tools.mcp:
+                    await self.agent.tools.mcp.disconnect(arg.split(' ',1)[1])
+                self.emit('notice', 'MCP connection closed; next operation requires approval.')
+            else:
+                self.emit('notice',json.dumps({k:dict(transport=v.get('transport','stdio'),
+                    connected=bool(self.agent.tools.mcp and k in self.agent.tools.mcp.workers))
+                    for k,v in self.agent.settings.mcp_servers.items()}))
         elif command == '/agents':
             children=[]
             for ident in self.state.get('children',[]):
@@ -328,7 +344,7 @@ class App:
         @bindings.add("s-tab")
         def toggle(event):
             modes = ["code", "plan", "chat"]
-            self.settings.mode = self.state["mode"] = modes[(modes.index(self.settings.mode) + 1) % len(modes)]
+            self.agent.settings.mode = self.settings.mode = self.state["mode"] = modes[(modes.index(self.settings.mode) + 1) % len(modes)]
             self.store.save(self.state)
             event.app.invalidate()
 
@@ -385,6 +401,8 @@ async def async_main(args):
         raise ValueError("--json requires a one-shot, review, session listing or doctor action")
     if args.allow_shell and args.prompt is None:
         raise ValueError("--allow-shell is only for explicit one-shot tasks")
+    if args.allow_lsp and args.prompt is None:
+        raise ValueError('--allow-lsp is only for one-shot tasks')
     if args.allow_mcp and args.prompt is None:
         raise ValueError('--allow-mcp is only for one-shot tasks')
     if args.doctor:
