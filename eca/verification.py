@@ -3,6 +3,16 @@ import re
 import json
 
 
+def repair_allowed(result):
+    """Do not rerun denied, timed-out, interrupted or unknown-outcome commands."""
+    try:
+        output = json.loads(result)
+        return (isinstance(output, dict) and output.get('timed_out') is False and
+                type(output.get('exit_code')) is int and output['exit_code'] >= 0)
+    except (TypeError, ValueError):
+        return False
+
+
 def command_status(command, result):
     """Successful command evidence only; never infer tests passed from prose."""
     try:

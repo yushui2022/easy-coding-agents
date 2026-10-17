@@ -11,10 +11,10 @@
   <a href="#快速开始">快速开始</a> ·
   <a href="docs/CLI_GUIDE.md">使用手册</a> ·
   <a href="CHANGELOG.md">更新记录</a> ·
-  <a href="docs/UPGRADE-v0.9.md">验证记录</a>
+  <a href="docs/UPGRADE-v0.10.md">验证记录</a>
 </p>
 
-<p align="center"><code>Python 3.11+</code> · <code>v0.9.0</code> · <code>开发中</code></p>
+<p align="center"><code>Python 3.11+</code> · <code>v0.10.0</code> · <code>开发中</code></p>
 
 ---
 
@@ -34,6 +34,7 @@ Easy Coding Agent（ECA）是一个可自行配置模型的 Python CLI 编程助
 | **长任务上下文** | 接近字符预算时摘要较早内容，保留完整历史与最近的完整工具调用组。 |
 | **进度与截断恢复** | 最近 12 项文件/命令观察跨摘要保留；确认输出达到上限后最多恢复两次，提示拆分操作。 |
 | **显式验收** | 指定任务后的验证命令；检查失败返回退出码 3，文件快照改变后结果标为过期。 |
+| **修复与复验** | 最多 10 项顺序检查；显式开启最多 3 轮修复，修复后复验整组，保存各轮结果。 |
 | **项目记忆** | 记住显式确认的约束和有执行记录支持的历史测试命令；代码指纹变化后排除过期命令记录。 |
 | **项目规则** | 文件编辑前加载路径上各级 `AGENTS.md`，先向模型提供适用规则。 |
 | **模型选择** | 支持 Chat Completions、Responses 与 Anthropic Messages；命名配置绑定模型、协议、接口和密钥来源。 |

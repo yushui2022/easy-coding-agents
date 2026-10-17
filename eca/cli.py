@@ -56,7 +56,8 @@ def parser():
     p.add_argument("--cwd", type=Path, default=Path.cwd(), help="Project directory")
     p.add_argument("-p", "--prompt", help="Run a single task and exit")
     p.add_argument("--json", action="store_true", help="JSONL events for --prompt")
-    p.add_argument("--verify-command", help="Run this check after an idle one-shot task; requires --allow-shell; failure exits 3")
+    p.add_argument("--verify-command", action='append', default=[], help="Run a check after the task; repeat for up to 10 checks; requires --allow-shell")
+    p.add_argument('--repair-attempts', type=int, default=0, help='Opt in to 1..3 repair rounds and rerunning selected checks (default: 0)')
     p.add_argument("--model")
     p.add_argument("--model-profile", help="Select [model_profiles.NAME] with its own endpoint and credential variable")
     p.add_argument("--base-url")
@@ -134,6 +135,8 @@ class App:
         elif event == "tasks":
             for task in data:
                 self.console.print(f"  [{task['status']}] {task['content']}", markup=False)
+        elif event == 'verification_suite':
+            self.console.print(f"Verification suite: {data['status']} ({len(data.get('rounds', []))} round(s))", markup=False)
         elif event == 'subagent_progress' and data['event'] in {'turn', 'tool', 'error', 'status'}:
             value = data['data']
             label = value.get('name', '') if isinstance(value, dict) else str(value)
@@ -170,12 +173,8 @@ class App:
             raise asyncio.CancelledError
 
     async def run_task(self, text):
-        async def workflow():
-            await self.agent.run(text)
-            if self.state['status'] == 'idle' and self.args.verify_command:
-                return await self.agent.verify(self.args.verify_command)
-            return True
-        task = asyncio.create_task(workflow())
+        from .workflow import verified_run
+        task = asyncio.create_task(verified_run(self.agent, text, self.args.verify_command, self.args.repair_attempts))
         loop = asyncio.get_running_loop()
         previous = signal.getsignal(signal.SIGINT)
         def interrupt(*_):
@@ -215,6 +214,8 @@ class App:
         data['children'] = self.state.get('children',[])
         data["stop_reason"] = self.state.get("stop_reason")
         data['verification'] = self.agent.verification_status()
+        from .workflow import suite_status
+        data['verification_suite'] = suite_status(self.agent)
         if self.args.json:
             self.emit("status", data)
         else:
@@ -243,9 +244,11 @@ class App:
             self.agent = self.make_agent()
             self.status()
         elif command == '/progress':
+            from .workflow import suite_status
             self.emit('notice', json.dumps({'observations': self.state.get('progress', []),
                 'tasks': self.state['tasks'], 'changes': self.agent.changes.list(),
-                'verification': self.agent.verification_status()}, ensure_ascii=False))
+                'verification': self.agent.verification_status(),
+                'verification_suite': suite_status(self.agent)}, ensure_ascii=False))
         elif command == '/verify':
             await self.agent.verify(arg)
         elif command == "/sessions":
@@ -445,8 +448,12 @@ class App:
 
 
 async def async_main(args):
-    if args.verify_command is not None and (args.prompt is None or not args.allow_shell or not args.verify_command.strip()):
+    if args.verify_command and (args.prompt is None or not args.allow_shell or any(not c.strip() for c in args.verify_command)):
         raise ValueError('--verify-command requires --prompt, --allow-shell and a nonempty command')
+    if len(args.verify_command) > 10 or not 0 <= args.repair_attempts <= 3 or (args.repair_attempts and not args.verify_command):
+        raise ValueError('At most 10 checks; --repair-attempts requires checks and must be 0..3')
+    if args.verify_command and (args.usage or args.doctor or args.list_sessions or args.changes is not None or args.undo is not None or args.accept_change is not None):
+        raise ValueError('Verification cannot be combined with offline actions')
     if args.usage:
         if args.prompt is not None or args.doctor or args.list_sessions or args.changes is not None or args.undo is not None or args.accept_change is not None:
             raise ValueError('--usage cannot be combined with other actions')

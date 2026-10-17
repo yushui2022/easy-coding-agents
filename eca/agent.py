@@ -317,7 +317,7 @@ If execution was interrupted, inspect the actual state before repeating mutation
         """Explicit user check; uses the same shell permissions and action journal."""
         if self.busy or not command.strip():
             raise ValueError('Verification requires an idle agent and a nonempty command')
-        from .verification import command_status
+        from .verification import command_status, repair_allowed
         ident = uuid.uuid4().hex
         before = self.memory().fingerprint()
         record = {'command': command, 'status': 'running', 'fingerprint': before}
@@ -334,6 +334,7 @@ If execution was interrupted, inspect the actual state before repeating mutation
             self.store.finish(action, result)
             self.state['messages'].append({'role': 'tool', 'tool_call_id': ident, 'content': result})
             record['status'] = command_status(command, result)
+            record['repair_allowed'] = record['status'] in {'failed', 'no_tests'} and repair_allowed(result)
             if record['status'] == 'passed' and (not before or self.memory().fingerprint() != before):
                 record['status'] = 'unconfirmed_snapshot'
             self.observe('shell', {'command': command}, result)
