@@ -22,6 +22,7 @@ from .agent import Agent
 from .config import Settings
 from .store import Store
 from .tools import atomic_write, run_process
+from .doctor import diagnose
 
 
 HELP = {
@@ -341,15 +342,24 @@ async def async_main(args):
         raise ValueError("--json requires a one-shot, review, session listing or doctor action")
     if args.allow_shell and args.prompt is None:
         raise ValueError("--allow-shell is only for explicit one-shot tasks")
-    settings = Settings.load(args.cwd, model=args.model, base_url=args.base_url, api_format=args.api_format, mode=args.mode,
-                             permission="accept-edits" if args.accept_edits else None)
     if args.doctor:
-        print(json.dumps({"version": __version__, "python": sys.version.split()[0], "project": str(settings.root),
-              "model": settings.model, "api_format": settings.api_format, "base_url": settings.base_url, "api_key_configured": bool(settings.api_key),
-              "permission": settings.permission, "mode": settings.mode, "state_dir": str(settings.state_dir),
-              "network_checked": False}, ensure_ascii=False, indent=None if args.json else 2))
-        return 0
+        report = diagnose(args.cwd, model=args.model, base_url=args.base_url, api_format=args.api_format, mode=args.mode,
+                          permission="accept-edits" if args.accept_edits else None)
+        print(json.dumps(report, ensure_ascii=False, indent=None if args.json else 2))
+        return 0 if report["ready"] else 1
+    if review or args.list_sessions:
+        # Recovery must remain available even when .env/eca.toml is broken.
+        root = args.cwd.resolve()
+        if not root.is_dir():
+            raise ValueError("Project directory does not exist")
+        settings = Settings(root)
+    else:
+        settings = Settings.load(args.cwd, model=args.model, base_url=args.base_url, api_format=args.api_format, mode=args.mode,
+                                 permission="accept-edits" if args.accept_edits else None)
     if args.list_sessions:
+        if not settings.state_dir.exists():
+            print("[]")
+            return 0
         store = Store(settings.root)
         try:
             print(json.dumps([{"id": i, "title": t, "updated": u} for i, t, u in store.list()], ensure_ascii=False, indent=None if args.json else 2))

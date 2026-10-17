@@ -11,10 +11,10 @@
   <a href="#快速开始">快速开始</a> ·
   <a href="docs/CLI_GUIDE.md">使用手册</a> ·
   <a href="CHANGELOG.md">更新记录</a> ·
-  <a href="docs/VALIDATION-v0.5.md">验证记录</a>
+  <a href="docs/VALIDATION-v0.5.1.md">验证记录</a>
 </p>
 
-<p align="center"><code>Python 3.11+</code> · <code>v0.5.0</code> · <code>开发中</code></p>
+<p align="center"><code>Python 3.11+</code> · <code>v0.5.1</code> · <code>开发中</code></p>
 
 ---
 
@@ -112,7 +112,7 @@ eca --doctor
 eca
 ```
 
-`--doctor` 只检查本地配置，不发送模型请求。也可以用 `eca --cwd ./your-project` 指定一个已存在的项目目录。
+`--doctor` 离线检查配置、密钥是否设置、状态目录、Shell 和 Git；不调用模型，也不创建会话。存在阻止启动的问题时退出码为 1，其他情况为 0；Git 等非必需能力的问题作为警告显示。也可以用 `eca --cwd ./your-project` 指定一个已存在的项目目录。
 
 ## 一个日常工作流
 
@@ -160,6 +160,7 @@ eca --changes --json
 - **本地存储，模型远程推理。** 会话、修改快照和项目记忆存放在目标项目的 `.eca/` 中；发送给模型的上下文会交给你配置的 API。请将 `.eca/` 加入目标项目的 `.gitignore`。
 - **Shell 没有沙箱。** 文件工具限定项目范围，但确认后的 Shell 命令具有当前用户权限；其副作用不在文件撤销范围内。
 - **历史成功不代表现在正确。** 记忆中的测试命令只证明当时返回了成功退出码；指纹不覆盖依赖安装状态、环境变量或外部服务。
+- **本地恢复不依赖模型配置。** 即使 `.env` 或 `eca.toml` 损坏，仍可使用 `--list-sessions`、`--changes`、`--undo ID` 和 `--accept-change ID`。
 - **恢复和摘要也有边界。** 摘要可能遗漏信息；结果不确定的操作不会自动重放。一个项目同时只允许一个 ECA 进程。
 - **仍未实现** MCP、LSP、Responses API、订阅 OAuth、子 Agent 和精确费用统计。
 
@@ -170,7 +171,7 @@ python -m pip install -r requirements-dev.txt
 python -B -m pytest -q
 ```
 
-最近一次 v0.5 全量回归为 **96 通过、1 跳过**；随后补充的记忆专项运行 **11 项通过**，两组结果存在重叠。测试覆盖恢复、撤销、两种协议及记忆机制，使用本地 HTTP 服务和确定性模型响应，不是实际模型任务成功率评测。详见 [验证范围与结果](docs/VALIDATION-v0.5.md)。
+最近一次 v0.5.1 全量回归为 **105 通过、1 跳过**。测试覆盖恢复、撤销、两种协议及记忆机制，使用本地 HTTP 服务和确定性模型响应，不是实际模型任务成功率评测。详见 [验证范围与结果](docs/VALIDATION-v0.5.1.md)。
 
 CI 配置目前保留为 [工作流模板](docs/ci-workflow.yml)，尚未启用。跨平台执行和真实仓库长任务稳定性仍需持续验证。
 

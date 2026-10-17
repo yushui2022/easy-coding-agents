@@ -40,9 +40,16 @@ class Settings:
         config_path = root / "eca.toml"
         data = tomllib.loads(config_path.read_text("utf-8")) if config_path.exists() else {}
         cfg = data.get("agent", {})
+        if not isinstance(cfg, dict):
+            raise ValueError("[agent] must be a TOML table")
+        supported = set(cls.__dataclass_fields__) - {"root", "api_key"} | {"api_key_env"}
         if "api_key" in cfg:
             raise ValueError("Use api_key_env instead of storing a secret in eca.toml")
+        if set(cfg) - supported:
+            raise ValueError("Unknown [agent] option; compare eca.toml with eca.example.toml")
         key_name = cfg.get("api_key_env")
+        if key_name is not None and (not isinstance(key_name, str) or not key_name.strip()):
+            raise ValueError("api_key_env must be a nonempty environment variable name")
         api_format = overrides.get("api_format") or env.get("ECA_API_FORMAT") or cfg.get("api_format", "openai")
         native = api_format == "anthropic"
         key = env.get(key_name, "") if key_name else (env.get("ECA_API_KEY") or
@@ -62,6 +69,8 @@ class Settings:
         return settings
 
     def validate(self):
+        if not isinstance(self.api_key, str):
+            raise ValueError("API key must be text")
         if type(self.network_retries) is not int or not 0 <= self.network_retries <= 5:
             raise ValueError("network_retries must be an integer from 0 to 5")
         if type(self.auto_compact) is not bool:
@@ -78,8 +87,14 @@ class Settings:
             value = getattr(self, name)
             if type(value) is not int or value <= 0:
                 raise ValueError(f"{name} must be a positive integer")
+        if not isinstance(self.base_url, str):
+            raise ValueError("base_url must be text")
         url = urlsplit(self.base_url)
-        if url.scheme not in {"http", "https"} or not url.netloc or url.username or url.password:
-            raise ValueError("base_url must be an HTTP(S) URL without embedded credentials")
+        if url.scheme not in {"http", "https"} or not url.hostname or url.username or url.password or url.query or url.fragment:
+            raise ValueError("base_url must be an HTTP(S) URL without credentials, query parameters or fragments")
+        try:
+            url.port
+        except ValueError:
+            raise ValueError("base_url has an invalid port") from None
         if not isinstance(self.model, str) or not self.model.strip():
             raise ValueError("model cannot be empty; set ECA_MODEL, --model or agent.model")

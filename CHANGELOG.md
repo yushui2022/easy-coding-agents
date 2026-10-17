@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1 — 2026-10-17
+
+- Replace configuration-only doctor output with structured, read-only local readiness checks and actionable warnings.
+- Keep session listing and file review/undo available with malformed model configuration; avoid initializing state when listing an empty project.
+- Reject unknown agent options, invalid key-variable types, invalid endpoint ports and credential-bearing query/fragment URLs.
+
 ## 0.5.0 — 2026-10-17
 
 - Integrate existing memory-core SQLite/FTS through a source-qualified CLI adapter; package the core with ECA.

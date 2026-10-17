@@ -182,3 +182,21 @@ ID 对应一次文件编辑，同一文件多次修改应按 ID 从新到旧撤�
 这不是完整的语义规则执行器：CLI 保证适用规则先进入模型上下文，模型仍需正确理解和遵守。根目录 `MEMORY.md` 仅标为未经验证的项目笔记。
 
 验证记录见 [v0.5 验证说明](VALIDATION-v0.5.md)。
+
+## 离线诊断与配置损坏时的恢复
+
+`eca --doctor --json` 返回结构化检查结果：`checks` 中每项包含 `name`、`status`（ok / warning / error）与处理说明。`ready` 表示本地检查未发现阻止启动的问题，不代表 API 可用或文件一定可写。只检查目录访问属性，不实际试写；不检查网络连通性或密钥是否有效。
+
+检查内容包括 Python 版本、项目/状态目录、配置格式与类型、密钥是否设置、Shell、Git，以及 Git 是否忽略 `.env` 和 `.eca/`。配置损坏时返回诊断，不输出原始配置文本；API 地址只显示来源域名，不显示可能含凭据的自定义路径。警告不会导致失败；error 对应退出码 1。
+
+`[agent]` 中未知配置项不再静默忽略；请修正拼写。接口地址不接受内嵌凭据、查询参数和片段，密钥应通过环境变量配置。
+
+文件审阅/撤销和 `--list-sessions` 不读取 `.env` 或 `eca.toml`，无需有效模型配置。这样即使配置损坏，仍可先恢复工作区：
+
+```sh
+eca --cwd ./your-project --list-sessions --json
+eca --cwd ./your-project --resume SESSION_ID --changes --json
+eca --cwd ./your-project --resume SESSION_ID --undo CHANGE_ID --json
+```
+
+空项目的会话列表返回 `[]`，不会创建状态目录。已有会话的恢复仍受项目锁和快照冲突检查保护。诊断不会修改 Git 索引或忽略文件。
