@@ -183,6 +183,10 @@ python -B -m pytest -q
 
 CI 配置目前保留为 [工作流模板](docs/ci-workflow.yml)，尚未启用。跨平台执行和真实仓库长任务稳定性仍需持续验证。
 
+另提供显式运行的 [DeepSeek 在线验收](benchmark/LIVE_ACCEPTANCE.md)：覆盖 Bug 修复、跨文件重构、补测试、并行合并与中断恢复，采用外部断言验收，不纳入默认离线测试。测试仓库为小型固定场景，不代表大型业务项目表现。
+
+[2026-10-17 实测记录](docs/LIVE-ACCEPTANCE-2026-10-17.md)：最终五项全部通过，包含真实请求用量、费用小计及未知项。
+
 ```text
 eca/                  CLI、执行循环、工具、恢复与记忆适配
 agent_memory_core/    可独立研究的记忆存储与检索核心

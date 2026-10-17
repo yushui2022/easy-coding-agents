@@ -1,0 +1,214 @@
+{
+  "model": "deepseek-flash",
+  "endpoint": "https://api.deepseek.com/v1",
+  "runner_sha256": "7aa4dd2e7a0863f195ee2400c221309566e94ff7f03c11be9f15d7fa7289ebc5",
+  "commit": "99961a9209b7a4355beffb7c3b83ce7014c615b9",
+  "passed": 5,
+  "total": 5,
+  "date": "2026-10-17",
+  "price_source": "https://api-docs.deepseek.com/quick_start/pricing/",
+  "rates_per_million": {
+    "input": "0.15",
+    "output": "0.6",
+    "cache_read": "0.003",
+    "currency": "USD",
+    "period": "off-peak (Saturday)"
+  },
+  "cases": [
+    {
+      "case": "bug",
+      "passed": true,
+      "checks": {
+        "unittest_exit_zero": true,
+        "external_assertions": true,
+        "original_tests_preserved": true,
+        "agent_finished": true,
+        "agent_ran_nonempty_tests": true,
+        "tool_results_paired": true,
+        "git_index_preserved": true,
+        "guidance_preserved": true
+      },
+      "elapsed_seconds": 15.3,
+      "status": "idle",
+      "error_type": null,
+      "usage": {
+        "scope": "root session and all descendants",
+        "requests": 7,
+        "reported_tokens": {
+          "input": 3545,
+          "cache_read": 12288,
+          "output": 660
+        },
+        "priced_subtotals": {
+          "USD": "0.000964614"
+        },
+        "incomplete_usage_requests": 0,
+        "incomplete_cost_requests": 0,
+        "historical_usage_untracked": false,
+        "billing_note": "Calculated from provider usage and configured price snapshots; not an invoice."
+      },
+      "children": [],
+      "denied_actions": []
+    },
+    {
+      "case": "refactor",
+      "passed": true,
+      "checks": {
+        "unittest_exit_zero": true,
+        "external_assertions": true,
+        "original_tests_preserved": true,
+        "old_module_deleted": true,
+        "agent_finished": true,
+        "agent_ran_nonempty_tests": true,
+        "tool_results_paired": true,
+        "git_index_preserved": true,
+        "guidance_preserved": true
+      },
+      "elapsed_seconds": 23.56,
+      "status": "idle",
+      "error_type": null,
+      "usage": {
+        "scope": "root session and all descendants",
+        "requests": 11,
+        "reported_tokens": {
+          "input": 4282,
+          "cache_read": 24704,
+          "output": 1448
+        },
+        "priced_subtotals": {
+          "USD": "0.001585212"
+        },
+        "incomplete_usage_requests": 0,
+        "incomplete_cost_requests": 0,
+        "historical_usage_untracked": false,
+        "billing_note": "Calculated from provider usage and configured price snapshots; not an invoice."
+      },
+      "children": [],
+      "denied_actions": []
+    },
+    {
+      "case": "tests",
+      "passed": true,
+      "checks": {
+        "unittest_exit_zero": true,
+        "external_assertions": true,
+        "original_tests_preserved": true,
+        "implementation_preserved": true,
+        "tests_reject_broken_implementation": true,
+        "agent_finished": true,
+        "agent_ran_nonempty_tests": true,
+        "tool_results_paired": true,
+        "git_index_preserved": true,
+        "guidance_preserved": true
+      },
+      "elapsed_seconds": 14.83,
+      "status": "idle",
+      "error_type": null,
+      "usage": {
+        "scope": "root session and all descendants",
+        "requests": 7,
+        "reported_tokens": {
+          "input": 3834,
+          "cache_read": 12672,
+          "output": 1467
+        },
+        "priced_subtotals": {
+          "USD": "0.001493316"
+        },
+        "incomplete_usage_requests": 0,
+        "incomplete_cost_requests": 0,
+        "historical_usage_untracked": false,
+        "billing_note": "Calculated from provider usage and configured price snapshots; not an invoice."
+      },
+      "children": [],
+      "denied_actions": []
+    },
+    {
+      "case": "parallel",
+      "passed": true,
+      "checks": {
+        "unittest_exit_zero": true,
+        "external_assertions": true,
+        "original_tests_preserved": true,
+        "agent_finished": true,
+        "agent_ran_nonempty_tests": true,
+        "tool_results_paired": true,
+        "git_index_preserved": true,
+        "guidance_preserved": true,
+        "two_completed_children": true,
+        "merge_used": true
+      },
+      "elapsed_seconds": 38.38,
+      "status": "idle",
+      "error_type": null,
+      "usage": {
+        "scope": "root session and all descendants",
+        "requests": 29,
+        "reported_tokens": {
+          "input": 16379,
+          "cache_read": 54528,
+          "output": 4804
+        },
+        "priced_subtotals": {
+          "USD": "0.005502834"
+        },
+        "incomplete_usage_requests": 0,
+        "incomplete_cost_requests": 0,
+        "historical_usage_untracked": false,
+        "billing_note": "Calculated from provider usage and configured price snapshots; not an invoice."
+      },
+      "children": [
+        "idle",
+        "idle"
+      ],
+      "denied_actions": [
+        "Run shell command"
+      ]
+    },
+    {
+      "case": "resume",
+      "passed": true,
+      "checks": {
+        "unittest_exit_zero": true,
+        "external_assertions": true,
+        "original_tests_preserved": true,
+        "agent_finished": true,
+        "agent_ran_nonempty_tests": true,
+        "tool_results_paired": true,
+        "git_index_preserved": true,
+        "guidance_preserved": true,
+        "interrupted_and_resumed": true,
+        "no_duplicate_writes": true
+      },
+      "elapsed_seconds": 13.53,
+      "status": "idle",
+      "error_type": null,
+      "usage": {
+        "scope": "root session and all descendants",
+        "requests": 10,
+        "reported_tokens": {
+          "input": 3851,
+          "cache_read": 16896,
+          "output": 833
+        },
+        "priced_subtotals": {
+          "USD": "0.001128138"
+        },
+        "incomplete_usage_requests": 1,
+        "incomplete_cost_requests": 1,
+        "historical_usage_untracked": false,
+        "billing_note": "Calculated from provider usage and configured price snapshots; not an invoice."
+      },
+      "children": [],
+      "denied_actions": []
+    }
+  ],
+  "known_cost_usd": "0.010674114",
+  "requests": 64,
+  "incomplete_usage_requests": 1,
+  "tokens": {
+    "input": 31891,
+    "cache_read": 121088,
+    "output": 9212
+  }
+}
