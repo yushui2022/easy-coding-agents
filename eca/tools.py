@@ -12,7 +12,7 @@ import subprocess
 import tempfile
 
 
-SKIP = {".git", ".eca", "node_modules", "venv", ".venv", "__pycache__", "dist", "build", ".next", "target"}
+SKIP = {".git", ".eca", ".agent_memory", ".pytest_cache", "output", "node_modules", "venv", ".venv", "__pycache__", "dist", "build", ".next", "target"}
 
 
 def schema(name, description, properties, required):
@@ -126,6 +126,19 @@ class Tools:
         self.settings, self.state = settings, state
         self.approve, self.question, self.emit = approve, ask, emit
         self.changes = None
+        self.guidance_seen, self.guidance_pending = set(), set()
+
+    def file_guidance(self, target):
+        from .guidance import guidance
+        rules = guidance(self.settings.root, target)
+        missing = [(p, digest, text) for p, digest, text in rules if (p, digest) not in self.guidance_seen]
+        if not missing:
+            return ""
+        result = "Applicable project rules (deeper directories override parent rules within their scope; user instructions take precedence):\n" + "\n".join(f"[{p}]\n{text}" for p, _, text in missing)
+        if len(result) > self.settings.output_limit - 200:
+            raise ValueError("Applicable rules exceed tool output_limit; increase it or shorten AGENTS.md before editing")
+        self.guidance_pending.update((p, digest) for p, digest, _ in missing)
+        return result
 
     def path(self, value):
         path = (self.settings.root / value).resolve()
@@ -224,6 +237,9 @@ class Tools:
         return "\n".join(results) or "No matches."
 
     async def change(self, path, before, content):
+        rules = self.file_guidance(path)
+        if rules:
+            return "File unchanged. Read these applicable rules before retrying the edit:\n" + rules
         if len(content.encode("utf-8")) > 2_000_000:
             raise ValueError("Change exceeds 2 MB limit")
         old = before.decode("utf-8") if before is not None else ""

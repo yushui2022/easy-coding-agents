@@ -35,6 +35,9 @@ HELP = {
     "/accept ID": "Mark a file edit reviewed (does not commit Git)",
     "/undo ID": "Undo one file edit if no newer edits would be overwritten",
     "/continue": "Continue saved work; inspect uncertain effects before retrying",
+    "/memory": "Show project memories with sources and freshness",
+    "/remember TEXT": "Explicitly confirm a project constraint for future sessions",
+    "/forget ID": "Remove a project memory from storage and search",
 }
 
 
@@ -225,6 +228,21 @@ class App:
             self.emit("tasks", self.state["tasks"])
         elif command == "/status":
             self.status()
+        elif command == "/memory":
+            rows = self.agent.memory().listing()
+            if self.args.json:
+                self.emit("memory", rows)
+            else:
+                self.console.print(self.redact(json.dumps(rows, ensure_ascii=False, indent=2)), markup=False)
+        elif command == "/remember":
+            ident = self.agent.memory().add("user_constraint", arg, f"session:{self.state['id']}/explicit-user-confirmation")
+            self.emit("notice", f"Saved project constraint {ident}. Use /memory to inspect or /forget {ident} to remove.")
+        elif command == "/forget":
+            self.agent.memory().forget(arg)
+            self.agent.memory_context = ""
+            self.state["messages"].append({"role": "user", "content": f"I removed project memory {arg}. Do not rely on that memory; verify current files or ask me if needed."})
+            self.store.save(self.state)
+            self.emit("notice", "Memory removed from active storage and search. Existing conversation transcripts are retained.")
         elif command == "/continue":
             await self.run_task("Continue the unfinished task. First inspect actual state for any interrupted or uncertain tool actions; do not blindly repeat mutations.")
         elif command == "/changes":

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .provider import Provider
 from .changes import Changes
+from .knowledge import Knowledge
 from .tools import SCHEMAS, Tools, allowed
 
 
@@ -16,6 +17,8 @@ class Agent:
         self.provider = provider or Provider(settings)
         self.tools = Tools(settings, state, approve, question, emit)
         self.changes = self.tools.changes = Changes(store, state["id"], self.tools.path)
+        self.knowledge = None
+        self.memory_context = ""
         self.busy = False
 
     def system_prompt(self):
@@ -38,15 +41,22 @@ If execution was interrupted, inspect the actual state before repeating mutation
         for name in ("AGENTS.md", "MEMORY.md"):
             path = root / name
             if path.is_file() and not path.is_symlink() and path.stat().st_size <= 64_000:
-                prompt += f"\nProject guidance ({name}):\n{path.read_text('utf-8', errors='replace')}\n"
+                label = "Project guidance" if name == "AGENTS.md" else "Unverified project notes; validate claims against current files"
+                prompt += f"\n{label} ({name}):\n{path.read_text('utf-8', errors='replace')}\n"
         if self.state.get("profile"):
             prompt += f"\nUser-selected agent instructions:\n{self.state['profile']}\n"
         if self.state["tasks"]:
             prompt += "\nCurrent task plan:\n" + json.dumps(self.state["tasks"], ensure_ascii=False)
         return prompt
 
+    def memory(self):
+        if self.knowledge is None:
+            self.knowledge = Knowledge(self.settings, self.tools.files, self.tools.path)
+            self.store.resources.append(self.knowledge)
+        return self.knowledge
+
     def context(self):
-        system = self.system_prompt()
+        system = self.system_prompt() + self.memory_context
         messages = self.state["messages"][self.state.get("context_start", 0):]
         if self.state.get("context_anchor") and messages and messages[0]["role"] != "user":
             messages = [{"role": "user", "content": self.state["context_anchor"]}, *messages]
@@ -70,6 +80,8 @@ If execution was interrupted, inspect the actual state before repeating mutation
         if self.busy:
             raise RuntimeError("A turn is already running")
         self.busy = True
+        self.tools.guidance_seen.clear()
+        self.tools.guidance_pending.clear()
         self.state["messages"].append({"role": "user", "content": prompt})
         if self.state["title"] == "New session":
             self.state["title"] = prompt[:80].replace("\n", " ")
@@ -80,6 +92,9 @@ If execution was interrupted, inspect the actual state before repeating mutation
         try:
             for turn in range(self.settings.max_turns):
                 self.emit("turn", turn + 1)
+                self.memory_context = self.memory().context(prompt) if self.settings.project_memory else ""
+                self.tools.guidance_seen.update(self.tools.guidance_pending)
+                self.tools.guidance_pending.clear()
                 if self.settings.auto_compact and self.context_size() > self.settings.context_chars * 0.85:
                     await self._compact(automatic=True)
                 tool_schema = [s for s in SCHEMAS if s["function"]["name"] in allowed(self.settings.mode)]
@@ -102,6 +117,7 @@ If execution was interrupted, inspect the actual state before repeating mutation
                     else:
                         self.emit("tool", {"name": name, "args": args})
                         action_id = self.store.begin(self.state["id"], tc["id"], name, args)
+                        fingerprint = self.memory().fingerprint() if name == "shell" and self.settings.project_memory else None
                         try:
                             result = await self.tools.execute(name, args)
                         except asyncio.CancelledError:
@@ -110,6 +126,8 @@ If execution was interrupted, inspect the actual state before repeating mutation
                         except Exception as exc:
                             result = f"Tool failed: {type(exc).__name__}: {exc}"
                         self.store.finish(action_id, result)
+                        if name == "shell" and self.settings.project_memory:
+                            self.memory().record_test(args.get("command", ""), result, self.state["id"], action_id, fingerprint)
                     self.state["messages"].append({"role": "tool", "tool_call_id": tc["id"], "content": result})
                     self.store.save(self.state)
                     self.emit("result", result)
@@ -143,7 +161,7 @@ If execution was interrupted, inspect the actual state before repeating mutation
         await self._compact()
 
     def context_size(self):
-        return (len(self.system_prompt()) + len(self.state.get("summary", "")) +
+        return (len(self.system_prompt()) + len(self.memory_context) + len(self.state.get("summary", "")) +
                 len(self.state.get("context_anchor", "")) +
                 len(json.dumps(self.state["messages"][self.state.get("context_start", 0):], ensure_ascii=False)))
 
@@ -174,13 +192,16 @@ If execution was interrupted, inspect the actual state before repeating mutation
         response, _ = await self.provider.complete(messages, [], lambda event, data: self.emit(event, data) if event == "notice" else None)
         if response.get("tool_calls") or not response.get("content"):
             raise ValueError("Summary was not a text response")
-        size = len(self.system_prompt()) + len(response["content"]) + len(anchor) + len(json.dumps(history[cutoff:], ensure_ascii=False))
+        size = len(self.system_prompt()) + len(self.memory_context) + len(response["content"]) + len(anchor) + len(json.dumps(history[cutoff:], ensure_ascii=False))
         if size > self.settings.context_chars:
             raise ValueError("Summary and recent work still exceed context_chars. Increase the budget or start a new session; full history is saved.")
         self.state["summary"] = response["content"]
         self.state["context_start"] = cutoff
         self.state["context_anchor"] = anchor
+        self.tools.guidance_seen.clear()
         self.store.save(self.state)
 
     async def close(self):
+        if self.knowledge:
+            self.knowledge.close()
         await self.provider.close()

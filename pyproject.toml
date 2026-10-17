@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "easy-coding-agent"
-version = "0.4.0"
+version = "0.5.0"
 description = "An asynchronous, project-scoped terminal coding assistant"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -14,4 +14,4 @@ dependencies = ["openai>=1.30,<3", "httpx>=0.27,<1", "prompt-toolkit>=3.0.48,<4"
 eca = "eca.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["eca*"]
+include = ["eca*", "agent_memory_core*"]

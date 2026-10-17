@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0 — 2026-10-17
+
+- Integrate existing memory-core SQLite/FTS through a source-qualified CLI adapter; package the core with ECA.
+- Capture successful test-command evidence with session/action provenance and bounded project fingerprints; exclude stale records from new-session context.
+- Add `/memory`, `/remember`, `/forget` and optional automatic-memory opt-out.
+- Load hierarchical AGENTS.md rules before file edits; defer mutations until rules have reached a subsequent model request.
+- Keep legacy research databases isolated and assistant claims out of automatic project memory.
+
 ## 0.4.0 — 2026-10-17
 
 - Persist before/after snapshots before file-tool writes; review, accept and undo individual edits without resetting the Git index or overwriting later edits.

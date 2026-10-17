@@ -9,6 +9,7 @@ import uuid
 
 class Store:
     def __init__(self, root: Path):
+        self.resources = []
         self.root = root.resolve()
         directory = self.root / ".eca"
         if directory.is_symlink() or directory.resolve() != directory:
@@ -111,5 +112,7 @@ class Store:
         self.save(state)
 
     def close(self):
+        for resource in self.resources:
+            resource.close()
         self.db.close()
         self.lock.close()
