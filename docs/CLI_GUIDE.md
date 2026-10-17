@@ -91,7 +91,7 @@ eca --cwd G:\Projects\demo --list-sessions
 
 每个仓库使用独立 `.eca/`：SQLite 保存完整消息、工具调用及结果；操作日志记录工具开始与完成。恢复时补齐未完成的消息配对，对结果不确定的操作提示核实，不自动重放。单个项目同一时刻只允许一个 ECA 进程。
 
-上下文窗口使用字符预算；必要时按完整用户轮次裁剪发送内容，原始历史不删。可手动 `/compact` 生成摘要。当前没有精确 token/cost 仪表盘。
+上下文窗口使用字符预算；必要时按完整用户轮次裁剪发送内容，原始历史不删。可手动 `/compact` 生成摘要。`/usage` 查看 API 报告用量及按配置价格计算的费用；缺失信息不会估算补齐。
 
 旧入口保存在 `legacy_main.py`，旧模块和历史数据原样保留；旧 Markdown 会话不自动导入新运行时。详见 [升级与迁移说明](UPGRADE-v0.2.md)。
 
@@ -108,7 +108,7 @@ python -B -m pytest -q
 
 [验证记录](VALIDATION-v0.2.md) · [升级说明](UPGRADE-v0.2.md) · [原版 README](legacy/README-v0.1.md)
 
-暂未实现 MCP、Responses 协议、OAuth 登录、LSP、子 Agent 或 Shell 沙箱。优先把现有开发闭环做好，再逐项扩展。
+MCP、子 Agent 和费用账本的配置、权限及边界见 [v0.6 扩展手册](EXTENSIONS-v0.6.md)。暂未实现 Responses 协议、OAuth 登录、LSP 或 Shell 沙箱。
 
 ## 记忆研究模块
 

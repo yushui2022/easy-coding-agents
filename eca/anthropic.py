@@ -71,7 +71,7 @@ class AnthropicProvider:
         if self.client:
             await self.client.aclose()
 
-    async def complete(self, messages, tools, emit):
+    async def complete(self, messages, tools, emit, usage_callback=None):
         settings = self.settings
         if not settings.api_key:
             raise ValueError("Missing Anthropic API key. Set ANTHROPIC_API_KEY or ECA_API_KEY.")
@@ -102,6 +102,8 @@ class AnthropicProvider:
                         raise RuntimeError("Duplicate Anthropic message_start")
                     started = True
                     usage.update(event["message"].get("usage", {}))
+                    if usage_callback:
+                        usage_callback(usage)
                 elif kind == "content_block_start":
                     index, block = event["index"], dict(event["content_block"])
                     if not started or index in blocks or finish is not None:
@@ -132,6 +134,8 @@ class AnthropicProvider:
                 elif kind == "message_delta":
                     finish = event.get("delta", {}).get("stop_reason") or finish
                     usage.update(event.get("usage", {}))
+                    if usage_callback:
+                        usage_callback(usage)
                 elif kind == "message_stop":
                     stopped = True
                     break
@@ -161,7 +165,7 @@ class AnthropicProvider:
         message = {"role": "assistant", "content": text or None}
         if calls:
             message["tool_calls"] = calls
-        usage["prompt_tokens"] = usage.get("input_tokens", 0)
+        usage["prompt_tokens"] = sum(usage.get(k, 0) for k in ('input_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens'))
         usage["completion_tokens"] = usage.get("output_tokens", 0)
         usage["total_tokens"] = usage["prompt_tokens"] + usage["completion_tokens"]
         return message, usage

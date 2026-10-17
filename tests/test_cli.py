@@ -31,7 +31,7 @@ class CLITests(unittest.TestCase):
                 else:
                     delta = {"tool_calls": [{"index": 0, "id": "fixture-1", "type": "function", "function": {"name": "write", "arguments": json.dumps({"path": "hello.py", "content": "print('hello')\n"})}}]}
                     reason = "tool_calls"
-                chunk = {"id": "fixture", "object": "chat.completion.chunk", "created": 1, "model": "fixture", "choices": [{"index": 0, "delta": delta, "finish_reason": reason}]}
+                chunk = {"id": "fixture", "object": "chat.completion.chunk", "created": 1, "model": "fixture", "choices": [{"index": 0, "delta": delta, "finish_reason": reason}], "usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7}}
                 data = ("data: " + json.dumps(chunk) + "\n\ndata: [DONE]\n\n").encode()
                 if api_format == "anthropic":
                     if reason == "tool_calls":
@@ -46,7 +46,7 @@ class CLITests(unittest.TestCase):
                         {"type": "content_block_start", "index": 0, "content_block": block},
                         {"type": "content_block_delta", "index": 0, "delta": change},
                         {"type": "content_block_stop", "index": 0},
-                        {"type": "message_delta", "delta": {"stop_reason": "tool_use" if reason == "tool_calls" else "end_turn"}},
+                        {"type": "message_delta", "delta": {"stop_reason": "tool_use" if reason == "tool_calls" else "end_turn"}, "usage":{"output_tokens":2}},
                         {"type": "message_stop"},
                     ]
                     data = "".join("data: " + json.dumps(e) + "\n\n" for e in events).encode()
@@ -76,6 +76,13 @@ class CLITests(unittest.TestCase):
                 second = subprocess.run([*command, "--resume", "latest", "-p", "Continue with summary"], env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
                 self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
                 self.assertEqual(len(requests), 3)
+                usage = subprocess.run([*command, '--usage'],env=env,capture_output=True,text=True,encoding='utf-8',timeout=60)
+                self.assertEqual(usage.returncode,0,usage.stdout+usage.stderr)
+                totals=json.loads(usage.stdout)
+                self.assertEqual(totals['requests'],3)
+                self.assertEqual(totals['reported_tokens']['input'],15)
+                self.assertEqual(totals['reported_tokens']['output'],6)
+                self.assertEqual(totals['incomplete_usage_requests'],0)
                 self.assertTrue(all(payload.get("max_tokens") == 384 for payload in requests))
                 if api_format == "anthropic":
                     self.assertTrue(any(b["type"] == "tool_result" for m in requests[-1]["messages"] for b in m["content"]))

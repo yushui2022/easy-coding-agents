@@ -26,6 +26,12 @@ class Settings:
     command_timeout: int = 120
     request_timeout: int = 120
     output_limit: int = 24_000
+    stream_usage: bool = True
+    subagent_max_turns: int = 6
+    subagent_max_calls: int = 3
+    subagent_timeout: int = 180
+    mcp_servers: dict = field(default_factory=dict, repr=False)
+    pricing: dict = field(default_factory=dict)
 
     @property
     def state_dir(self):
@@ -42,7 +48,7 @@ class Settings:
         cfg = data.get("agent", {})
         if not isinstance(cfg, dict):
             raise ValueError("[agent] must be a TOML table")
-        supported = set(cls.__dataclass_fields__) - {"root", "api_key"} | {"api_key_env"}
+        supported = set(cls.__dataclass_fields__) - {"root", "api_key", "mcp_servers", "pricing"} | {"api_key_env"}
         if "api_key" in cfg:
             raise ValueError("Use api_key_env instead of storing a secret in eca.toml")
         if set(cfg) - supported:
@@ -60,7 +66,8 @@ class Settings:
                       api_format=api_format,
                       model=env.get("ECA_MODEL") or env.get("MODEL_NAME") or cfg.get("model", "" if native else cls.model),
                       base_url=env.get("ECA_BASE_URL") or env.get("ANTHROPIC_BASE_URL" if native else "OPENAI_BASE_URL") or cfg.get("base_url", default_url))
-        for name in ("mode", "permission", "max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "network_retries", "auto_compact", "project_memory"):
+        values.update(mcp_servers=data.get("mcp_servers", {}), pricing=data.get("pricing", {}))
+        for name in ("mode", "permission", "max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "network_retries", "auto_compact", "project_memory", "stream_usage", "subagent_max_turns", "subagent_max_calls", "subagent_timeout"):
             if name in cfg:
                 values[name] = cfg[name]
         values.update({k: v for k, v in overrides.items() if v is not None})
@@ -69,6 +76,12 @@ class Settings:
         return settings
 
     def validate(self):
+        from .usage import validate_pricing
+        from .mcp_client import validate_servers
+        validate_pricing(self.pricing)
+        validate_servers(self.mcp_servers)
+        if type(self.stream_usage) is not bool:
+            raise ValueError("stream_usage must be true or false")
         if not isinstance(self.api_key, str):
             raise ValueError("API key must be text")
         if type(self.network_retries) is not int or not 0 <= self.network_retries <= 5:
@@ -83,7 +96,7 @@ class Settings:
             raise ValueError("mode must be code, plan or chat")
         if self.permission not in {"ask", "accept-edits"}:
             raise ValueError("permission must be ask or accept-edits")
-        for name in ("max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens"):
+        for name in ("max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "subagent_max_turns", "subagent_max_calls", "subagent_timeout"):
             value = getattr(self, name)
             if type(value) is not int or value <= 0:
                 raise ValueError(f"{name} must be a positive integer")

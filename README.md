@@ -11,10 +11,10 @@
   <a href="#快速开始">快速开始</a> ·
   <a href="docs/CLI_GUIDE.md">使用手册</a> ·
   <a href="CHANGELOG.md">更新记录</a> ·
-  <a href="docs/VALIDATION-v0.5.2.md">验证记录</a>
+  <a href="docs/VALIDATION-v0.6.md">验证记录</a>
 </p>
 
-<p align="center"><code>Python 3.11+</code> · <code>v0.5.2</code> · <code>开发中</code></p>
+<p align="center"><code>Python 3.11+</code> · <code>v0.6.0</code> · <code>开发中</code></p>
 
 ---
 
@@ -36,6 +36,9 @@ Easy Coding Agent（ECA）是一个可自行配置模型的 Python CLI 编程助
 | **项目规则** | 文件编辑前加载路径上各级 `AGENTS.md`，先向模型提供适用规则。 |
 | **模型选择** | 支持 OpenAI 兼容 Chat Completions 与 Anthropic 原生 Messages 两种协议。 |
 | **脚本调用** | 单次任务、JSONL 输出，以及无需调用模型的文件改动审阅命令。 |
+| **MCP** | 可选安装官方 SDK，连接 stdio / Streamable HTTP 服务；外部操作逐次授权。 |
+| **子 Agent** | 独立会话、有限轮数的研究或编码子任务；沿用父会话权限，顺序执行。 |
+| **用量与费用** | 请求级持久账本，涵盖重试、摘要和子任务；按 API 用量与配置价格计算，缺失值明确标注。 |
 
 ## 快速开始
 
@@ -162,16 +165,18 @@ eca --changes --json
 - **历史成功不代表现在正确。** 记忆中的测试命令只证明当时返回了成功退出码；指纹不覆盖依赖安装状态、环境变量或外部服务。
 - **本地恢复不依赖模型配置。** 即使 `.env` 或 `eca.toml` 损坏，仍可使用 `--list-sessions`、`--changes`、`--undo ID` 和 `--accept-change ID`。
 - **恢复和摘要也有边界。** 摘要可能遗漏信息；结果不确定的操作不会自动重放。一个项目同时只允许一个 ECA 进程。
-- **仍未实现** MCP、LSP、Responses API、订阅 OAuth、子 Agent 和精确费用统计。
+- **扩展的边界。** MCP 外部副作用不在撤销范围内；子 Agent 共享项目文件并顺序执行；费用是按配置价格计算的统计，不替代服务商账单。接入配置见 [扩展功能手册](docs/EXTENSIONS-v0.6.md)。
+- **仍未实现** LSP、Responses API、订阅 OAuth、并行子任务工作区隔离和 MCP OAuth 登录。
 
 ## 开发与验证
 
 ```sh
 python -m pip install -r requirements-dev.txt
+python -m pip install -e ".[mcp]" # 包含 MCP 本地集成测试所需依赖
 python -B -m pytest -q
 ```
 
-最近一次 v0.5.2 全量回归为 **115 通过、1 跳过**。离线测试覆盖恢复、撤销、两种协议、记忆、预算提示及零测试识别；另外进行了用户授权的少量真实模型试跑，保留成功和失败记录，不代表复杂项目成功率。详见 [验证范围与结果](docs/VALIDATION-v0.5.2.md)。
+最近一次 v0.6 全量回归为 **127 通过、1 跳过**。覆盖恢复、撤销、两种模型协议、记忆、MCP 本地传输、子任务权限与请求费用账本。本轮未调用付费模型；测试限定在 `tests/`，不再收集 `output/` 中的试跑产物。详见 [验证范围与结果](docs/VALIDATION-v0.6.md)。
 
 CI 配置目前保留为 [工作流模板](docs/ci-workflow.yml)，尚未启用。跨平台执行和真实仓库长任务稳定性仍需持续验证。
 

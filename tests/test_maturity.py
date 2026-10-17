@@ -172,7 +172,7 @@ class RetryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, response)
         self.assertEqual(provider._complete.await_count, 2)
         wait.assert_awaited_once_with(1)
-        self.assertIn("Retry 1/2", notices[0][1])
+        self.assertTrue(any(event=='notice' and 'Retry 1/2' in data for event,data in notices))
 
     async def test_partial_text_is_not_automatically_replayed(self):
         provider = Provider(Settings(Path.cwd()))

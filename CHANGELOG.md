@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0 — 2026-10-17
+
+- Add optional official-SDK MCP stdio/Streamable HTTP tool discovery and invocation with per-operation approval, bounded timeouts, schema validation and no automatic replay.
+- Add bounded child agents with independent durable sessions, sequential execution, inherited file/Shell approvals and parent mode ceilings. Children cannot delegate or invoke MCP.
+- Persist each model request attempt, including retries, cancellation, compaction and child work. Normalize provider cache usage and calculate Decimal subtotals from per-request price snapshots; unknown or incomplete usage/prices remain explicit.
+- Add `/mcp`, `/agents`, `/usage`, headless `--usage`, and server-scoped `--allow-mcp`.
+
 ## 0.5.2 — 2026-10-17
 
 - Pass max_output_tokens to OpenAI-compatible requests, matching the native provider's output cap.

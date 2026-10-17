@@ -23,9 +23,13 @@ from .config import Settings
 from .store import Store
 from .tools import atomic_write, run_process
 from .doctor import diagnose
+from .usage import UsageLedger
 
 
 HELP = {
+    "/usage": "Show durable usage and priced subtotals, including child agents",
+    "/agents": "List child sessions; resume one to inspect its changes",
+    "/mcp": "List configured MCP servers without connecting",
     "/help": "Show commands", "/new": "Start a new session", "/sessions": "List saved sessions",
     "/resume ID": "Resume a session (or latest)", "/mode code|plan|chat": "Change execution mode",
     "/model NAME": "Change model for this process", "/permission ask|accept-edits": "File edit approvals",
@@ -54,6 +58,8 @@ def parser():
     p.add_argument("--mode", choices=["code", "plan", "chat"])
     p.add_argument("--accept-edits", action="store_true", help="Approve file edits inside project; shell still requires approval")
     p.add_argument("--allow-shell", action="store_true", help="Explicitly approve ALL shell commands (including outside project); for trusted one-shot tasks only")
+    p.add_argument("--allow-mcp", action="append", default=[], metavar="SERVER", help="Approve MCP operations for one configured server in one-shot mode; repeat per server")
+    p.add_argument("--usage", action="store_true", help="Show saved usage without contacting the model; defaults to latest session")
     p.add_argument("--resume", nargs="?", const="latest", help="Resume session ID prefix, or latest")
     p.add_argument("--list-sessions", action="store_true")
     p.add_argument("--doctor", action="store_true", help="Check local configuration without an API request")
@@ -82,7 +88,8 @@ class App:
         self.streaming = False
 
     def make_agent(self):
-        return Agent(self.settings, self.store, self.state, self.approve, self.question, self.emit)
+        return Agent(self.settings, self.store, self.state, self.approve, self.question, self.emit,
+                     child=bool(self.state.get('parent_id')))
 
     def redact(self, text):
         return text.replace(self.settings.api_key, "[redacted]") if self.settings.api_key else text
@@ -112,13 +119,15 @@ class App:
             self.console.print(self.redact(str(data)), style="yellow" if event == "notice" else "red", markup=False)
 
     async def approve(self, message, detail):
+        if message.startswith('Run MCP') and self.args.prompt is not None:
+            return json.loads(detail)['server'] in self.args.allow_mcp
         if message.startswith("Run shell") and self.args.allow_shell:
             return True
         if self.args.prompt is not None:
             self.emit("notice", "Approval unavailable in one-shot mode; action denied. Use --accept-edits / --allow-shell explicitly if appropriate.")
             return False
         self.console.print(message, style="yellow", markup=False)
-        if message.startswith("Run shell"):
+        if message.startswith(("Run shell", "Run MCP")):
             self.console.print(detail, markup=False)
         try:
             answer = await self.prompt.prompt_async("Allow once? [y/N] ", completer=None, bottom_toolbar=None)
@@ -172,6 +181,8 @@ class App:
         data = {"project": str(self.settings.root), "session": self.state["id"], "status": self.state["status"],
                 "model": self.settings.model, "api_format": self.settings.api_format, "mode": self.settings.mode, "permission": self.settings.permission,
                 "messages": len(self.state["messages"]), "last_reported_usage": self.state.get("usage", {})}
+        data['usage'] = self.agent.ledger.summary(self.state)
+        data['children'] = self.state.get('children',[])
         data["stop_reason"] = self.state.get("stop_reason")
         if self.args.json:
             self.emit("status", data)
@@ -229,6 +240,25 @@ class App:
             self.emit("tasks", self.state["tasks"])
         elif command == "/status":
             self.status()
+        elif command == '/usage':
+            data = self.agent.ledger.summary(self.state)
+            if self.args.json:
+                self.emit('usage',data)
+            else:
+                self.console.print(json.dumps(data,ensure_ascii=False,indent=2),markup=False)
+        elif command == '/mcp':
+            self.emit('notice',json.dumps({k:v.get('transport','stdio') for k,v in self.settings.mcp_servers.items()}))
+        elif command == '/agents':
+            children=[]
+            for ident in self.state.get('children',[]):
+                row=self.store.db.execute('SELECT state FROM sessions WHERE id=?',(ident,)).fetchone()
+                if row:
+                    child=json.loads(row[0])
+                    children.append({k:child.get(k) for k in ('id','title','status','mode','stop_reason')})
+            if self.args.json:
+                self.emit('agents',children)
+            else:
+                self.console.print(json.dumps(children,ensure_ascii=False,indent=2),markup=False)
         elif command == "/memory":
             rows = self.agent.memory().listing()
             if self.args.json:
@@ -333,6 +363,19 @@ class App:
 
 
 async def async_main(args):
+    if args.usage:
+        if args.prompt is not None or args.doctor or args.list_sessions or args.changes is not None or args.undo is not None or args.accept_change is not None:
+            raise ValueError('--usage cannot be combined with other actions')
+        root = args.cwd.resolve()
+        if not root.is_dir() or not (root/'.eca').exists():
+            raise ValueError('No saved usage in this project')
+        store = Store(root)
+        try:
+            state=store.load(args.resume or 'latest')
+            print(json.dumps(UsageLedger(store).summary(state),ensure_ascii=False,indent=None if args.json else 2))
+        finally:
+            store.close()
+        return 0
     review = args.changes is not None or args.undo is not None or args.accept_change is not None
     if review and (args.prompt is not None or args.list_sessions or args.doctor):
         raise ValueError("Review actions cannot be combined with prompt, doctor or session listing")
@@ -342,6 +385,8 @@ async def async_main(args):
         raise ValueError("--json requires a one-shot, review, session listing or doctor action")
     if args.allow_shell and args.prompt is None:
         raise ValueError("--allow-shell is only for explicit one-shot tasks")
+    if args.allow_mcp and args.prompt is None:
+        raise ValueError('--allow-mcp is only for one-shot tasks')
     if args.doctor:
         report = diagnose(args.cwd, model=args.model, base_url=args.base_url, api_format=args.api_format, mode=args.mode,
                           permission="accept-edits" if args.accept_edits else None)

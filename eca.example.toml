@@ -15,7 +15,36 @@ context_chars = 100000
 command_timeout = 120
 request_timeout = 120
 output_limit = 24000
+stream_usage = true # request usage in OpenAI-compatible streams; false for incompatible servers
+subagent_max_turns = 6 # per child; also bounded by parent max_turns
+subagent_max_calls = 3 # per parent run; no recursive delegation
+subagent_timeout = 180 # seconds per child
 
 [profiles]
 reviewer = "Review code for concrete correctness problems. Cite files and lines. Do not edit unless the user asks."
 builder = "Implement the requested change using existing project conventions, then run appropriate checks."
+
+# Optional MCP support: pip install -e ".[mcp]"
+# All MCP operations require approval, including launching a stdio server.
+# [mcp_servers.local]
+# transport = "stdio"
+# command = "python"
+# args = ["G:/Projects/my-mcp/server.py"]
+# timeout = 30
+# env = { SERVICE_TOKEN = "MY_SERVICE_TOKEN" } # destination variable = source env variable
+
+# [mcp_servers.remote]
+# transport = "http"
+# url = "https://example.com/mcp"
+# headers = { Authorization = "MY_MCP_AUTHORIZATION" } # env contains full Bearer value
+
+# EXAMPLE ONLY: replace model and rates with your actual provider contract.
+# Amounts per million tokens, decimal strings. Missing prices stay unknown.
+# [pricing."YOUR_MODEL_ID"]
+# currency = "USD"
+# input = "1.00"
+# output = "2.00"
+# cache_read = "0.10"
+# cache_write = "1.25"
+# cache_write_5m = "1.25"
+# cache_write_1h = "2.00"

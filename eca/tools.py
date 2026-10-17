@@ -32,11 +32,16 @@ SCHEMAS = [
     schema("shell", "Run a shell command in the project. Windows uses PowerShell; requires approval. Includes exit code.", {"command": STR, "timeout": INT}, ["command"]),
     schema("todo", "Replace task plan. Completion is a planning label, not proof tests passed.", {"items": {"type": "array", "items": {"type": "object", "properties": {"content": STR, "status": {"type": "string", "enum": ["pending", "in_progress", "completed"]}}, "required": ["content", "status"], "additionalProperties": False}}}, ["items"]),
     schema("ask", "Ask for missing requirements; use only when needed.", {"question": STR}, ["question"]),
+    schema("delegate", "Delegate a bounded subtask to an independent child agent. It shares files, not conversation. No recursive delegation. Default plan is read-only.",
+           {"task":STR,"mode":{"type":"string","enum":["plan","code"]}}, ["task"]),
+    schema("mcp_list", "List tools on a configured MCP server. Requires external-operation approval.", {"server":STR}, ["server"]),
+    schema("mcp_call", "Call a configured MCP tool after mcp_list. Requires approval; effects are outside file undo.",
+           {"server":STR,"tool":STR,"arguments":{"type":"object"}}, ["server","tool","arguments"]),
 ]
 
 
 def allowed(mode):
-    return {"read", "glob", "grep", "todo", "ask"} if mode == "plan" else (set() if mode == "chat" else {s["function"]["name"] for s in SCHEMAS})
+    return {"read", "glob", "grep", "todo", "ask", "delegate"} if mode == "plan" else (set() if mode == "chat" else {s["function"]["name"] for s in SCHEMAS})
 
 
 def atomic_write(path, content):
@@ -176,7 +181,7 @@ class Tools:
                 raise ValueError("Unexpected or missing tool arguments")
             for key, value in args.items():
                 kind = spec["properties"][key]["type"]
-                if (kind == "string" and not isinstance(value, str)) or (kind == "integer" and type(value) is not int) or (kind == "array" and not isinstance(value, list)):
+                if (kind == "string" and not isinstance(value, str)) or (kind == "integer" and type(value) is not int) or (kind == "array" and not isinstance(value, list)) or (kind == 'object' and not isinstance(value,dict)):
                     raise ValueError(f"Invalid type for {key}")
             result = await getattr(self, name)(**args)
             if name == "shell":
@@ -323,3 +328,20 @@ class Tools:
         # Instance callback is stored separately to avoid shadowing this tool method.
         response = await self.question(question)
         return response if isinstance(response, str) else "No user answer was provided."
+
+    async def delegate(self, task, mode="plan"):
+        if not getattr(self, 'delegate_handler', None):
+            return "Denied: recursive delegation is disabled."
+        return await self.delegate_handler(task, mode)
+
+    async def mcp_list(self, server):
+        if getattr(self,'mcp_disabled',False):
+            return 'Denied: MCP is disabled in child agents.'
+        from .mcp_client import MCPTools
+        return await MCPTools(self.settings, self.approve).invoke(server)
+
+    async def mcp_call(self, server, tool, arguments):
+        if getattr(self,'mcp_disabled',False):
+            return 'Denied: MCP is disabled in child agents.'
+        from .mcp_client import MCPTools
+        return await MCPTools(self.settings, self.approve).invoke(server, tool, arguments)

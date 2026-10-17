@@ -61,7 +61,9 @@ class AnthropicTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(str(requests[0].url), "https://api.anthropic.com/v1/messages")
         self.assertEqual(requests[0].headers["x-api-key"], "test-key")
         self.assertEqual(requests[0].headers["anthropic-version"], "2023-06-01")
-        self.assertEqual(emitted, [("text", "Hello")])
+        self.assertEqual([e for e in emitted if e[0]=='text'], [("text", "Hello")])
+        self.assertEqual(emitted[-1][0], 'request_end')
+        self.assertEqual(emitted[-1][1]['usage']['output_tokens'], 7)
 
     async def test_fragmented_tool_arguments(self):
         (message, _), _, _ = await self.invoke(response_events(True))

@@ -1,6 +1,7 @@
 """Native asynchronous streaming; partial responses are never executed."""
 import asyncio
 import json
+import uuid
 from urllib.parse import urlsplit
 import httpx
 from openai import AsyncOpenAI
@@ -15,6 +16,9 @@ class Provider:
 
     async def complete(self, messages, tools, emit):
         for attempt in range(self.settings.network_retries + 1):
+            ident = uuid.uuid4().hex
+            self.last_usage = {}
+            emit("request_start", {"id":ident})
             emitted = False
             def forward(event, data):
                 nonlocal emitted
@@ -22,7 +26,17 @@ class Provider:
                     emitted = True
                 emit(event, data)
             try:
-                return await self._complete(messages, tools, forward)
+                status = 'failed'
+                try:
+                    result = await self._complete(messages, tools, forward)
+                    self.last_usage = result[1]
+                    status = 'complete'
+                    return result
+                except asyncio.CancelledError:
+                    status = 'cancelled'
+                    raise
+                finally:
+                    emit("request_end", {"id":ident,"usage":self.last_usage,"status":status})
             except Exception as exc:
                 if emitted or not retryable(exc) or attempt == self.settings.network_retries:
                     raise
@@ -35,7 +49,8 @@ class Provider:
             from .anthropic import AnthropicProvider
             if self.native is None:
                 self.native = AnthropicProvider(self.settings)
-            return await self.native.complete(messages, tools, emit)
+            return await self.native.complete(messages, tools, emit,
+                usage_callback=lambda usage: setattr(self, 'last_usage', dict(usage)))
         if not self.settings.api_key:
             raise ValueError("Missing API key. Set ECA_API_KEY, OPENAI_API_KEY or MODELSCOPE_API_KEY in the environment/.env.")
         if self.client is None:
@@ -48,12 +63,15 @@ class Provider:
                   "max_tokens": self.settings.max_output_tokens}
         if tools:
             kwargs["tools"] = tools
+        if self.settings.stream_usage:
+            kwargs["stream_options"] = {"include_usage": True}
         stream = await self.client.chat.completions.create(**kwargs)
         content, calls, usage, finish = "", {}, {}, None
         try:
             async for chunk in stream:
                 if chunk.usage:
                     usage = chunk.usage.model_dump()
+                    self.last_usage = usage
                 if not chunk.choices:
                     continue
                 choice = chunk.choices[0]
