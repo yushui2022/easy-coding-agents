@@ -62,6 +62,7 @@ def parser():
     p.add_argument("--verify-command", action='append', default=[], help="Run a check after the task; repeat for up to 10 checks; requires --allow-shell")
     p.add_argument('--repair-attempts', type=int, default=0, help='Opt in to 1..3 repair rounds and rerunning selected checks (default: 0)')
     p.add_argument("--model")
+    p.add_argument("--worker-first", help="Opt-in worker-first pipeline; requires an enabled worker profile and --verify-command")
     p.add_argument("--model-profile", help="Select [model_profiles.NAME] with its own endpoint and credential variable")
     p.add_argument("--base-url")
     p.add_argument("--api-format", choices=["openai", "anthropic", "responses"], help="Model wire protocol")
@@ -186,7 +187,7 @@ class App:
 
     async def run_task(self, text):
         from .workflow import verified_run
-        task = asyncio.create_task(verified_run(self.agent, text, self.args.verify_command, self.args.repair_attempts))
+        task = asyncio.create_task(verified_run(self.agent, text, self.args.verify_command, self.args.repair_attempts, self.args.worker_first))
         loop = asyncio.get_running_loop()
         previous = signal.getsignal(signal.SIGINT)
         def interrupt(*_):
@@ -471,6 +472,8 @@ class App:
 
 
 async def async_main(args):
+    if args.worker_first is not None and (not args.worker_first or args.prompt is None or not args.verify_command):
+        raise ValueError('--worker-first requires a profile, -p and --verify-command')
     if args.verify_command and (args.prompt is None or not args.allow_shell or any(not c.strip() for c in args.verify_command)):
         raise ValueError('--verify-command requires --prompt, --allow-shell and a nonempty command')
     if len(args.verify_command) > 10 or not 0 <= args.repair_attempts <= 3 or (args.repair_attempts and not args.verify_command):

@@ -232,3 +232,8 @@ eca --cwd ./your-project --resume SESSION_ID --undo CHANGE_ID --json
 ### 可选多模型 Worker（v0.13）
 
 只配置一个 API 即可使用，`[agent].worker_profiles` 默认空列表。需要异构子 Agent 时，将已定义的模型档案名称加入该列表；`/models` 查看 `worker_enabled`。主 Agent 可按子任务选用这些档案，省略选择仍使用主模型，不静默故障回退。[完整配置与本地小模型限制](UPGRADE-v0.13.md)。
+
+
+### Worker 优先验收链路（v0.14）
+
+`--worker-first helper` 与 `-p`、`--verify-command`、`--allow-shell` 搭配：先执行 Worker，再检查。需要失败后由主模型接手时，另加 `--repair-attempts 1`（默认 0）。Worker 使用共享目录，修改保留；取消、超时和未知结果不会自动重放。[完整示例](UPGRADE-v0.14.md)。

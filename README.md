@@ -11,10 +11,10 @@
   <a href="#快速开始">快速开始</a> ·
   <a href="docs/CLI_GUIDE.md">使用手册</a> ·
   <a href="CHANGELOG.md">更新记录</a> ·
-  <a href="docs/UPGRADE-v0.13.md">验证记录</a>
+  <a href="docs/UPGRADE-v0.14.md">验证记录</a>
 </p>
 
-<p align="center"><code>Python 3.11+</code> · <code>v0.13.0</code> · <code>开发中</code></p>
+<p align="center"><code>Python 3.11+</code> · <code>v0.14.0</code> · <code>开发中</code></p>
 
 ---
 
@@ -27,6 +27,8 @@ Easy Coding Agent（ECA）是一个可自行配置模型的 Python CLI 编程助
 ## 可选多模型协作
 
 默认只需一个 API，原有用法不变。需要时额外配置云端或本地 Worker，并通过 `worker_profiles` 显式开启，主 Agent 才能按子任务选择模型。不会自动下载本地模型；具体小模型需要支持工具调用并经过任务验证。[配置示例](docs/UPGRADE-v0.13.md)
+
+还可以显式启用 [Worker → 检查 → 主模型修复链路](docs/UPGRADE-v0.14.md)：`--worker-first` 指定先执行的模型，只有检查失败且配置修复预算时才调用主模型接手。
 
 ## 能做什么
 

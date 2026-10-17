@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.0 — 2026-10-17
+
+- 显式 `--worker-first PROFILE`：先由已启用的 Worker 执行，再运行用户指定检查。
+- 普通检查失败时，按已有 `--repair-attempts 0..3` 预算交给当前主模型修复，再检查；默认零次。
+- Worker 未完成、取消、超时或未知检查结果不自动接手重跑。持久记录 Worker、检查轮次与接手原因。
+- 全量 222 passed, 2 skipped；25 个运行时模块与安装包一致。用法及共享目录边界见 [v0.14](docs/UPGRADE-v0.14.md)。
+
 ## 0.13.0 — 2026-10-17
 
 - 可选 `agent.worker_profiles` 白名单；默认空列表，单 API 使用方式不变。
