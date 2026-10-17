@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.2 — 2026-10-17
+
+- Pass max_output_tokens to OpenAI-compatible requests, matching the native provider's output cap.
+- Tell the model its remaining response budget and encourage direct reads, batched independent reads and timely final reporting; no additional summary request is added.
+- Warn on repeated identical tool observations while still executing fresh calls; preserve JSON results and the existing repetition stop guard.
+- Label recognized unittest/pytest zero-test output as no_tests, preserve the actual exit code, and exclude it from successful-command memory. This is a bounded-output heuristic, not a universal test-runner parser.
+
 ## 0.5.1 — 2026-10-17
 
 - Replace configuration-only doctor output with structured, read-only local readiness checks and actionable warnings.

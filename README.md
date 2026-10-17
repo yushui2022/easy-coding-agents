@@ -11,10 +11,10 @@
   <a href="#快速开始">快速开始</a> ·
   <a href="docs/CLI_GUIDE.md">使用手册</a> ·
   <a href="CHANGELOG.md">更新记录</a> ·
-  <a href="docs/VALIDATION-v0.5.1.md">验证记录</a>
+  <a href="docs/VALIDATION-v0.5.2.md">验证记录</a>
 </p>
 
-<p align="center"><code>Python 3.11+</code> · <code>v0.5.1</code> · <code>开发中</code></p>
+<p align="center"><code>Python 3.11+</code> · <code>v0.5.2</code> · <code>开发中</code></p>
 
 ---
 
@@ -171,7 +171,7 @@ python -m pip install -r requirements-dev.txt
 python -B -m pytest -q
 ```
 
-最近一次 v0.5.1 全量回归为 **105 通过、1 跳过**。测试覆盖恢复、撤销、两种协议及记忆机制，使用本地 HTTP 服务和确定性模型响应，不是实际模型任务成功率评测。详见 [验证范围与结果](docs/VALIDATION-v0.5.1.md)。
+最近一次 v0.5.2 全量回归为 **115 通过、1 跳过**。离线测试覆盖恢复、撤销、两种协议、记忆、预算提示及零测试识别；另外进行了用户授权的少量真实模型试跑，保留成功和失败记录，不代表复杂项目成功率。详见 [验证范围与结果](docs/VALIDATION-v0.5.2.md)。
 
 CI 配置目前保留为 [工作流模板](docs/ci-workflow.yml)，尚未启用。跨平台执行和真实仓库长任务稳定性仍需持续验证。
 

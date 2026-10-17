@@ -44,7 +44,8 @@ class Provider:
             self.client = AsyncOpenAI(api_key=self.settings.api_key, base_url=self.settings.base_url,
                                       timeout=self.settings.request_timeout, max_retries=0,
                                       http_client=httpx.AsyncClient(trust_env=not local))
-        kwargs = {"model": self.settings.model, "messages": messages, "stream": True}
+        kwargs = {"model": self.settings.model, "messages": messages, "stream": True,
+                  "max_tokens": self.settings.max_output_tokens}
         if tools:
             kwargs["tools"] = tools
         stream = await self.client.chat.completions.create(**kwargs)

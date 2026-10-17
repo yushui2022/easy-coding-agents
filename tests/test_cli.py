@@ -59,6 +59,7 @@ class CLITests(unittest.TestCase):
         base = Path(os.environ.get("ECA_TEST_TMP", tempfile.gettempdir()))
         base.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=base) as tmp:
+            (Path(tmp) / "eca.toml").write_text("[agent]\nmax_output_tokens = 384\n", encoding="utf-8")
             server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
@@ -75,12 +76,13 @@ class CLITests(unittest.TestCase):
                 second = subprocess.run([*command, "--resume", "latest", "-p", "Continue with summary"], env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
                 self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
                 self.assertEqual(len(requests), 3)
+                self.assertTrue(all(payload.get("max_tokens") == 384 for payload in requests))
                 if api_format == "anthropic":
                     self.assertTrue(any(b["type"] == "tool_result" for m in requests[-1]["messages"] for b in m["content"]))
-                    self.assertEqual(requests[-1]["messages"][-1]["content"][0]["text"], "Continue with summary")
+                    self.assertTrue(any(b.get("text") == "Continue with summary" for m in requests[-1]["messages"] for b in m["content"]))
                 else:
                     self.assertIn("tool", [m["role"] for m in requests[-1]["messages"]])
-                    self.assertEqual(requests[-1]["messages"][-1]["content"], "Continue with summary")
+                    self.assertTrue(any(m.get("content") == "Continue with summary" for m in requests[-1]["messages"]))
                 review = subprocess.run([*command, "--changes"], env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
                 self.assertEqual(review.returncode, 0, review.stdout + review.stderr)
                 changes = json.loads(review.stdout)["data"]

@@ -129,7 +129,11 @@ ANTHROPIC_BASE_URL=https://api.anthropic.com/v1
 若已有 `eca.toml`，同步修改其中的 `api_key_env`、`base_url` 和 `model`；配置了 `api_key_env` 时会从指定变量读取密钥；否则优先使用 `ECA_API_KEY`。`ECA_BASE_URL` 优先于 TOML 地址。
 先运行 `python -B -m eca --doctor` 检查协议、地址和密钥是否配置（不会发起 API 请求）。
 
-支持文本流、工具调用、多个工具结果回传、会话恢复与 `/compact`。`[agent].max_output_tokens` 控制原生接口响应预算，默认 8192。
+支持文本流、工具调用、多个工具结果回传、会话恢复与 `/compact`。`[agent].max_output_tokens` 控制两种接口的响应预算，默认 8192；推理模型预算过低可能在工具参数生成完成前截断，工具不会因此执行。
+
+v0.5.2 会在每次请求末尾提示剩余轮数，接近上限时要求优先汇报实际结果和未完成事项，不增加额外总结请求。重复工具调用仍重新执行；相同参数再次得到相同结果时会提醒模型调整策略。这些提示不保证模型一定收尾，也不代表任务已通过验证。
+
+Shell 输出保留原始退出码。识别到 unittest 的 `Ran 0 tests` 或 pytest 的 `no tests ran/collected` 时，附加 `test_status: no_tests` 和说明，并排除成功测试记忆。检测只覆盖这些输出格式及保留的输出片段，未识别到该标记也不能证明测试有效。
 断流、输出截断、损坏的工具参数或错误事件不会交给工具执行。临时网络错误在输出文本前可有限重试；不启用 Thinking、服务端工具、图片或订阅 OAuth。
 
 CI 模板保存在 [docs/ci-workflow.yml](ci-workflow.yml)。当前 GitHub 凭据缺少 `workflow` 权限，尚未启用 Actions；取得权限后将模板放入 `.github/workflows/tests.yml`。

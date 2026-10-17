@@ -8,6 +8,7 @@ import uuid
 
 from agent_memory_core.storage import MemoryStorage
 from .tools import SKIP
+from .verification import no_tests_found
 
 
 class Knowledge:
@@ -81,6 +82,8 @@ class Knowledge:
             return
         try:
             output = json.loads(result)
+            if no_tests_found(command, output) or output.get("test_status") == "no_tests":
+                return
             if type(output.get("exit_code")) is not int or output["exit_code"] != 0 or output.get("timed_out") is not False:
                 return
             if self.fingerprint() != before:

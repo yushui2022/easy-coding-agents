@@ -10,6 +10,7 @@ import shutil
 import signal
 import subprocess
 import tempfile
+from .verification import no_tests_found
 
 
 SKIP = {".git", ".eca", ".agent_memory", ".pytest_cache", "output", "node_modules", "venv", ".venv", "__pycache__", "dist", "build", ".next", "target"}
@@ -299,7 +300,14 @@ class Tools:
             argv = [executable, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", prefix + command]
         else:
             argv = ["/bin/sh", "-c", command]
-        return await run_process(argv, self.settings.root, timeout, max(1, self.settings.output_limit // 3))
+        result = await run_process(argv, self.settings.root, timeout, max(1, self.settings.output_limit // 3))
+        output = json.loads(result)
+        if no_tests_found(command, output):
+            output["test_status"] = "no_tests"
+            output["verification_warning"] = "No tests were discovered. Exit code 0 is not test coverage. Check discovery or add targeted tests; do not repeat the unchanged command."
+            self.emit("notice", output["verification_warning"])
+            return json.dumps(output, ensure_ascii=False)
+        return result
 
     async def todo(self, items):
         if len(items) > 50:
