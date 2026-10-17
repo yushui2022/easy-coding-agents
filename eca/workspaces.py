@@ -175,21 +175,33 @@ async def merge(agent, session, paths):
         raise ValueError('Select 1..100 unique file paths to merge')
     child_tools = Tools(replace(agent.settings, root=workspace(agent.store, state)), state,
                         agent.tools.approve, agent.tools.question, agent.emit)
+    if not child_tools.settings.root.is_dir():
+        raise ValueError('Isolated workspace is unavailable')
     changes = []
     for name in paths:
         source, target = child_tools.path(name), agent.tools.path(name)
         name = target.relative_to(agent.settings.root).as_posix()
-        if not source.is_file() or source.stat().st_size > 2_000_000:
-            raise ValueError('Only existing text files up to 2 MB can be merged; deletion is manual')
+        if source.relative_to(child_tools.settings.root).as_posix() != name:
+            raise ValueError('Child and parent paths resolve differently')
+        if source.exists() and (not source.is_file() or source.stat().st_size > 2_000_000):
+            raise ValueError('Only text files up to 2 MB can be merged')
+        if not source.exists():
+            recorded = agent.store.db.execute(
+                'SELECT after,status FROM file_changes WHERE session_id=? AND path=? ORDER BY id DESC LIMIT 1',
+                (state['id'], name)).fetchone()
+            if name not in state['baseline'] or recorded is None or recorded[0] is not None or recorded[1] not in {'applied', 'accepted'}:
+                raise ValueError('Missing child file has no completed deletion record')
         if target.exists() and (not target.is_file() or target.stat().st_size > 2_000_000):
             raise ValueError('Target cannot be compared safely')
         before = target.read_bytes() if target.exists() else None
-        after = source.read_bytes()
+        after = source.read_bytes() if source.exists() else None
         if before == after:
             continue
         if digest(before) != state['baseline'].get(name):
             raise ValueError(f'Merge conflict: {name}; parent changed since snapshot')
-        changes.append((target, before, after.decode('utf-8')))
+        if before is not None and '\x00' in before.decode('utf-8') or after is not None and '\x00' in after.decode('utf-8'):
+            raise ValueError('Binary files cannot be merged')
+        changes.append((target, before, after.decode('utf-8') if after is not None else None))
     # Preflight the whole selection before any write. Each write rechecks after approval.
     return json.dumps([await agent.tools.change(target, before, content)
                        for target, before, content in changes], ensure_ascii=False)
@@ -210,7 +222,7 @@ def review(agent, state):
             continue
         current = path.read_bytes() if path.exists() else None
         if digest(current) != state.get('baseline', {}).get(name):
-            result.append(dict(path=name, status='modified' if name in state['baseline'] else 'added'))
+            result.append(dict(path=name, status='deleted' if current is None else 'modified' if name in state['baseline'] else 'added'))
     if len(rows)>200:
         result.append(dict(status='truncated'))
     return result

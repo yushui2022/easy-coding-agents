@@ -11,10 +11,10 @@
   <a href="#快速开始">快速开始</a> ·
   <a href="docs/CLI_GUIDE.md">使用手册</a> ·
   <a href="CHANGELOG.md">更新记录</a> ·
-  <a href="docs/VALIDATION-v0.8.md">验证记录</a>
+  <a href="docs/VALIDATION-v0.8.1.md">验证记录</a>
 </p>
 
-<p align="center"><code>Python 3.11+</code> · <code>v0.8.0</code> · <code>开发中</code></p>
+<p align="center"><code>Python 3.11+</code> · <code>v0.8.1</code> · <code>开发中</code></p>
 
 ---
 
@@ -157,7 +157,7 @@ eca --resume latest -p "继续之前的任务，先检查中断状态"
 eca --changes --json
 ```
 
-单次任务默认拒绝需要交互确认的操作。`--accept-edits` 允许文件编辑；`--allow-shell` 会授权该任务中的所有 Shell 命令，应只在明确需要时使用。退出码、事件格式与完整命令说明见 [使用手册](docs/CLI_GUIDE.md)。
+单次任务默认拒绝需要交互确认的操作。`--accept-edits` 允许文件创建、编辑和删除；`--allow-shell` 会授权该任务中的所有 Shell 命令，应只在明确需要时使用。退出码、事件格式与完整命令说明见 [使用手册](docs/CLI_GUIDE.md)。
 
 ## 数据、权限与当前边界
 
@@ -177,7 +177,9 @@ python -m pip install -e ".[mcp]" # 包含 MCP 本地集成测试所需依赖
 python -B -m pytest -q
 ```
 
-测试覆盖并发与取消、隔离合并、MCP 连接生命周期、模型配置恢复、Responses SDK 与 LSP 版本化诊断。测试未调用付费模型；真实模型和大型语言服务器表现仍需后续验证。详见 [验证范围与结果](docs/VALIDATION-v0.8.md)。
+新增可撤销的单文件删除、子 Agent 删除结果合并与冲突检查，详见 [v0.8.1 更新](docs/UPGRADE-v0.8.1.md)。
+
+测试覆盖并发与取消、隔离合并、MCP 连接生命周期、模型配置恢复、Responses SDK 与 LSP 版本化诊断。测试未调用付费模型；真实模型和大型语言服务器表现仍需后续验证。详见 [验证范围与结果](docs/VALIDATION-v0.8.1.md)。
 
 CI 配置目前保留为 [工作流模板](docs/ci-workflow.yml)，尚未启用。跨平台执行和真实仓库长任务稳定性仍需持续验证。
 

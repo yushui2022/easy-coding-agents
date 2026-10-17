@@ -29,6 +29,7 @@ SCHEMAS = [
     schema("grep", "Search literal text in workspace files; optional filename glob.", {"query": STR, "include": STR}, ["query"]),
     schema("write", "Create or overwrite a UTF-8 file with diff approval; prefer edit for existing files.", {"path": STR, "content": STR}, ["path", "content"]),
     schema("edit", "Replace exactly one occurrence. Ambiguous matches are rejected.", {"path": STR, "old": STR, "new": STR}, ["path", "old", "new"]),
+    schema("delete", "Delete one UTF-8 text file with diff approval and recoverable journal. No directories or binary files.", {"path": STR}, ["path"]),
     schema("shell", "Run a shell command in the project. Windows uses PowerShell; requires approval. Includes exit code.", {"command": STR, "timeout": INT}, ["command"]),
     schema("todo", "Replace task plan. Completion is a planning label, not proof tests passed.", {"items": {"type": "array", "items": {"type": "object", "properties": {"content": STR, "status": {"type": "string", "enum": ["pending", "in_progress", "completed"]}}, "required": ["content", "status"], "additionalProperties": False}}}, ["items"]),
     schema("ask", "Ask for missing requirements; use only when needed.", {"question": STR}, ["question"]),
@@ -36,7 +37,7 @@ SCHEMAS = [
            {"task":STR,"mode":{"type":"string","enum":["plan","code"]}}, ["task"]),
     schema("delegate_parallel", "Run independent tasks concurrently in isolated source snapshots. No shell/MCP/LSP; merge selected files afterwards.",
            {"tasks": {"type": "array", "items": {"type": "object", "properties": {"task": STR, "mode": STR}, "required": ["task"]}}}, ["tasks"]),
-    schema("merge_agent", "Merge selected text files from an isolated child. Reject parent conflicts; journal each approved write. Not an atomic multi-file transaction.",
+    schema("merge_agent", "Merge selected text files or recorded deletions from an isolated child. Reject parent conflicts; journal each approved change. Not an atomic multi-file transaction.",
            {"session": STR, "paths": {"type": "array", "items": STR}}, ["session", "paths"]),
     schema("lsp", "Query a configured stdio language server: definition, references, hover, symbols, implementation or push/pull diagnostics. Line is 1-based, character is 0-based UTF-16. Requires process approval.",
            {"server": STR, "operation": STR, "path": STR, "line": INT, "character": INT}, ["server", "operation", "path"]),
@@ -260,14 +261,21 @@ class Tools:
         rules = self.file_guidance(path)
         if rules:
             return "File unchanged. Read these applicable rules before retrying the edit:\n" + rules
-        if len(content.encode("utf-8")) > 2_000_000:
+        if content is not None and len(content.encode("utf-8")) > 2_000_000:
             raise ValueError("Change exceeds 2 MB limit")
         old = before.decode("utf-8") if before is not None else ""
-        diff = "".join(difflib.unified_diff(old.splitlines(True), content.splitlines(True), fromfile=f"a/{path.relative_to(self.settings.root)}", tofile=f"b/{path.relative_to(self.settings.root)}"))
+        if content is None and before is None:
+            raise ValueError("Cannot delete a missing file")
+        if "\x00" in old or (content is not None and "\x00" in content):
+            raise ValueError("Binary files are not supported")
+        diff = "".join(difflib.unified_diff(old.splitlines(True), (content or "").splitlines(True), fromfile=f"a/{path.relative_to(self.settings.root)}" if before is not None else "/dev/null", tofile=f"b/{path.relative_to(self.settings.root)}" if content is not None else "/dev/null"))
+        if content is None and not diff:
+            diff = f"Delete empty file: {path.relative_to(self.settings.root)}\n"
         if before is not None and old == content:
             return "No change."
         self.emit("diff", diff)
-        if self.settings.permission != "accept-edits" and await self.approve(f"Write {path.relative_to(self.settings.root)}?", diff) is not True:
+        action = "Delete" if content is None else "Write"
+        if self.settings.permission != "accept-edits" and await self.approve(f"{action} {path.relative_to(self.settings.root)}?", diff) is not True:
             return "Denied by user. File unchanged."
         current = path.read_bytes() if path.exists() else None
         if current != before:
@@ -276,12 +284,27 @@ class Tools:
         if self.path(str(path)) != path:
             raise ValueError("File path changed while awaiting approval")
         relative = path.relative_to(self.settings.root).as_posix()
-        ident = self.changes.prepare(relative, before, content.encode("utf-8")) if self.changes else None
-        atomic_write(path, content)
+        ident = self.changes.prepare(relative, before, content.encode("utf-8") if content is not None else None) if self.changes else None
+        if content is None:
+            if ident is None:
+                raise ValueError("Deletion requires a durable change journal")
+            path.unlink()
+        else:
+            atomic_write(path, content)
         if ident is not None:
             self.changes.mark(ident, "applied")
         review = f" Change #{ident}; review with /changes {ident}, undo with /undo {ident}." if ident is not None else ""
-        return f"Saved {relative}.{review} This is not a test result; run appropriate checks."
+        return f"{'Deleted' if content is None else 'Saved'} {relative}.{review} This is not a test result; run appropriate checks."
+
+    async def delete(self, path):
+        # Reject aliases rather than deleting their resolved target.
+        lexical = self.settings.root / path
+        target = self.path(path)
+        if lexical.absolute() != target or lexical.is_symlink():
+            raise ValueError("Deletion requires a direct file path without aliases")
+        if not target.is_file() or target.stat().st_size > 2_000_000:
+            raise ValueError("Only existing text files up to 2 MB can be deleted")
+        return await self.change(target, target.read_bytes(), None)
 
     async def write(self, path, content):
         target = self.path(path)

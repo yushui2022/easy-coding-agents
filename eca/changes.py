@@ -46,9 +46,10 @@ class Changes:
 
     def diff(self, ident):
         _, path, before, after, _ = self.get(ident)
-        return "".join(difflib.unified_diff(
-            (before or b"").decode("utf-8").splitlines(True), after.decode("utf-8").splitlines(True),
-            fromfile="a/" + path if before is not None else "/dev/null", tofile="b/" + path))
+        diff = "".join(difflib.unified_diff(
+            (before or b"").decode("utf-8").splitlines(True), (after or b"").decode("utf-8").splitlines(True),
+            fromfile="a/" + path if before is not None else "/dev/null", tofile="b/" + path if after is not None else "/dev/null"))
+        return diff or (f"Delete empty file: {path}\n" if after is None else f"Create empty file: {path}\n" if before is None else "")
 
     def accept(self, ident):
         _, path, _, after, status = self.get(ident)
