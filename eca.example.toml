@@ -1,0 +1,16 @@
+# Copy to eca.toml in the project you want to work on.
+[agent]
+model = "Qwen/Qwen2.5-Coder-32B-Instruct"
+base_url = "https://api-inference.modelscope.cn/v1"
+api_key_env = "MODELSCOPE_API_KEY"
+mode = "code"
+permission = "ask"
+max_turns = 40
+context_chars = 100000
+command_timeout = 120
+request_timeout = 120
+output_limit = 24000
+
+[profiles]
+reviewer = "Review code for concrete correctness problems. Cite files and lines. Do not edit unless the user asks."
+builder = "Implement the requested change using existing project conventions, then run appropriate checks."
