@@ -1,4 +1,4 @@
-# Developer guide — v0.10.0
+# Developer guide — v0.11.0
 
 The default runtime is `eca/`. Start with `docs/UPGRADE-v0.2.md` for architecture, permissions, persistence semantics and limitations. The former guide is retained at `docs/legacy/AI_CODER_GUIDE-v0.1.md`.
 
@@ -33,3 +33,7 @@ LSP clients persist within the session: synchronize changed text, discard mismat
 Deletion is a nullable after-image in the existing file journal. Require a durable record before unlink, reject binary files/directories/aliases, and restore only when the current file still matches the recorded absence. Child deletion merges require a completed deletion record and matching parent baseline. Do not infer deletion from an arbitrary missing child file.
 
 A complete, untruncated AGENTS.md read acknowledges only those exact bytes, using the guidance fingerprint and universal newlines. Promote acknowledgment only after the next model response; partial reads, changed rules and unread parent scopes must still block mutation.
+
+Docker isolation is opt-in, requires a local Linux engine and a preinstalled trusted image, and must never fall back to host execution. Do not mount the live repository, Docker socket, credential directories or user home. Only a bounded filtered source snapshot is mounted read-only; command writes are disposable. Network is disabled and resource/capability limits are fixed. Preserve container cleanup on timeout/cancellation and the in-container timeout watchdog. MCP/LSP are denied in this mode, including execution-layer checks. This backend remains experimental until real-engine acceptance runs; mocked flags do not prove kernel isolation.
+
+The source index is a rebuildable local SQLite FTS cache, not a source of instructions or authoritative dependency resolution. Respect Git ignores, protected paths, size limits and output limits; remove deleted/ignored entries, refresh changed files, and validate returned content hashes. Python symbols/imports use AST; other languages only provide lexical hints. Do not claim embeddings, precise cross-language references or whole-repository coverage when scans are partial.

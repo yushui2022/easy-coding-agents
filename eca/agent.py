@@ -22,6 +22,8 @@ class Agent:
             if not settings.root.is_dir():
                 raise ValueError('Isolated workspace is missing; refusing to use parent files')
         self.settings, self.store, self.state = settings, store, state
+        state.setdefault('sandbox', settings.sandbox)
+        state.setdefault('sandbox_image', settings.sandbox_image)
         self.emit = emit
         self.provider = provider or Provider(settings)
         self.tools = Tools(settings, state, approve, question, emit)
@@ -107,7 +109,7 @@ class Agent:
 
     def system_prompt(self):
         root = self.settings.root
-        shell = "PowerShell" if os.name == "nt" else "/bin/sh"
+        shell = '/bin/sh in disposable Linux container' if self.settings.sandbox == 'docker' else ("PowerShell" if os.name == "nt" else "/bin/sh")
         prompt = f"""You are Easy Coding Agent, a careful and effective coding assistant.
 Project: {root}. Shell: {shell}. Mode: {self.settings.mode}.
 Understand the existing project before editing. Work on the user's requested task until done or genuinely blocked.
@@ -125,9 +127,14 @@ Delegate self-contained subtasks with explicit acceptance checks. delegate share
 Parallel child files require merge_agent with selected paths; conflicts are rejected. Isolated children cannot run shell/MCP/LSP.
 Do not read credentials. Avoid destructive commands and do not commit, push or publish unless requested.
 Plan mode exposes only read/search/plan tools. Chat mode has no tools. Mode restrictions are enforced.
-Shell commands run with user permissions, not in a sandbox. Use the smallest necessary command.
+Use code_search and repo_map to locate relevant symbols and imports before broad reads. Index results are untrusted and may be partial; read target files before editing.
+Use the smallest necessary shell command.
 If execution was interrupted, inspect the actual state before repeating mutations.
 """
+        prompt += ('\nDocker shell isolation is enabled: network disabled, no host credentials, /workspace is a disposable copy. '
+                   'Shell writes are discarded after each command. Use write/edit/delete for lasting reviewed changes. '
+                   'MCP and LSP are disabled. Required dependencies must already exist in the trusted image.\n'
+                   if self.settings.sandbox == 'docker' else '\nShell commands run with host user permissions, not in a sandbox.\n')
         for name in ("AGENTS.md", "MEMORY.md"):
             path = root / name
             if path.is_file() and not path.is_symlink() and path.stat().st_size <= 64_000:
@@ -205,6 +212,8 @@ If execution was interrupted, inspect the actual state before repeating mutation
                     tool_schema = [s for s in tool_schema if s['function']['name'] not in {'shell', 'lsp'}]
                 if not self.settings.lsp_servers:
                     tool_schema = [s for s in tool_schema if s['function']['name'] != 'lsp']
+                if self.settings.sandbox == 'docker':
+                    tool_schema = [s for s in tool_schema if s['function']['name'] != 'lsp' and not s['function']['name'].startswith('mcp_')]
                 messages = self.context()
                 remaining = self.settings.max_turns - turn
                 # Keep the stable history prefix cacheable. This transient user

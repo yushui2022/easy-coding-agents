@@ -12,7 +12,7 @@ def source_files(tools):
     """Respect Git ignores without copying Git metadata or credentials."""
     from .tools import SKIP
     try:
-        result = subprocess.run(['git', 'ls-files', '--cached', '--others', '--exclude-standard', '-z'],
+        result = subprocess.run(['git', '-c', 'core.fsmonitor=false', 'ls-files', '--cached', '--others', '--exclude-standard', '-z'],
             cwd=tools.settings.root, capture_output=True, timeout=10,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
     except (OSError, subprocess.TimeoutExpired):

@@ -27,6 +27,8 @@ from .usage import UsageLedger
 
 
 HELP = {
+    '/map [QUERY]': 'Show local indexed symbols/imports without a model request',
+    '/search QUERY': 'Search indexed source without a model request',
     "/progress": "Show recent runtime observations retained across compaction",
     "/verify COMMAND": "Run a user-selected check with normal shell approval",
     "/usage": "Show durable usage and priced subtotals, including child agents",
@@ -63,6 +65,8 @@ def parser():
     p.add_argument("--base-url")
     p.add_argument("--api-format", choices=["openai", "anthropic", "responses"], help="Model wire protocol")
     p.add_argument("--mode", choices=["code", "plan", "chat"])
+    p.add_argument('--sandbox', choices=['none', 'docker'], help='Docker runs shell in disposable offline Linux containers; never falls back to host')
+    p.add_argument('--sandbox-image', help='Preinstalled trusted Linux image with required tools; never downloaded automatically')
     p.add_argument("--accept-edits", action="store_true", help="Approve file edits inside project; shell still requires approval")
     p.add_argument("--allow-shell", action="store_true", help="Explicitly approve ALL shell commands (including outside project); for trusted one-shot tasks only")
     p.add_argument("--allow-lsp", action="append", default=[], metavar="SERVER", help="Approve startup of one configured language server in one-shot mode")
@@ -101,6 +105,13 @@ class App:
             self.state['model_profile'] = settings.model_profile
         elif not review_only:
             self.state.pop('model_profile', None)
+        if not review_only:
+            if args.resume and args.sandbox is None and self.state.get('sandbox'):
+                settings.sandbox = self.state['sandbox']
+            if args.resume and args.sandbox_image is None and self.state.get('sandbox_image'):
+                settings.sandbox_image = self.state['sandbox_image']
+            settings.validate()
+            self.state.update(sandbox=settings.sandbox, sandbox_image=settings.sandbox_image)
         self.state["mode"] = settings.mode
         self.store.save(self.state)
         self.prompt = None
@@ -216,6 +227,7 @@ class App:
         data['verification'] = self.agent.verification_status()
         from .workflow import suite_status
         data['verification_suite'] = suite_status(self.agent)
+        data['sandbox'] = self.agent.settings.sandbox
         if self.args.json:
             self.emit("status", data)
         else:
@@ -234,9 +246,13 @@ class App:
         elif command in {"/new", "/resume"}:
             state = self.store.create(self.settings.mode) if command == "/new" else self.store.load(arg or "latest")
             selected = self.settings.select_profile(state['model_profile']) if state.get('model_profile') else self.settings
+            if state.get('sandbox') == 'docker':
+                selected.sandbox = 'docker'
+                selected.sandbox_image = state.get('sandbox_image', selected.sandbox_image)
             await self.agent.close()
             self.settings = selected
             self.state = state
+            self.state.update(sandbox=selected.sandbox, sandbox_image=selected.sandbox_image)
             self.settings.mode = state["mode"]
             if self.settings.model_profile:
                 self.state["model_profile"] = self.settings.model_profile
@@ -251,6 +267,9 @@ class App:
                 'verification_suite': suite_status(self.agent)}, ensure_ascii=False))
         elif command == '/verify':
             await self.agent.verify(arg)
+        elif command in {'/map', '/search'}:
+            result = await self.agent.tools.execute('repo_map' if command == '/map' else 'code_search', {'query': arg})
+            self.emit('notice', result)
         elif command == "/sessions":
             self.show_sessions()
         elif command == "/mode":
@@ -388,7 +407,7 @@ class App:
                 self.agent.changes.accept(ident)
             self.emit("notice", f"Change #{ident}: {'undone' if command == '/undo' else 'accepted'}. Git index unchanged.")
         elif command == "/diff":
-            result = json.loads(await run_process(["git", "--no-pager", "diff", "--no-ext-diff", "--no-textconv", "HEAD", "--", ".", ":(exclude).env", ":(exclude).env.*", ":(exclude).eca", ":(exclude)venv", ":(exclude)*.pyc"], self.settings.root, 20))
+            result = json.loads(await run_process(["git", "-c", "core.fsmonitor=false", "--no-pager", "diff", "--no-ext-diff", "--no-textconv", "HEAD", "--", ".", ":(exclude).env", ":(exclude).env.*", ":(exclude).eca", ":(exclude)venv", ":(exclude)*.pyc"], self.settings.root, 20))
             self.console.print(Syntax(result["stdout"] or result["stderr"] or "No tracked changes. New untracked files are not included.", "diff"))
         elif command == "/export":
             path = self.settings.state_dir / "exports" / f"{self.state['id']}.md"
@@ -482,7 +501,7 @@ async def async_main(args):
         raise ValueError('--allow-mcp is only for one-shot tasks')
     if args.doctor:
         report = diagnose(args.cwd, model_profile=args.model_profile, model=args.model, base_url=args.base_url, api_format=args.api_format, mode=args.mode,
-                          permission="accept-edits" if args.accept_edits else None)
+                          permission="accept-edits" if args.accept_edits else None, sandbox=args.sandbox, sandbox_image=args.sandbox_image)
         print(json.dumps(report, ensure_ascii=False, indent=None if args.json else 2))
         return 0 if report["ready"] else 1
     if review or args.list_sessions:
@@ -493,7 +512,7 @@ async def async_main(args):
         settings = Settings(root)
     else:
         settings = Settings.load(args.cwd, model_profile=args.model_profile, model=args.model, base_url=args.base_url, api_format=args.api_format, mode=args.mode,
-                                 permission="accept-edits" if args.accept_edits else None)
+                                 permission="accept-edits" if args.accept_edits else None, sandbox=args.sandbox, sandbox_image=args.sandbox_image)
     if args.list_sessions:
         if not settings.state_dir.exists():
             print("[]")

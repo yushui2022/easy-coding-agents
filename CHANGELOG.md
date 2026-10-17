@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.0 — 2026-10-17
+
+- 新增可选实验性 Docker Shell 隔离：本地 Linux 引擎、禁网、受限资源、过滤后的只读源码副本、命令写入丢弃、取消清理和容器内超时。
+- 后端不可用不回退宿主机；Docker 模式禁用 MCP/LSP，恢复会话保留隔离设置。
+- 新增 SQLite FTS5 增量代码索引、Python AST/其他语言词法摘要，提供 code_search/repo_map 工具及 `/search`、`/map`。
+- 验收指纹容量提升到 20,000 文件 / 50 MB；超限保持未知。关闭宿主机源码枚举的 Git fsmonitor hook。
+- 真实容器验收本机未运行，不能把参数测试视为隔离证明。详见 [v0.11](docs/UPGRADE-v0.11.md)。
+- 全量 204 passed, 2 skipped；3,000 文件索引回归通过，wheel 的 25 个运行时模块与源码一致。
+
 ## 0.10.0 — 2026-10-17
 
 - `--verify-command` 支持最多 10 项顺序检查，首个失败后停止。

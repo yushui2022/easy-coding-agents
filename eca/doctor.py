@@ -31,6 +31,10 @@ def diagnose(root, **overrides):
             check("configuration", "error", f"Configuration could not be loaded ({type(exc).__name__}). Check TOML syntax, option names/types, model ID and endpoint; use eca.example.toml as reference.")
         else:
             check("configuration", "ok", "Configuration parsed and validated.")
+            report['sandbox'] = settings.sandbox
+            if settings.sandbox == 'docker':
+                check('sandbox_backend', 'warning' if shutil.which('docker') else 'error',
+                      'Docker CLI checked only; local Linux engine and preinstalled image are checked at execution. No host fallback.')
             check("api_key", "ok" if settings.api_key else "error", "API key configured (not tested)." if settings.api_key else "API key missing. Set the configured api_key_env, ECA_API_KEY or the selected provider's key variable.")
             url = urlsplit(settings.base_url)
             # Display origin only; custom paths can themselves contain credentials.

@@ -37,6 +37,8 @@ class Settings:
     reasoning_effort: str = ""
     model_profiles: dict = field(default_factory=dict, repr=False)
     model_profile: str = ""
+    sandbox: str = 'none'
+    sandbox_image: str = 'python:3.11-slim'
 
     @property
     def state_dir(self):
@@ -72,7 +74,7 @@ class Settings:
                       model=env.get("ECA_MODEL") or env.get("MODEL_NAME") or cfg.get("model", "" if native else cls.model),
                       base_url=env.get("ECA_BASE_URL") or env.get("ANTHROPIC_BASE_URL" if native else "OPENAI_BASE_URL") or cfg.get("base_url", default_url))
         values.update(mcp_servers=data.get("mcp_servers", {}), pricing=data.get("pricing", {}), lsp_servers=data.get("lsp_servers", {}), model_profiles=data.get("model_profiles", {}))
-        for name in ("reasoning_effort", "mode", "permission", "max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "network_retries", "auto_compact", "project_memory", "stream_usage", "subagent_max_turns", "subagent_max_calls", "subagent_timeout", "subagent_concurrency"):
+        for name in ("sandbox", "sandbox_image", "reasoning_effort", "mode", "permission", "max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "network_retries", "auto_compact", "project_memory", "stream_usage", "subagent_max_turns", "subagent_max_calls", "subagent_timeout", "subagent_concurrency"):
             if name in cfg:
                 values[name] = cfg[name]
         selected = model_profile if model_profile is not None else cfg.get('model_profile', '')
@@ -95,6 +97,11 @@ class Settings:
         return select(self, name)
 
     def validate(self):
+        import re
+        if self.sandbox not in {'none', 'docker'}:
+            raise ValueError('sandbox must be none or docker')
+        if not isinstance(self.sandbox_image, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9./_:@-]{0,255}', self.sandbox_image):
+            raise ValueError('Invalid sandbox image reference')
         from .models import validate_profiles
         validate_profiles(self.model_profiles, self.root)
         if not isinstance(self.model_profile, str):

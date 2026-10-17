@@ -14,7 +14,7 @@ import tempfile
 from .verification import no_tests_found
 
 
-SKIP = {".git", ".eca", ".agent_memory", ".pytest_cache", "output", "node_modules", "venv", ".venv", "__pycache__", "dist", "build", ".next", "target"}
+SKIP = {".git", ".eca", ".ssh", ".aws", ".kube", ".agent_memory", ".pytest_cache", "output", "node_modules", "venv", ".venv", "__pycache__", "dist", "build", ".next", "target"}
 
 
 def schema(name, description, properties, required):
@@ -25,13 +25,15 @@ def schema(name, description, properties, required):
 STR = {"type": "string"}
 INT = {"type": "integer"}
 SCHEMAS = [
+    schema('code_search', 'Search a local incremental source index. Returns ranked files and matching lines. Prefer before broad repeated reads.', {'query': STR, 'limit': INT}, ['query']),
+    schema('repo_map', 'Get bounded file symbols and import summaries. Python uses AST; other languages use lexical hints. Optional search query.', {'query': STR, 'limit': INT}, []),
     schema("read", "Read a UTF-8 text file with 1-based lines. Read before editing.", {"path": STR, "offset": INT, "limit": INT}, ["path"]),
     schema("glob", "Find workspace files; ignores build/cache/secret directories.", {"pattern": STR}, ["pattern"]),
     schema("grep", "Search literal text in workspace files; optional filename glob.", {"query": STR, "include": STR}, ["query"]),
     schema("write", "Create or overwrite a UTF-8 file with diff approval; prefer edit for existing files.", {"path": STR, "content": STR}, ["path", "content"]),
     schema("edit", "Replace exactly one occurrence. Ambiguous matches are rejected.", {"path": STR, "old": STR, "new": STR}, ["path", "old", "new"]),
     schema("delete", "Delete one UTF-8 text file with diff approval and recoverable journal. No directories or binary files.", {"path": STR}, ["path"]),
-    schema("shell", "Run a shell command in the project. Windows uses PowerShell; requires approval. Includes exit code.", {"command": STR, "timeout": INT}, ["command"]),
+    schema("shell", "Run the configured shell with approval: host PowerShell/sh, or /bin/sh in disposable Docker mode. Docker writes are discarded. Includes exit code.", {"command": STR, "timeout": INT}, ["command"]),
     schema("todo", "Replace task plan. Completion is a planning label, not proof tests passed.", {"items": {"type": "array", "items": {"type": "object", "properties": {"content": STR, "status": {"type": "string", "enum": ["pending", "in_progress", "completed"]}}, "required": ["content", "status"], "additionalProperties": False}}}, ["items"]),
     schema("ask", "Ask for missing requirements; use only when needed.", {"question": STR}, ["question"]),
     schema("delegate", "Delegate a bounded subtask to an independent child agent. It shares files, not conversation. No recursive delegation. Default plan is read-only.",
@@ -53,7 +55,7 @@ SCHEMAS = [
 
 
 def allowed(mode):
-    return {"read", "glob", "grep", "todo", "ask", "delegate", "delegate_parallel", "lsp"} if mode == "plan" else (set() if mode == "chat" else {s["function"]["name"] for s in SCHEMAS})
+    return {"read", "glob", "grep", "code_search", "repo_map", "todo", "ask", "delegate", "delegate_parallel", "lsp"} if mode == "plan" else (set() if mode == "chat" else {s["function"]["name"] for s in SCHEMAS})
 
 
 def atomic_write(path, content):
@@ -165,7 +167,7 @@ class Tools:
         if not path.is_relative_to(self.settings.root):
             raise ValueError("Path is outside the project")
         parts = [p.lower() for p in path.relative_to(self.settings.root).parts]
-        if any(p in {".git", ".eca"} for p in parts) or any(p == ".env" or (p.startswith(".env.") and p != ".env.example") for p in parts):
+        if any(p in {".git", ".eca", '.ssh', '.aws', '.kube', '.npmrc', '.pypirc', '.netrc'} for p in parts) or any(p == ".env" or (p.startswith(".env.") and p != ".env.example") for p in parts):
             raise ValueError("Protected path (.git, .eca or secrets)")
         if path.suffix.lower() in {".pem", ".key", ".p12", ".pfx"}:
             raise ValueError("Private key files are excluded")
@@ -187,6 +189,8 @@ class Tools:
                     yield path
 
     async def execute(self, name, args):
+        if self.settings.sandbox == 'docker' and (name == 'lsp' or name.startswith('mcp_')):
+            return 'Denied: MCP and LSP host processes/connections are disabled in Docker sandbox mode.'
         if self.state.get('isolated') and (name in {'shell', 'lsp'} or name.startswith('mcp_')):
             return 'Denied: external processes are disabled in isolated children.'
         if name not in allowed(self.settings.mode):
@@ -225,6 +229,21 @@ class Tools:
             self.guidance_pending.add((target.relative_to(self.settings.root).as_posix(),
                                        hashlib.sha256(rules.encode()).hexdigest()))
         return result
+
+    async def code_search(self, query, limit=10):
+        return await self._indexed(query, limit, False)
+
+    async def repo_map(self, query='', limit=20):
+        return await self._indexed(query, limit, True)
+
+    async def _indexed(self, query, limit, outline):
+        from .code_index import CodeIndex
+        task = asyncio.create_task(asyncio.to_thread(CodeIndex(self).query, query, limit, outline))
+        try:
+            return await asyncio.shield(task)
+        except asyncio.CancelledError:
+            await task
+            raise
 
     async def glob(self, pattern):
         return await asyncio.to_thread(self._glob, pattern)
@@ -341,9 +360,13 @@ class Tools:
         timeout = timeout or self.settings.command_timeout
         if not 1 <= timeout <= 600:
             raise ValueError("Shell timeout must be 1..600 seconds")
-        if await self.approve("Run shell command? Commands have your user account's permissions.", command) is not True:
+        policy = 'Offline disposable Docker container; shell writes are discarded.' if self.settings.sandbox == 'docker' else "Commands have your user account's permissions."
+        if await self.approve('Run shell command? ' + policy, command) is not True:
             return "Denied by user. Command not executed."
-        if os.name == "nt":
+        if self.settings.sandbox == 'docker':
+            from .sandbox import run
+            result = await run(self, command, timeout, run_process)
+        elif os.name == "nt":
             executable = shutil.which("pwsh") or shutil.which("powershell")
             if not executable:
                 raise ValueError("PowerShell not found")
@@ -351,7 +374,8 @@ class Tools:
             argv = [executable, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", prefix + command]
         else:
             argv = ["/bin/sh", "-c", command]
-        result = await run_process(argv, self.settings.root, timeout, max(1, self.settings.output_limit // 3))
+        if self.settings.sandbox != 'docker':
+            result = await run_process(argv, self.settings.root, timeout, max(1, self.settings.output_limit // 3))
         output = json.loads(result)
         if no_tests_found(command, output):
             output["test_status"] = "no_tests"

@@ -2,6 +2,8 @@
 
 本手册说明当前 CLI 的配置、权限、恢复和记忆机制。简明入口见 [项目首页](../README.md)。
 
+v0.11 增加可选 `--sandbox docker --sandbox-image IMAGE`（需要本地 Linux Docker 和预装可信镜像，不自动回退宿主机），以及无需模型请求的 `/search QUERY`、`/map [QUERY]`。安全范围、临时写入语义和索引上限见 [v0.11 升级说明](UPGRADE-v0.11.md)。
+
 v0.10 可重复指定 `--verify-command`（最多 10 项），并用 `--repair-attempts 1..3` 显式允许失败后修复和整组复验；默认不自动重跑。各轮结果保存于原会话，详见 [多项验收与有界修复](UPGRADE-v0.10.md)。
 
 v0.9 增加 `/progress`、`/verify COMMAND` 和 `--verify-command`。单次任务需要同时显式提供 `--allow-shell`；指定验证未通过时退出码为 3。`idle` 与验证结果分开显示，文件变化使旧结果失效。完整示例、退出码和边界见 [v0.9 升级说明](UPGRADE-v0.9.md)。
