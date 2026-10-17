@@ -76,7 +76,7 @@ class Agent:
         settings = replace(self.settings, mode=mode, mcp_servers={},
                            max_turns=min(self.settings.max_turns, self.settings.subagent_max_turns))
         state = self.store.create(mode)
-        state.update(parent_id=self.state['id'], billing_root=self.state.get('billing_root',self.state['id']),
+        state.update(model_profile=self.settings.model_profile, parent_id=self.state['id'], billing_root=self.state.get('billing_root',self.state['id']),
                      usage_tracking_complete=self.state.get('usage_tracking_complete',True))
         self.store.save(state)
         self.state.setdefault('children',[]).append(state['id'])
@@ -299,7 +299,11 @@ If execution was interrupted, inspect the actual state before repeating mutation
                     return
                 raise ValueError("Context cannot be compacted safely yet. Shorten the input or increase context_chars; full history is saved.")
             self.emit("notice", "Context nearing its budget; summarizing older work before continuing. Full history stays on disk.")
-        transcript = json.dumps({"previous_summary": self.state.get("summary"), "messages": history[start:cutoff]}, ensure_ascii=False)
+        # Opaque Responses reasoning is provider-specific replay data, not text
+        # for a summarizer. Keep it in the archive but never spend tokens on it.
+        portable = [{k:v for k,v in message.items() if k not in {'response_items', 'response_scope'}}
+                    for message in history[start:cutoff]]
+        transcript = json.dumps({"previous_summary": self.state.get("summary"), "messages": portable}, ensure_ascii=False)
         limit = max(1000, self.settings.context_chars - 4000)
         if len(transcript) > limit:
             transcript = "[Earlier transcript omitted; this is a partial text excerpt]\n" + transcript[-limit:]

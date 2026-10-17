@@ -55,8 +55,24 @@ class MCPTools:
         self.persistent = persistent
         self.workers = {}
         self.connection_keys = {}
+        self.locks = {}
+        self.ready = set()
+        self.failures = {}
+
+    def connected(self, server):
+        worker = self.workers.get(server)
+        return bool(worker and not worker[1].done() and worker[1] in self.ready)
+
+    def status(self, server):
+        return dict(connected=self.connected(server), last_error=self.failures.get(server))
 
     async def invoke(self, server, tool=None, arguments=None):
+        if server not in self.settings.mcp_servers:
+            raise ValueError('Unknown MCP server')
+        async with self.locks.setdefault(server, asyncio.Lock()):
+            return await self._invoke(server, tool, arguments)
+
+    async def _invoke(self, server, tool=None, arguments=None):
         if server not in self.settings.mcp_servers:
             raise ValueError("Unknown MCP server")
         cfg = self.settings.mcp_servers[server]
@@ -80,8 +96,10 @@ class MCPTools:
         except ImportError:
             return 'MCP support is not installed. Install easy-coding-agent[mcp].'
         except Exception as exc:
+            self.failures[server] = type(exc).__name__
             await self.disconnect(server)
             return f"MCP {type(exc).__name__}: operation failed; external outcome may be unknown. No automatic retry."
+        self.failures.pop(server, None)
         text = json.dumps(result, ensure_ascii=False)
         for secret in [self.settings.api_key, *values.values()]:
             if secret:
@@ -111,6 +129,8 @@ class MCPTools:
             session = await stack.enter_async_context(ClientSession(read,write,
                 read_timeout_seconds=timedelta(seconds=cfg.get('timeout',30))))
             await session.initialize()
+            if queue is not None:
+                self.ready.add(asyncio.current_task())
             if queue is None:
                 return await self._request(session, tool, arguments)
             while True:
@@ -191,7 +211,7 @@ class MCPTools:
         if not self.persistent:
             return await self._operate(cfg, values, tool, arguments)
         key = hashlib.sha256(json.dumps([cfg, values], sort_keys=True).encode()).hexdigest()
-        if server in self.workers and self.connection_keys.get(server) != key:
+        if server in self.workers and (self.connection_keys.get(server) != key or self.workers[server][1].done()):
             await self.disconnect(server)
         if server not in self.workers:
             self.connection_keys[server] = key
@@ -215,6 +235,7 @@ class MCPTools:
         self.connection_keys.pop(server, None)
         worker = self.workers.pop(server, None)
         if worker:
+            self.ready.discard(worker[1])
             worker[1].cancel()
             await asyncio.gather(worker[1], return_exceptions=True)
 

@@ -137,6 +137,7 @@ while True:
         self.settings.lsp_servers = {'py':dict(command=sys.executable, args=['-B',str(script)])}
         result = json.loads(await self.tools.lsp('py','definition','code.py',2,4))
         self.assertEqual(result['result']['position'], {'line':1,'character':4})
+        await self.tools.close()
         self.tools.approve = no
         self.assertIn('Denied', await self.tools.lsp('py','symbols','code.py'))
         self.assertEqual((self.root/'code.py').read_text(), 'x = 1')

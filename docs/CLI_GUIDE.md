@@ -208,3 +208,7 @@ eca --cwd ./your-project --resume SESSION_ID --undo CHANGE_ID --json
 ## v0.7 扩展
 
 并行隔离子任务、文件合并、MCP 连接/资源/提示词、Responses 模型与 LSP 配置见 [v0.7 升级手册](UPGRADE-v0.7.md)。`/mcp disconnect NAME` 可断开指定服务。
+
+## v0.8 可靠性与配置
+
+`/models`、`/model @NAME`、`--model-profile NAME`、`/agents ID`、`/lsp [disconnect NAME]` 见 [v0.8 升级手册](UPGRADE-v0.8.md)。模型配置不是 `/agent` 的行为提示词配置。

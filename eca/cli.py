@@ -29,6 +29,8 @@ from .usage import UsageLedger
 HELP = {
     "/usage": "Show durable usage and priced subtotals, including child agents",
     "/agents": "List child sessions; resume one to inspect its changes",
+    "/models": "List configured model profiles; /model @NAME selects one",
+    "/lsp": "Show language-server status; /lsp disconnect NAME closes one",
     "/mcp": "List configured MCP servers without connecting",
     "/help": "Show commands", "/new": "Start a new session", "/sessions": "List saved sessions",
     "/resume ID": "Resume a session (or latest)", "/mode code|plan|chat": "Change execution mode",
@@ -53,6 +55,7 @@ def parser():
     p.add_argument("-p", "--prompt", help="Run a single task and exit")
     p.add_argument("--json", action="store_true", help="JSONL events for --prompt")
     p.add_argument("--model")
+    p.add_argument("--model-profile", help="Select [model_profiles.NAME] with its own endpoint and credential variable")
     p.add_argument("--base-url")
     p.add_argument("--api-format", choices=["openai", "anthropic", "responses"], help="Model wire protocol")
     p.add_argument("--mode", choices=["code", "plan", "chat"])
@@ -83,7 +86,19 @@ class App:
             raise
         if args.resume and args.mode is None:
             settings.mode = self.state.get("mode", "code")
+        review_only = args.changes is not None or args.undo is not None or args.accept_change is not None
+        if not review_only and args.resume and not any((args.model_profile, args.model, args.base_url, args.api_format)) and self.state.get('model_profile'):
+            try:
+                self.settings = settings = settings.select_profile(self.state['model_profile'])
+            except Exception:
+                self.store.close()
+                raise
+        if not review_only and settings.model_profile:
+            self.state['model_profile'] = settings.model_profile
+        elif not review_only:
+            self.state.pop('model_profile', None)
         self.state["mode"] = settings.mode
+        self.store.save(self.state)
         self.prompt = None
         self.agent = self.make_agent()
         self.streaming = False
@@ -116,7 +131,7 @@ class App:
         elif event == "tasks":
             for task in data:
                 self.console.print(f"  [{task['status']}] {task['content']}", markup=False)
-        elif event == 'subagent_progress' and data['event'] in {'turn', 'tool', 'error'}:
+        elif event == 'subagent_progress' and data['event'] in {'turn', 'tool', 'error', 'status'}:
             value = data['data']
             label = value.get('name', '') if isinstance(value, dict) else str(value)
             self.console.print(f"  Agent {data['session'][:8]} · {data['event']} · {self.redact(label)}", markup=False)
@@ -208,9 +223,14 @@ class App:
             self.console.print(table)
         elif command in {"/new", "/resume"}:
             state = self.store.create(self.settings.mode) if command == "/new" else self.store.load(arg or "latest")
+            selected = self.settings.select_profile(state['model_profile']) if state.get('model_profile') else self.settings
             await self.agent.close()
+            self.settings = selected
             self.state = state
             self.settings.mode = state["mode"]
+            if self.settings.model_profile:
+                self.state["model_profile"] = self.settings.model_profile
+            self.store.save(self.state)
             self.agent = self.make_agent()
             self.status()
         elif command == "/sessions":
@@ -224,10 +244,23 @@ class App:
             if arg not in {"ask", "accept-edits"}:
                 raise ValueError("Usage: /permission ask|accept-edits")
             self.agent.settings.permission = self.settings.permission = arg
+        elif command == '/models':
+            self.emit('notice', json.dumps({name: {'model': cfg['model'], 'api_format': cfg['api_format']}
+                                          for name, cfg in self.settings.model_profiles.items()}))
         elif command == "/model":
             if not arg:
-                raise ValueError("Usage: /model MODEL_NAME")
-            self.agent.settings.model = self.settings.model = arg
+                raise ValueError("Usage: /model MODEL_NAME or /model @PROFILE")
+            if arg.startswith('@'):
+                selected = self.settings.select_profile(arg[1:])
+                await self.agent.close()
+                self.settings = selected
+                self.state['model_profile'] = arg[1:]
+                self.agent = self.make_agent()
+            else:
+                self.agent.settings.model = self.settings.model = arg
+                self.agent.settings.model_profile = self.settings.model_profile = ''
+                self.state.pop('model_profile', None)
+            self.store.save(self.state)
         elif command == "/agent":
             path = self.settings.root / "eca.toml"
             profiles = tomllib.loads(path.read_text("utf-8")).get("profiles", {}) if path.exists() else {}
@@ -253,6 +286,17 @@ class App:
                 self.emit('usage',data)
             else:
                 self.console.print(json.dumps(data,ensure_ascii=False,indent=2),markup=False)
+        elif command == '/lsp':
+            manager = self.agent.tools.language_servers
+            if arg:
+                if not arg.startswith('disconnect '):
+                    raise ValueError('Usage: /lsp [disconnect SERVER]')
+                if manager:
+                    await manager.disconnect(arg.split(' ', 1)[1])
+                self.emit('notice', 'Language server disconnected.')
+            else:
+                self.emit('notice', json.dumps(manager.status() if manager else
+                    {name:'disconnected' for name in self.agent.settings.lsp_servers}))
         elif command == '/mcp':
             if arg:
                 if not arg.startswith('disconnect '):
@@ -262,15 +306,22 @@ class App:
                 self.emit('notice', 'MCP connection closed; next operation requires approval.')
             else:
                 self.emit('notice',json.dumps({k:dict(transport=v.get('transport','stdio'),
-                    connected=bool(self.agent.tools.mcp and k in self.agent.tools.mcp.workers))
+                    **(self.agent.tools.mcp.status(k) if self.agent.tools.mcp else {'connected':False, 'last_error':None}))
                     for k,v in self.agent.settings.mcp_servers.items()}))
         elif command == '/agents':
             children=[]
-            for ident in self.state.get('children',[]):
+            identifiers = [self.store.peek(arg)['id']] if arg else self.state.get('children', [])
+            for ident in identifiers:
                 row=self.store.db.execute('SELECT state FROM sessions WHERE id=?',(ident,)).fetchone()
                 if row:
                     child=json.loads(row[0])
-                    children.append({k:child.get(k) for k in ('id','title','status','mode','stop_reason')})
+                    entry = {k:child.get(k) for k in ('id','title','status','mode','stop_reason', 'isolated')}
+                    if arg:
+                        if child.get('parent_id') != self.state['id']:
+                            raise ValueError('Session is not a child of this parent')
+                        from .workspaces import review
+                        entry['changes'] = review(self.agent, child)
+                    children.append(entry)
             if self.args.json:
                 self.emit('agents',children)
             else:
@@ -406,7 +457,7 @@ async def async_main(args):
     if args.allow_mcp and args.prompt is None:
         raise ValueError('--allow-mcp is only for one-shot tasks')
     if args.doctor:
-        report = diagnose(args.cwd, model=args.model, base_url=args.base_url, api_format=args.api_format, mode=args.mode,
+        report = diagnose(args.cwd, model_profile=args.model_profile, model=args.model, base_url=args.base_url, api_format=args.api_format, mode=args.mode,
                           permission="accept-edits" if args.accept_edits else None)
         print(json.dumps(report, ensure_ascii=False, indent=None if args.json else 2))
         return 0 if report["ready"] else 1
@@ -417,7 +468,7 @@ async def async_main(args):
             raise ValueError("Project directory does not exist")
         settings = Settings(root)
     else:
-        settings = Settings.load(args.cwd, model=args.model, base_url=args.base_url, api_format=args.api_format, mode=args.mode,
+        settings = Settings.load(args.cwd, model_profile=args.model_profile, model=args.model, base_url=args.base_url, api_format=args.api_format, mode=args.mode,
                                  permission="accept-edits" if args.accept_edits else None)
     if args.list_sessions:
         if not settings.state_dir.exists():

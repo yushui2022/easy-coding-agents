@@ -30,17 +30,20 @@ class Settings:
     subagent_max_turns: int = 6
     subagent_max_calls: int = 3
     subagent_timeout: int = 180
+    subagent_concurrency: int = 2
     mcp_servers: dict = field(default_factory=dict, repr=False)
     pricing: dict = field(default_factory=dict)
     lsp_servers: dict = field(default_factory=dict)
     reasoning_effort: str = ""
+    model_profiles: dict = field(default_factory=dict, repr=False)
+    model_profile: str = ""
 
     @property
     def state_dir(self):
         return self.root / ".eca"
 
     @classmethod
-    def load(cls, root: Path, **overrides):
+    def load(cls, root: Path, model_profile=None, **overrides):
         root = root.resolve()
         if not root.is_dir():
             raise ValueError(f"Project directory does not exist: {root}")
@@ -50,7 +53,7 @@ class Settings:
         cfg = data.get("agent", {})
         if not isinstance(cfg, dict):
             raise ValueError("[agent] must be a TOML table")
-        supported = set(cls.__dataclass_fields__) - {"root", "api_key", "mcp_servers", "pricing", "lsp_servers"} | {"api_key_env"}
+        supported = set(cls.__dataclass_fields__) - {"root", "api_key", "mcp_servers", "pricing", "lsp_servers", "model_profiles"} | {"api_key_env"}
         if "api_key" in cfg:
             raise ValueError("Use api_key_env instead of storing a secret in eca.toml")
         if set(cfg) - supported:
@@ -68,16 +71,34 @@ class Settings:
                       api_format=api_format,
                       model=env.get("ECA_MODEL") or env.get("MODEL_NAME") or cfg.get("model", "" if native else cls.model),
                       base_url=env.get("ECA_BASE_URL") or env.get("ANTHROPIC_BASE_URL" if native else "OPENAI_BASE_URL") or cfg.get("base_url", default_url))
-        values.update(mcp_servers=data.get("mcp_servers", {}), pricing=data.get("pricing", {}), lsp_servers=data.get("lsp_servers", {}))
-        for name in ("reasoning_effort", "mode", "permission", "max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "network_retries", "auto_compact", "project_memory", "stream_usage", "subagent_max_turns", "subagent_max_calls", "subagent_timeout"):
+        values.update(mcp_servers=data.get("mcp_servers", {}), pricing=data.get("pricing", {}), lsp_servers=data.get("lsp_servers", {}), model_profiles=data.get("model_profiles", {}))
+        for name in ("reasoning_effort", "mode", "permission", "max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "network_retries", "auto_compact", "project_memory", "stream_usage", "subagent_max_turns", "subagent_max_calls", "subagent_timeout", "subagent_concurrency"):
             if name in cfg:
                 values[name] = cfg[name]
+        selected = model_profile if model_profile is not None else cfg.get('model_profile', '')
+        if not isinstance(selected, str):
+            raise ValueError('model_profile must be text')
+        if selected:
+            from .models import select, validate_profiles
+            validate_profiles(values['model_profiles'], root)
+            profiled = select(cls(**values), selected)
+            values = {name: getattr(profiled, name) for name in cls.__dataclass_fields__}
         values.update({k: v for k, v in overrides.items() if v is not None})
+        if any(overrides.get(k) is not None for k in ('model', 'base_url', 'api_format')):
+            values['model_profile'] = ''
         settings = cls(**values)
         settings.validate()
         return settings
 
+    def select_profile(self, name):
+        from .models import select
+        return select(self, name)
+
     def validate(self):
+        from .models import validate_profiles
+        validate_profiles(self.model_profiles, self.root)
+        if not isinstance(self.model_profile, str):
+            raise ValueError('model_profile must be text')
         from .usage import validate_pricing
         from .mcp_client import validate_servers
         validate_pricing(self.pricing)
@@ -102,10 +123,12 @@ class Settings:
             raise ValueError("mode must be code, plan or chat")
         if self.permission not in {"ask", "accept-edits"}:
             raise ValueError("permission must be ask or accept-edits")
-        for name in ("max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "subagent_max_turns", "subagent_max_calls", "subagent_timeout"):
+        for name in ("max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "subagent_max_turns", "subagent_max_calls", "subagent_timeout", "subagent_concurrency"):
             value = getattr(self, name)
             if type(value) is not int or value <= 0:
                 raise ValueError(f"{name} must be a positive integer")
+        if self.subagent_concurrency > 8:
+            raise ValueError("subagent_concurrency must be 1..8")
         if not isinstance(self.base_url, str):
             raise ValueError("base_url must be text")
         url = urlsplit(self.base_url)

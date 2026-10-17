@@ -79,6 +79,45 @@ for line in sys.stdin:
         self.assertTrue(worker.done())
         self.assertEqual(client.workers,{})
 
+    async def test_dead_connection_is_reported_and_next_explicit_call_reconnects(self):
+        client=MCPTools(self.settings,yes,persistent=True)
+        try:
+            await client.invoke('fixture')
+            self.assertTrue(client.connected('fixture'))
+            worker=client.workers['fixture'][1]
+            worker.cancel()
+            await asyncio.gather(worker,return_exceptions=True)
+            self.assertFalse(client.connected('fixture'))
+            result=json.loads(await client.invoke('fixture','echo',{'text':'new explicit operation'}))
+            self.assertEqual(result['content'][0]['text'],'new explicit operation')
+            self.assertIsNot(worker,client.workers['fixture'][1])
+        finally:
+            await client.close()
+
+    async def test_cancel_waiting_request_does_not_disconnect_active_operation(self):
+        client=MCPTools(self.settings,yes,persistent=True)
+        first=second=None
+        try:
+            await client.invoke('fixture')
+            first=asyncio.create_task(client.invoke('fixture','echo',{'text':'slow'}))
+            for _ in range(100):
+                if (self.root/'called').exists(): break
+                await asyncio.sleep(0.01)
+            self.assertTrue((self.root/'called').exists())
+            second=asyncio.create_task(client.invoke('fixture'))
+            await asyncio.sleep(0)
+            second.cancel()
+            with self.assertRaises(asyncio.CancelledError): await second
+            self.assertTrue(client.connected('fixture'))
+            self.assertFalse(first.done())
+        finally:
+            if first:
+                first.cancel()
+                await asyncio.gather(first,return_exceptions=True)
+            if second:
+                await asyncio.gather(second,return_exceptions=True)
+            await client.close()
+
     async def test_resource_prompt_operations_with_real_stdio(self):
         script=self.root/'fixture.py'
         text=script.read_text('utf-8').replace("    else: result={}", """    elif method=='resources/list': result={'resources':[{'uri':'fixture://doc','name':'doc'}]}

@@ -55,7 +55,7 @@ class Store:
     def list(self):
         return self.db.execute("SELECT id, title, updated FROM sessions ORDER BY updated DESC LIMIT 100").fetchall()
 
-    def load(self, identifier):
+    def peek(self, identifier):
         if identifier == "latest":
             rows = self.db.execute("SELECT state FROM sessions ORDER BY updated DESC LIMIT 1").fetchall()
         else:
@@ -66,6 +66,10 @@ class Store:
         state = json.loads(rows[0][0])
         if Path(state["root"]).resolve() != self.root:
             raise ValueError("Session belongs to another project")
+        return state
+
+    def load(self, identifier):
+        state = self.peek(identifier)
         self.repair(state)
         return state
 
@@ -106,7 +110,7 @@ class Store:
                 pending.pop(msg["tool_call_id"], None)
         close_pending()
         state["messages"] = repaired
-        if state["status"] == "running":
+        if state["status"] in {"running", "queued", "preparing"}:
             state["status"] = "interrupted"
             state["stop_reason"] = "Previous process stopped unexpectedly. Inspect /changes and uncertain shell effects before /continue."
         self.save(state)

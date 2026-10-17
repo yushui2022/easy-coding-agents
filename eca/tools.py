@@ -38,7 +38,7 @@ SCHEMAS = [
            {"tasks": {"type": "array", "items": {"type": "object", "properties": {"task": STR, "mode": STR}, "required": ["task"]}}}, ["tasks"]),
     schema("merge_agent", "Merge selected text files from an isolated child. Reject parent conflicts; journal each approved write. Not an atomic multi-file transaction.",
            {"session": STR, "paths": {"type": "array", "items": STR}}, ["session", "paths"]),
-    schema("lsp", "Query a configured stdio language server: definition, references, hover, symbols or pull diagnostics. Line is 1-based, character is 0-based UTF-16. Requires process approval.",
+    schema("lsp", "Query a configured stdio language server: definition, references, hover, symbols, implementation or push/pull diagnostics. Line is 1-based, character is 0-based UTF-16. Requires process approval.",
            {"server": STR, "operation": STR, "path": STR, "line": INT, "character": INT}, ["server", "operation", "path"]),
     schema("mcp_resources", "List resources/templates or read an explicit resource URI; requires server approval.",
            {"server": STR, "operation": {"type": "string", "enum": ["list", "templates", "read"]}, "uri": STR}, ["server", "operation"]),
@@ -143,6 +143,7 @@ class Tools:
         self.approve, self.question, self.emit = approve, ask, emit
         self.changes = None
         self.mcp = None
+        self.language_servers = None
         self.guidance_seen, self.guidance_pending = set(), set()
 
     def file_guidance(self, target):
@@ -380,8 +381,10 @@ class Tools:
         return await self.mcp_client().invoke(server, '@prompt' if name else '@prompts', {'name': name, 'arguments': arguments or {}})
 
     async def lsp(self, server, operation, path, line=1, character=0):
-        from .lsp import query
-        return await query(self, server, operation, path, line, character)
+        from .lsp import LSPManager
+        if self.language_servers is None:
+            self.language_servers = LSPManager(self)
+        return await self.language_servers.query(server, operation, path, line, character)
 
     async def delegate_parallel(self, tasks):
         if not getattr(self, 'parallel_handler', None):
@@ -394,5 +397,7 @@ class Tools:
         return await self.merge_handler(session, paths)
 
     async def close(self):
+        if self.language_servers:
+            await self.language_servers.close()
         if self.mcp:
             await self.mcp.close()

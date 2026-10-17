@@ -11,10 +11,10 @@
   <a href="#快速开始">快速开始</a> ·
   <a href="docs/CLI_GUIDE.md">使用手册</a> ·
   <a href="CHANGELOG.md">更新记录</a> ·
-  <a href="docs/VALIDATION-v0.7.md">验证记录</a>
+  <a href="docs/VALIDATION-v0.8.md">验证记录</a>
 </p>
 
-<p align="center"><code>Python 3.11+</code> · <code>v0.7.0</code> · <code>开发中</code></p>
+<p align="center"><code>Python 3.11+</code> · <code>v0.8.0</code> · <code>开发中</code></p>
 
 ---
 
@@ -34,11 +34,11 @@ Easy Coding Agent（ECA）是一个可自行配置模型的 Python CLI 编程助
 | **长任务上下文** | 接近字符预算时摘要较早内容，保留完整历史与最近的完整工具调用组。 |
 | **项目记忆** | 记住显式确认的约束和有执行记录支持的历史测试命令；代码指纹变化后排除过期命令记录。 |
 | **项目规则** | 文件编辑前加载路径上各级 `AGENTS.md`，先向模型提供适用规则。 |
-| **模型选择** | 支持 OpenAI 兼容 Chat Completions、Responses 与 Anthropic 原生 Messages。 |
+| **模型选择** | 支持 Chat Completions、Responses 与 Anthropic Messages；命名配置绑定模型、协议、接口和密钥来源。 |
 | **脚本调用** | 单次任务、JSONL 输出，以及无需调用模型的文件改动审阅命令。 |
 | **MCP** | 可选 SDK；复用 stdio / HTTP 连接，调用工具、读取资源与提示词；逐次授权。 |
-| **子 Agent** | 可并行运行独立源码快照子任务，选择文件合并、检查冲突并撤销；保留顺序委派。 |
-| **LSP** | 经批准启动语言服务器，查询定义、引用、悬停、符号及 pull diagnostics。 |
+| **子 Agent** | 独立快照、并发队列与失败状态；查看子任务改动，选择文件合并、检查冲突并撤销。 |
+| **LSP** | 批准后复用进程；同步文件，查询定义/引用/实现；区分当前、无版本和待返回的诊断。 |
 | **用量与费用** | 请求级持久账本，涵盖重试、摘要和子任务；按 API 用量与配置价格计算，缺失值明确标注。 |
 
 ## 快速开始
@@ -167,7 +167,7 @@ eca --changes --json
 - **本地恢复不依赖模型配置。** 即使 `.env` 或 `eca.toml` 损坏，仍可使用 `--list-sessions`、`--changes`、`--undo ID` 和 `--accept-change ID`。
 - **恢复和摘要也有边界。** 摘要可能遗漏信息；结果不确定的操作不会自动重放。一个项目同时只允许一个 ECA 进程。
 - **扩展的边界。** MCP 外部副作用不在撤销范围内；并行子任务使用源码快照并禁止外部进程，旧式 delegate 仍共享目录；费用是按配置价格计算的统计，不替代服务商账单。接入配置见 [扩展功能手册](docs/EXTENSIONS-v0.6.md)。
-- **仍未实现** 操作系统沙箱、Git worktree 分支合并、订阅/MCP OAuth、LSP 重命名与长期索引。v0.7 的配置、用法与具体边界见 [升级手册](docs/UPGRADE-v0.7.md)。
+- **仍未实现** 操作系统沙箱、Git worktree 分支合并、订阅/MCP OAuth、LSP 重命名与长期索引。配置、设计参考与边界见 [v0.8 升级手册](docs/UPGRADE-v0.8.md)。
 
 ## 开发与验证
 
@@ -177,7 +177,7 @@ python -m pip install -e ".[mcp]" # 包含 MCP 本地集成测试所需依赖
 python -B -m pytest -q
 ```
 
-v0.7 已完成全量与新增专项回归，覆盖并行隔离、合并撤销、MCP 连接/资源/提示词、Responses SDK 与 LSP 协议交互。测试未调用付费模型；真实模型和大型语言服务器表现仍需后续验证。详见 [验证范围与结果](docs/VALIDATION-v0.7.md)。
+测试覆盖并发与取消、隔离合并、MCP 连接生命周期、模型配置恢复、Responses SDK 与 LSP 版本化诊断。测试未调用付费模型；真实模型和大型语言服务器表现仍需后续验证。详见 [验证范围与结果](docs/VALIDATION-v0.8.md)。
 
 CI 配置目前保留为 [工作流模板](docs/ci-workflow.yml)，尚未启用。跨平台执行和真实仓库长任务稳定性仍需持续验证。
 

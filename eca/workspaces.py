@@ -74,19 +74,30 @@ async def parallel(agent, tasks):
     states = []
     for task in tasks:
         state = agent.store.create(task.get('mode', 'plan'))
-        state.update(parent_id=agent.state['id'], billing_root=agent.state.get('billing_root', agent.state['id']),
-                     isolated=True, baseline={p: digest(data) for p, data in files.items()},
+        state.update(status='preparing', title=task['task'][:80], parent_id=agent.state['id'], billing_root=agent.state.get('billing_root', agent.state['id']),
+                     isolated=True, model_profile=agent.settings.model_profile, baseline={p: digest(data) for p, data in files.items()},
                      usage_tracking_complete=agent.state.get('usage_tracking_complete', True))
-        root = workspace(agent.store, state)
-        root.mkdir(parents=True, exist_ok=False)
-        for name, data in files.items():
-            dest = root / name
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(data)
-        agent.store.save(state)
         agent.state.setdefault('children', []).append(state['id'])
         states.append(state)
-    agent.store.save(agent.state)
+        agent.store.save(state)
+        agent.store.save(agent.state)
+    try:
+        for state in states:
+            root = workspace(agent.store, state)
+            root.mkdir(parents=True, exist_ok=False)
+            for name, data in files.items():
+                dest = root / name
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(data)
+            state['status'] = 'queued'
+            agent.store.save(state)
+            agent.emit('subagent_progress', dict(session=state['id'], event='status', data='queued'))
+    except Exception as exc:
+        for state in states:
+            state.update(status='error', stop_reason=f'Snapshot preparation failed: {type(exc).__name__}')
+            agent.store.save(state)
+        raise
+    semaphore = asyncio.Semaphore(agent.settings.subagent_concurrency)
     prompt_lock = asyncio.Lock()
 
     async def approve(session, message, detail):
@@ -108,21 +119,35 @@ async def parallel(agent, tasks):
                 agent.emit('subagent_progress', dict(session=state['id'], event=event, data=data))
         async def child_approve(message, detail):
             return await approve(state['id'], message, detail)
-        child = Agent(settings, agent.store, state, child_approve, question, emit, child=True)
+        child = None
         try:
-            await asyncio.wait_for(child.run(task['task']), agent.settings.subagent_timeout)
+            async with semaphore:
+                child = Agent(settings, agent.store, state, child_approve, question, emit, child=True)
+                emit('status', 'running')
+                await asyncio.wait_for(child.run(task['task']), agent.settings.subagent_timeout)
         except TimeoutError:
             state.update(status='timeout', stop_reason='Child time limit reached')
         except asyncio.CancelledError:
+            state.update(status='interrupted', stop_reason='Parent cancelled; queued/running task stopped')
             raise
         except Exception as exc:
             state.update(status='error', stop_reason=f'Child failed: {type(exc).__name__}')
         finally:
-            await child.close()
+            if child is not None:
+                try:
+                    await child.close()
+                except Exception as exc:
+                    state.update(status='error', stop_reason=f'Child cleanup failed: {type(exc).__name__}')
             agent.store.save(state)
+            emit('status', state['status'])
         summary = next((m.get('content') for m in reversed(state['messages'])
                         if m['role'] == 'assistant' and not m.get('tool_calls')), '')
+        try:
+            changes = review(agent, state)
+        except (OSError, ValueError):
+            changes = [{'status':'unavailable', 'notice':'Inspect the retained workspace manually.'}]
         return dict(session=state['id'], status=state['status'], summary=(summary or '')[:2000],
+                    stop_reason=state.get('stop_reason'), changes=changes,
                     workspace=str(workspace(agent.store, state)), notice='Isolated edits need merge_agent; report is unverified.')
 
     jobs = [asyncio.create_task(run(task, state)) for task, state in zip(tasks, states)]
@@ -133,14 +158,18 @@ async def parallel(agent, tasks):
             if not job.done():
                 job.cancel()
         await asyncio.gather(*jobs, return_exceptions=True)
+        for state in states:
+            if state['status'] in {'queued', 'preparing'}:
+                state.update(status='interrupted', stop_reason='Batch stopped before this task started')
+                agent.store.save(state)
 
 
 async def merge(agent, session, paths):
     from .tools import Tools
     if agent.child or agent.settings.mode != 'code':
         return 'Denied: merge requires a parent in code mode.'
-    state = agent.store.load(session)
-    if state.get('parent_id') != agent.state['id'] or not state.get('isolated') or state['status'] == 'running':
+    state = agent.store.peek(session)
+    if state.get('parent_id') != agent.state['id'] or not state.get('isolated') or state['status'] in {'preparing', 'queued', 'running'}:
         raise ValueError('Not a completed isolated child of this session')
     if not paths or len(paths) > 100 or len(set(paths)) != len(paths) or not all(isinstance(x, str) for x in paths):
         raise ValueError('Select 1..100 unique file paths to merge')
@@ -164,3 +193,24 @@ async def merge(agent, session, paths):
     # Preflight the whole selection before any write. Each write rechecks after approval.
     return json.dumps([await agent.tools.change(target, before, content)
                        for target, before, content in changes], ensure_ascii=False)
+
+
+def review(agent, state):
+    """Read-only summary of child file-tool changes; never repairs running sessions."""
+    if not state.get('isolated'):
+        return []
+    from .tools import Tools
+    child_tools = Tools(replace(agent.settings, root=workspace(agent.store, state)), state, None, None, lambda *_: None)
+    rows = agent.store.db.execute('SELECT DISTINCT path FROM file_changes WHERE session_id=? LIMIT 201', (state['id'],)).fetchall()
+    result = []
+    for (name,) in rows[:200]:
+        path = child_tools.path(name)
+        if path.exists() and (not path.is_file() or path.stat().st_size > 2_000_000):
+            result.append(dict(path=name, status='unreadable'))
+            continue
+        current = path.read_bytes() if path.exists() else None
+        if digest(current) != state.get('baseline', {}).get(name):
+            result.append(dict(path=name, status='modified' if name in state['baseline'] else 'added'))
+    if len(rows)>200:
+        result.append(dict(status='truncated'))
+    return result

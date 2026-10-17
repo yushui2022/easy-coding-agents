@@ -1,6 +1,6 @@
 # Copy to eca.toml in the project you want to work on.
 [agent]
-api_format = "openai" # or "anthropic"; then set matching model, base_url and api_key_env
+api_format = "openai" # or "anthropic" / "responses"; then set matching model, base_url and api_key_env
 model = "Qwen/Qwen2.5-Coder-32B-Instruct"
 base_url = "https://api-inference.modelscope.cn/v1"
 api_key_env = "MODELSCOPE_API_KEY"
@@ -17,6 +17,7 @@ request_timeout = 120
 output_limit = 24000
 stream_usage = true # request usage in OpenAI-compatible streams; false for incompatible servers
 subagent_max_turns = 6 # per child; also bounded by parent max_turns
+subagent_concurrency = 2 # simultaneous children, 1..8; excess tasks wait
 subagent_max_calls = 3 # per parent run; no recursive delegation
 subagent_timeout = 180 # seconds per child
 
@@ -59,3 +60,13 @@ builder = "Implement the requested change using existing project conventions, th
 # args = ["--stdio"]
 # language_id = "python"
 # timeout = 30
+
+# v0.8: a profile binds a model to its own endpoint and credential variable.
+# Select with --model-profile fast or /model @fast.
+# [model_profiles.fast]
+# model = "YOUR_MODEL_ID"
+# base_url = "https://YOUR_PROVIDER/v1"
+# api_format = "openai"
+# api_key_env = "FAST_MODEL_KEY"
+# stream_usage = true
+# max_output_tokens = 4096

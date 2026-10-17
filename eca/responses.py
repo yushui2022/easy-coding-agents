@@ -1,14 +1,15 @@
 """Stateless Responses adapter preserving reasoning items and tool identities."""
 import json
+import hashlib
 
 
-def input_items(messages):
+def input_items(messages, scope=None):
     items = []
     for message in messages:
         role = message['role']
         if role == 'tool':
             items.append(dict(type='function_call_output', call_id=message['tool_call_id'], output=message['content']))
-        elif role == 'assistant' and message.get('response_items'):
+        elif role == 'assistant' and message.get('response_items') and (scope is None or message.get('response_scope') == scope):
             items.extend(message['response_items'])
         else:
             if message.get('content'):
@@ -19,7 +20,8 @@ def input_items(messages):
 
 
 async def complete(client, settings, messages, tools, emit, usage_callback):
-    kwargs = dict(model=settings.model, input=input_items(messages), store=False, stream=True,
+    scope = hashlib.sha256((settings.base_url+'\0'+settings.model).encode()).hexdigest()
+    kwargs = dict(model=settings.model, input=input_items(messages, scope), store=False, stream=True,
                   max_output_tokens=settings.max_output_tokens, include=['reasoning.encrypted_content'])
     if tools:
         kwargs['tools'] = [dict(type='function', **t['function'], strict=False) for t in tools]
@@ -58,7 +60,7 @@ async def complete(client, settings, messages, tools, emit, usage_callback):
         items.append(value)
     if not text and not calls:
         raise RuntimeError('Empty Responses output')
-    message = dict(role='assistant', content=''.join(text) or None, response_items=items)
+    message = dict(role='assistant', content=''.join(text) or None, response_items=items, response_scope=scope)
     if calls:
         message['tool_calls'] = calls
     u = response.usage.model_dump() if response.usage else {}

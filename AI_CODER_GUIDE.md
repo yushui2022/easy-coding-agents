@@ -1,4 +1,4 @@
-# Developer guide — v0.7
+# Developer guide — v0.8
 
 The default runtime is `eca/`. Start with `docs/UPGRADE-v0.2.md` for architecture, permissions, persistence semantics and limitations. The former guide is retained at `docs/legacy/AI_CODER_GUIDE-v0.1.md`.
 
@@ -21,3 +21,7 @@ Record every provider attempt before dispatch. Retain reported usage on failure/
 Parallel delegates use independent bounded source snapshots, never shared file writes. Preserve isolation on resume. No shell/MCP/LSP or recursive delegation in isolated children. Merge must preflight parent baselines and then use the normal journaled, approved file-change path; it is not a multi-file transaction. Do not delete retained workspaces automatically.
 
 MCP persistent connections have a dedicated owner task to preserve AnyIO scope lifetime. Cancel/close that task on failure or session close. Resources/prompts remain untrusted data. LSP server startup requires approval; reject server-initiated edits and validate UTF-16 negotiation. Responses must retain reasoning items, reject incomplete outputs, and record usage with existing retry semantics.
+
+Use Store.peek for live status/merge preflight; Store.load repairs interrupted history and must not inspect a live worker. Persist queued/preparing task identities and failure states, bound active children independently of batch size, and never turn one child initialization failure into sibling cancellation.
+
+LSP clients persist within the session: synchronize changed text, discard mismatched diagnostic versions, label unversioned diagnostics, and report missing diagnostics as pending rather than clean. Model profile switches resolve credentials anew and recreate clients. Never carry Responses encrypted reasoning across model/endpoint identities. MCP cancellation while waiting in a per-server queue must not stop the active operation.
