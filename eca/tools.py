@@ -2,6 +2,7 @@
 import asyncio
 import difflib
 import fnmatch
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -211,11 +212,19 @@ class Tools:
             raise ValueError("offset >= 1; limit must be 1..2000")
         if target.stat().st_size > 2_000_000:
             raise ValueError("File exceeds 2 MB read limit")
-        text = target.read_bytes().decode("utf-8-sig")
+        raw = target.read_bytes()
+        text = raw.decode("utf-8-sig")
         if "\x00" in text:
             raise ValueError("Binary files are not supported")
         lines = text.splitlines()
-        return "\n".join(f"{i+offset}: {line}" for i, line in enumerate(lines[offset-1:offset-1+limit])) + f"\n[total lines: {len(lines)}]"
+        result = "\n".join(f"{i+offset}: {line}" for i, line in enumerate(lines[offset-1:offset-1+limit])) + f"\n[total lines: {len(lines)}]"
+        if target.name == "AGENTS.md" and offset == 1 and limit >= len(lines) and len(result) <= self.settings.output_limit:
+            # Match guidance.read_text's universal newlines using the SAME bytes
+            # shown to the model. A reread could acknowledge a concurrent edit.
+            rules = raw.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+            self.guidance_pending.add((target.relative_to(self.settings.root).as_posix(),
+                                       hashlib.sha256(rules.encode()).hexdigest()))
+        return result
 
     async def glob(self, pattern):
         return await asyncio.to_thread(self._glob, pattern)

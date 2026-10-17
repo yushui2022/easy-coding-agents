@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.2 — 2026-10-17
+
+- 修复完整读取 AGENTS.md 后仍重复阻断后续写入的问题，保留同批次、部分读取、截断和规则变更保护。
+- 新增 StockFlow 多模块 FastAPI / SQLite 项目验收契约及真实模型构建、修复、恢复运行器。
+- 相关规则/删除专项 12 项通过，全量 166 passed, 1 skipped。
+
 ## Unreleased
 
 - 新增显式运行的 DeepSeek 在线验收工具，使用独立 Git fixture、外部断言与测试变异检查，覆盖五类编码流程。

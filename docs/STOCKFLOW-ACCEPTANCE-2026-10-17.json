@@ -1,0 +1,165 @@
+{
+  "model": "deepseek-flash",
+  "baseline": "48b12ef97b8affa5742493134fd35ef8842d8bdb",
+  "context_chars": 400000,
+  "runner_sha256": "f5d9ebc379899dae53ddc48972825fa0d8769da1c97846f7050024bf0b22d083",
+  "contract_sha256": "b3755b59607e3c2efbe235cf8ea3dddc1cd33deed25ac6ea285d0f6fd2d30dd5",
+  "passed": true,
+  "status": "idle",
+  "usage": {
+    "scope": "root session and all descendants",
+    "requests": 82,
+    "reported_tokens": {
+      "input": 362811,
+      "cache_read": 1240320,
+      "output": 154367
+    },
+    "priced_subtotals": {
+      "USD": "0.150762810"
+    },
+    "incomplete_usage_requests": 4,
+    "incomplete_cost_requests": 4,
+    "historical_usage_untracked": false,
+    "billing_note": "Calculated from provider usage and configured price snapshots; not an invoice."
+  },
+  "project": "eca-stockflow",
+  "date": "2026-10-17",
+  "interventions": [
+    "Stopped original runtime after repeated rule gating; resumed with v0.8.2 fix.",
+    "Stopped again after repeated compaction/rereads; resumed with 400000-character budget and focused test-completion instruction."
+  ],
+  "phases": [
+    {
+      "phase": 1,
+      "status": "error",
+      "error_type": "RuntimeError",
+      "checks": {
+        "external": {
+          "exit_code": 0,
+          "tests": 36,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "passed": true
+        },
+        "local": {
+          "exit_code": 5,
+          "tests": 0,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "passed": false
+        },
+        "structure": {
+          "modules": 15,
+          "python_lines": 1806,
+          "passed": false
+        },
+        "protected_files": {
+          "passed": true
+        }
+      }
+    },
+    {
+      "phase": 2,
+      "status": "error",
+      "error_type": "RuntimeError",
+      "checks": {
+        "external": {
+          "exit_code": 0,
+          "tests": 36,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "passed": true
+        },
+        "local": {
+          "exit_code": 5,
+          "tests": 0,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "passed": false
+        },
+        "structure": {
+          "modules": 15,
+          "python_lines": 1806,
+          "passed": false
+        },
+        "protected_files": {
+          "passed": true
+        }
+      }
+    },
+    {
+      "phase": 3,
+      "status": "idle",
+      "error_type": null,
+      "checks": {
+        "external": {
+          "exit_code": 0,
+          "tests": 36,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "passed": true
+        },
+        "local": {
+          "exit_code": 0,
+          "tests": 80,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "passed": true
+        },
+        "structure": {
+          "modules": 15,
+          "python_lines": 1806,
+          "passed": true
+        },
+        "protected_files": {
+          "passed": true
+        }
+      }
+    }
+  ],
+  "source_archive_sha256": "96c8ce3ea229e058c184d8a0325c1e40c4f96279338e4863386671134e031160",
+  "source_manifest": {
+    "README.md": "33ff05ecc80b8a7c8f891ca48d72a584b27da0df9e181d85ef47bb140929dfaf",
+    "SPEC.md": "337bfaf8263d3ac754ed129bff09353ef21ffde62a822595508deaa7bc9da781",
+    "AGENTS.md": "2116dbef84a9f26dec4f48a3dd51b5efc469f0b1af838f8649885551beff6b52",
+    "requirements.txt": "a47848efd569d821c7c6a3c822de61118364ac5d6c4c4a5470813851b6d0f47c",
+    "pyproject.toml": "ccb6457086f27cbea1378320333e3a45f44c5e585b5094414089648d1bd0bbb0",
+    ".gitignore": "5f4ed3150176ce27ac0155ff0f610dcfa4a019e6ff55ec02b18f537ef496d84e",
+    "stockflow/auth.py": "5d463b06c8b5f2372610e844c42065cefa408aaee5dfbaeecb9e148b1fe48880",
+    "stockflow/config.py": "33c2d95eabd8971530380b0905fcf58422334d4bad30cd70eae2b53ebf29e151",
+    "stockflow/csv_utils.py": "30d6e7f6f351916333f7e14ad10b3c7a1beac9ef04560dfc2b5bd6afb55d6a90",
+    "stockflow/db.py": "d421819a17d29388d63639bfba50dea8a5d5b0740170b5da33f772e59522e7e4",
+    "stockflow/errors.py": "cd64a07dfdb57a94d219f44bb0a0a93496113324c02c0f05ddb607b54d124ff3",
+    "stockflow/main.py": "11c47acf71cbb366f37e60c293fb5fad30c8c98e4b8c0c915fd84291396b6d09",
+    "stockflow/repositories.py": "18830bf9275183cd41f3e8f55e2e1ea870054774a07b5ba864b13ed2df42c2f6",
+    "stockflow/routes.py": "a916d6c1dbc1af2625f39f62946b7141e9c096e95562b08c690e5a68f29a5be5",
+    "stockflow/schemas.py": "61e0383990010fdab5da165c9451fe15f19056ee64b55494769e1c3f81b124c5",
+    "stockflow/__init__.py": "8fbb51bccdb182f3d93025cb284fbe9d455de3c065a0102629a44d375dfd5ebd",
+    "stockflow/services/inventory.py": "82aac83476cb679307cc3d0adcb5672bfe1888dbaf0078b92dd8ec39c02ad92a",
+    "stockflow/services/orders.py": "4db28abdb3b2b076e81f672ea37ae6adab48aabd53214b378bf5c0c867d150ad",
+    "stockflow/services/products.py": "4adae9fe548b1e75180cd50f5947d4471899215e0f3b037ffcb262662cef6160",
+    "stockflow/services/reporting.py": "b3aa3f1ff667878dd886a79848c3d50ab3479936998884701327b4b970f534f3",
+    "stockflow/services/__init__.py": "eb13908087c4618ad102d551bbb5f757ac6e6a6a22d0708a500d8b1fe9dd8547",
+    "tests/conftest.py": "536a598aef18461385e7f8ac278fd0010c06237f76912dbf352c4fcb6ede5f09",
+    "tests/test_auth.py": "28b20c557b291736562a747b5c047c152748a02d137b7e167a7ce7f07061c0a7",
+    "tests/test_concurrency.py": "8a8bb7d188894be493a80337f5b57e7eaadaec1be44ad401d8769602dc1ec8a4",
+    "tests/test_config.py": "6b06f753290bd7270ec801f42899fdb77e9c3af72df9e359dba84bd53afce5f0",
+    "tests/test_orders.py": "ebcceaed184b8afd357d7cdfbe9895ed71edf515e24b192a8e9141dd8fb03088",
+    "tests/test_products.py": "96256bd05056c5424e56e8ef9a77d997b39b871cdc20e8a3553c31dcfbd6d5f2",
+    "tests/test_reports.py": "b55646d11e22ef605955ccb0c11ac72321ac242a0f69a8c2ddeecb7a914b6ec9",
+    "tests/__init__.py": "b18cd31e77d76d7e899df64846204a4ff9b720104e8a34b6eb6f72516f4bdca3"
+  },
+  "request_statuses": {
+    "cancelled": 2,
+    "complete": 78,
+    "failed": 2
+  },
+  "compaction_requests": 8,
+  "file_tool_changes": 33
+}

@@ -11,10 +11,10 @@
   <a href="#快速开始">快速开始</a> ·
   <a href="docs/CLI_GUIDE.md">使用手册</a> ·
   <a href="CHANGELOG.md">更新记录</a> ·
-  <a href="docs/VALIDATION-v0.8.1.md">验证记录</a>
+  <a href="docs/UPGRADE-v0.8.2.md">验证记录</a>
 </p>
 
-<p align="center"><code>Python 3.11+</code> · <code>v0.8.1</code> · <code>开发中</code></p>
+<p align="center"><code>Python 3.11+</code> · <code>v0.8.2</code> · <code>开发中</code></p>
 
 ---
 
@@ -186,6 +186,8 @@ CI 配置目前保留为 [工作流模板](docs/ci-workflow.yml)，尚未启用�
 另提供显式运行的 [DeepSeek 在线验收](benchmark/LIVE_ACCEPTANCE.md)：覆盖 Bug 修复、跨文件重构、补测试、并行合并与中断恢复，采用外部断言验收，不纳入默认离线测试。测试仓库为小型固定场景，不代表大型业务项目表现。
 
 [2026-10-17 实测记录](docs/LIVE-ACCEPTANCE-2026-10-17.md)：最终五项全部通过，包含真实请求用量、费用小计及未知项。
+
+进一步完成了 [StockFlow 多模块后端验收](docs/STOCKFLOW-ACCEPTANCE-2026-10-17.md)：36 项外部测试、80 项项目自身测试通过；过程暴露并修复了规则读取后的重复阻断，也记录了人工续跑和上下文调整。最新运行时修复与回归见 [v0.8.2](docs/UPGRADE-v0.8.2.md)。
 
 ```text
 eca/                  CLI、执行循环、工具、恢复与记忆适配

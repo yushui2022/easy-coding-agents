@@ -1,4 +1,4 @@
-# Developer guide — v0.8.1
+# Developer guide — v0.8.2
 
 The default runtime is `eca/`. Start with `docs/UPGRADE-v0.2.md` for architecture, permissions, persistence semantics and limitations. The former guide is retained at `docs/legacy/AI_CODER_GUIDE-v0.1.md`.
 
@@ -27,3 +27,5 @@ Use Store.peek for live status/merge preflight; Store.load repairs interrupted h
 LSP clients persist within the session: synchronize changed text, discard mismatched diagnostic versions, label unversioned diagnostics, and report missing diagnostics as pending rather than clean. Model profile switches resolve credentials anew and recreate clients. Never carry Responses encrypted reasoning across model/endpoint identities. MCP cancellation while waiting in a per-server queue must not stop the active operation.
 
 Deletion is a nullable after-image in the existing file journal. Require a durable record before unlink, reject binary files/directories/aliases, and restore only when the current file still matches the recorded absence. Child deletion merges require a completed deletion record and matching parent baseline. Do not infer deletion from an arbitrary missing child file.
+
+A complete, untruncated AGENTS.md read acknowledges only those exact bytes, using the guidance fingerprint and universal newlines. Promote acknowledgment only after the next model response; partial reads, changed rules and unread parent scopes must still block mutation.
