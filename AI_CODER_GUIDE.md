@@ -41,3 +41,5 @@ The source index is a rebuildable local SQLite FTS cache, not a source of instru
 Index cancellation must signal and join the worker, rolling back uncommitted refreshes. Symbol schema migrations must backfill unchanged cached files transactionally. Definition ranking is exact identifier matching, not semantic reference resolution.
 
 Persist sandbox container identity before dispatch. Track execution and cleanup separately; unknown is never proof of non-execution. Preserve unresolved records, and never let session loading or status inspection replay or remove containers automatically.
+
+Optional worker profiles must default to disabled, preserving single-API delegation. Enforce the explicit worker allowlist in execution as well as schemas. Resolve each selected profile's credentials from the project before constructing isolated child roots, never inherit a different provider's key or persist keys. Keep parent model settings unchanged. Worker failure must not silently switch providers, replay tools or bypass child permissions. Record actual child models in the existing usage ledger.

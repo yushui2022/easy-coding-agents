@@ -22,6 +22,7 @@ subagent_max_turns = 6 # per child; also bounded by parent max_turns
 subagent_concurrency = 2 # simultaneous children, 1..8; excess tasks wait
 subagent_max_calls = 3 # per parent run; no recursive delegation
 subagent_timeout = 180 # seconds per child
+worker_profiles = [] # optional: ["local_helper", "fast"]; empty preserves single-API behavior
 
 [profiles]
 reviewer = "Review code for concrete correctness problems. Cite files and lines. Do not edit unless the user asks."
@@ -72,3 +73,16 @@ builder = "Implement the requested change using existing project conventions, th
 # api_key_env = "FAST_MODEL_KEY"
 # stream_usage = true
 # max_output_tokens = 4096
+
+
+# Optional worker model: also add "local_helper" to [agent].worker_profiles above.
+# Start your compatible local server yourself; ECA never installs or downloads models.
+# Set LOCAL_MODEL_KEY=local in .env for a local server without authentication.
+# [model_profiles.local_helper]
+# model = "YOUR_INSTALLED_TOOL_CAPABLE_MODEL"
+# base_url = "http://localhost:11434/v1"
+# api_format = "openai"
+# api_key_env = "LOCAL_MODEL_KEY"
+# stream_usage = false
+# max_output_tokens = 2048
+# context_chars = 16000

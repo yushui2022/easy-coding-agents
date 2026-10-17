@@ -54,12 +54,14 @@ async def parallel(agent, tasks):
     if not tasks or len(tasks) > min(remaining, 8):
         raise ValueError('Batch exceeds remaining subagent calls or concurrency limit (8)')
     for task in tasks:
-        if (not isinstance(task, dict) or set(task) - {'task', 'mode'} or
+        if (not isinstance(task, dict) or set(task) - {'task', 'mode', 'model_profile'} or
             not isinstance(task.get('task'), str) or not task['task'].strip() or len(task['task']) > 12000 or
             task.get('mode', 'plan') not in {'plan', 'code'}):
             raise ValueError('Each task needs task text and optional plan/code mode')
         if task.get('mode') == 'code' and agent.settings.mode != 'code':
             return 'Denied: child mode exceeds parent permissions.'
+    from .models import worker_settings
+    selected = [worker_settings(agent.settings, task.get('model_profile')) for task in tasks]
     # Read once before starting any child; include current uncommitted source bytes.
     files, size = {}, 0
     for path in source_files(agent.tools):
@@ -72,10 +74,10 @@ async def parallel(agent, tasks):
         files[path.relative_to(agent.settings.root).as_posix()] = data
     agent.child_calls += len(tasks)
     states = []
-    for task in tasks:
+    for task, config in zip(tasks, selected):
         state = agent.store.create(task.get('mode', 'plan'))
         state.update(status='preparing', title=task['task'][:80], parent_id=agent.state['id'], billing_root=agent.state.get('billing_root', agent.state['id']),
-                     isolated=True, model_profile=agent.settings.model_profile, baseline={p: digest(data) for p, data in files.items()},
+                     isolated=True, model_profile=config.model_profile, baseline={p: digest(data) for p, data in files.items()},
                      usage_tracking_complete=agent.state.get('usage_tracking_complete', True))
         agent.state.setdefault('children', []).append(state['id'])
         states.append(state)
@@ -111,8 +113,8 @@ async def parallel(agent, tasks):
         async with prompt_lock:
             return await agent.tools.question(*args)
 
-    async def run(task, state):
-        settings = replace(agent.settings, mode=state['mode'], max_turns=min(
+    async def run(task, state, config):
+        settings = replace(config, mode=state['mode'], max_turns=min(
             agent.settings.max_turns, agent.settings.subagent_max_turns))
         def emit(event, data):
             if event != 'text':
@@ -146,11 +148,11 @@ async def parallel(agent, tasks):
             changes = review(agent, state)
         except (OSError, ValueError):
             changes = [{'status':'unavailable', 'notice':'Inspect the retained workspace manually.'}]
-        return dict(session=state['id'], status=state['status'], summary=(summary or '')[:2000],
+        return dict(session=state['id'], status=state['status'], model_profile=state['model_profile'], summary=(summary or '')[:2000],
                     stop_reason=state.get('stop_reason'), changes=changes,
                     workspace=str(workspace(agent.store, state)), notice='Isolated edits need merge_agent; report is unverified.')
 
-    jobs = [asyncio.create_task(run(task, state)) for task, state in zip(tasks, states)]
+    jobs = [asyncio.create_task(run(task, state, config)) for task, state, config in zip(tasks, states, selected)]
     try:
         return json.dumps(await asyncio.gather(*jobs), ensure_ascii=False)
     finally:

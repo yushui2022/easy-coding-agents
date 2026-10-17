@@ -285,7 +285,8 @@ class App:
                 raise ValueError("Usage: /permission ask|accept-edits")
             self.agent.settings.permission = self.settings.permission = arg
         elif command == '/models':
-            self.emit('notice', json.dumps({name: {'model': cfg['model'], 'api_format': cfg['api_format']}
+            self.emit('notice', json.dumps({name: {'model': cfg['model'], 'api_format': cfg['api_format'],
+                                                          'worker_enabled': name in self.settings.worker_profiles}
                                           for name, cfg in self.settings.model_profiles.items()}))
         elif command == "/model":
             if not arg:

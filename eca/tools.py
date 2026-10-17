@@ -197,7 +197,8 @@ class Tools:
         if name not in allowed(self.settings.mode):
             return f"Denied: {name} is unavailable in {self.settings.mode} mode."
         try:
-            spec = next(s["function"]["parameters"] for s in SCHEMAS if s["function"]["name"] == name)
+            from .models import delegation_schemas
+            spec = next(s["function"]["parameters"] for s in delegation_schemas(SCHEMAS, self.settings) if s["function"]["name"] == name)
             if not isinstance(args, dict) or set(args) - set(spec["properties"]) or set(spec["required"]) - set(args):
                 raise ValueError("Unexpected or missing tool arguments")
             for key, value in args.items():
@@ -406,10 +407,10 @@ class Tools:
         response = await self.question(question)
         return response if isinstance(response, str) else "No user answer was provided."
 
-    async def delegate(self, task, mode="plan"):
+    async def delegate(self, task, mode="plan", model_profile=None):
         if not getattr(self, 'delegate_handler', None):
             return "Denied: recursive delegation is disabled."
-        return await self.delegate_handler(task, mode)
+        return await self.delegate_handler(task, mode, model_profile=model_profile) if model_profile is not None else await self.delegate_handler(task, mode)
 
     async def mcp_list(self, server):
         if getattr(self,'mcp_disabled',False):

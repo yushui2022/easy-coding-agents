@@ -69,18 +69,20 @@ class Agent:
         from .workspaces import merge
         return await merge(self, session, paths)
 
-    async def delegate(self, task, mode='plan'):
+    async def delegate(self, task, mode='plan', model_profile=None):
         if self.child or self.settings.mode == 'chat' or (mode == 'code' and self.settings.mode != 'code'):
             return 'Denied: child mode exceeds parent permissions.'
         if mode not in {'plan','code'} or not isinstance(task,str) or not task.strip() or len(task)>12000:
             return 'Invalid subtask; supply a nonempty task of at most 12000 characters.'
         if self.child_calls >= self.settings.subagent_max_calls:
             return 'Subagent call limit reached for this run.'
+        from .models import worker_settings
+        selected = worker_settings(self.settings, model_profile)
         self.child_calls += 1
-        settings = replace(self.settings, mode=mode, mcp_servers={},
+        settings = replace(selected, mode=mode, mcp_servers={},
                            max_turns=min(self.settings.max_turns, self.settings.subagent_max_turns))
         state = self.store.create(mode)
-        state.update(model_profile=self.settings.model_profile, parent_id=self.state['id'], billing_root=self.state.get('billing_root',self.state['id']),
+        state.update(model_profile=settings.model_profile, parent_id=self.state['id'], billing_root=self.state.get('billing_root',self.state['id']),
                      usage_tracking_complete=self.state.get('usage_tracking_complete',True))
         self.store.save(state)
         self.state.setdefault('children',[]).append(state['id'])
@@ -103,7 +105,7 @@ class Agent:
             await child.close()
             self.store.save(state)
         summary = next((m.get('content') or '' for m in reversed(state['messages']) if m['role']=='assistant' and not m.get('tool_calls')), '')
-        result = dict(session=state['id'],status=state['status'],summary=summary[:self.settings.output_limit//2],
+        result = dict(session=state['id'],status=state['status'],model_profile=settings.model_profile,summary=summary[:self.settings.output_limit//2],
                       stop_reason=state.get('stop_reason'),notice='Child report is not independently verified. Review child session changes before accepting.')
         self.emit('subagent', result)
         return json.dumps(result,ensure_ascii=False)
@@ -136,6 +138,12 @@ If execution was interrupted, inspect the actual state before repeating mutation
                    'Shell writes are discarded after each command. Use write/edit/delete for lasting reviewed changes. '
                    'MCP and LSP are disabled. Required dependencies must already exist in the trusted image.\n'
                    if self.settings.sandbox == 'docker' else '\nShell commands run with host user permissions, not in a sandbox.\n')
+        if self.settings.worker_profiles and not self.child:
+            prompt += ('\nOptional worker model profiles: ' + ', '.join(self.settings.worker_profiles) +
+                       '. Set model_profile on a delegated task to select one; omission uses your current model. '
+                       'Use small workers for bounded read-only discovery or simple scoped tasks with acceptance checks. '
+                       'Keep architecture and difficult decisions here. Inspect source evidence and changes; worker prose is not validation. '
+                       'Do not assume parameter count establishes capability. Do not repeatedly delegate failed work.\n')
         for name in ("AGENTS.md", "MEMORY.md"):
             path = root / name
             if path.is_file() and not path.is_symlink() and path.stat().st_size <= 64_000:
@@ -215,6 +223,8 @@ If execution was interrupted, inspect the actual state before repeating mutation
                     tool_schema = [s for s in tool_schema if s['function']['name'] != 'lsp']
                 if self.settings.sandbox == 'docker':
                     tool_schema = [s for s in tool_schema if s['function']['name'] != 'lsp' and not s['function']['name'].startswith('mcp_')]
+                from .models import delegation_schemas
+                tool_schema = delegation_schemas(tool_schema, self.settings)
                 messages = self.context()
                 remaining = self.settings.max_turns - turn
                 # Keep the stable history prefix cacheable. This transient user

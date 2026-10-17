@@ -227,3 +227,8 @@ eca --cwd ./your-project --resume SESSION_ID --undo CHANGE_ID --json
 索引可取消：扫描会在文件边界检查取消信号，并回滚未完成的更新。当前文件解析、文件系统调用和 Git 枚举仍可能延迟响应（Git 枚举超时为 10 秒）。
 
 `/sandbox` 查看当前会话保存的容器名称、endpoint、镜像、执行结果和清理结果，不连接 Docker。`pending` 表示尚无持久清理结论，`unconfirmed` 表示清理未确认，`removed` 表示清理已确认；`execution=unknown` 不能解释为未执行。中断后需要人工核对记录中的容器，不会自动重跑。记录保留最近 20 次已清理运行及未确认记录；未确认达到 100 条时阻止新容器执行。
+
+
+### 可选多模型 Worker（v0.13）
+
+只配置一个 API 即可使用，`[agent].worker_profiles` 默认空列表。需要异构子 Agent 时，将已定义的模型档案名称加入该列表；`/models` 查看 `worker_enabled`。主 Agent 可按子任务选用这些档案，省略选择仍使用主模型，不静默故障回退。[完整配置与本地小模型限制](UPGRADE-v0.13.md)。

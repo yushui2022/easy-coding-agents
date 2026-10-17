@@ -37,6 +37,7 @@ class Settings:
     reasoning_effort: str = ""
     model_profiles: dict = field(default_factory=dict, repr=False)
     model_profile: str = ""
+    worker_profiles: list = field(default_factory=list)
     sandbox: str = 'none'
     sandbox_image: str = 'python:3.11-slim'
 
@@ -74,7 +75,7 @@ class Settings:
                       model=env.get("ECA_MODEL") or env.get("MODEL_NAME") or cfg.get("model", "" if native else cls.model),
                       base_url=env.get("ECA_BASE_URL") or env.get("ANTHROPIC_BASE_URL" if native else "OPENAI_BASE_URL") or cfg.get("base_url", default_url))
         values.update(mcp_servers=data.get("mcp_servers", {}), pricing=data.get("pricing", {}), lsp_servers=data.get("lsp_servers", {}), model_profiles=data.get("model_profiles", {}))
-        for name in ("sandbox", "sandbox_image", "reasoning_effort", "mode", "permission", "max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "network_retries", "auto_compact", "project_memory", "stream_usage", "subagent_max_turns", "subagent_max_calls", "subagent_timeout", "subagent_concurrency"):
+        for name in ("sandbox", "sandbox_image", "reasoning_effort", "mode", "permission", "max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "network_retries", "auto_compact", "project_memory", "stream_usage", "subagent_max_turns", "subagent_max_calls", "subagent_timeout", "subagent_concurrency", "worker_profiles"):
             if name in cfg:
                 values[name] = cfg[name]
         selected = model_profile if model_profile is not None else cfg.get('model_profile', '')
@@ -104,6 +105,10 @@ class Settings:
             raise ValueError('Invalid sandbox image reference')
         from .models import validate_profiles
         validate_profiles(self.model_profiles, self.root)
+        if (not isinstance(self.worker_profiles, list) or
+            any(not isinstance(name, str) or name not in self.model_profiles for name in self.worker_profiles) or
+            len(set(self.worker_profiles)) != len(self.worker_profiles)):
+            raise ValueError('worker_profiles must be a unique list of configured model profile names')
         if not isinstance(self.model_profile, str):
             raise ValueError('model_profile must be text')
         from .usage import validate_pricing

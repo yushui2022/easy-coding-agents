@@ -11,10 +11,10 @@
   <a href="#快速开始">快速开始</a> ·
   <a href="docs/CLI_GUIDE.md">使用手册</a> ·
   <a href="CHANGELOG.md">更新记录</a> ·
-  <a href="docs/UPGRADE-v0.12.md">验证记录</a>
+  <a href="docs/UPGRADE-v0.13.md">验证记录</a>
 </p>
 
-<p align="center"><code>Python 3.11+</code> · <code>v0.12.0</code> · <code>开发中</code></p>
+<p align="center"><code>Python 3.11+</code> · <code>v0.13.0</code> · <code>开发中</code></p>
 
 ---
 
@@ -23,6 +23,10 @@ Easy Coding Agent（ECA）是一个可自行配置模型的 Python CLI 编程助
 它重视三件事：**改动可检查、工作可继续、记忆有来源。** 你可以先看差异再允许写入，中断后恢复会话，也可以检查或撤销文件工具产生的修改。
 
 > 当前适合个人试用、开发与研究。基础机制已有自动化测试，但真实复杂任务的稳定性仍在验证中；尚未达到成熟编码 CLI 的功能覆盖与可靠性。
+
+## 可选多模型协作
+
+默认只需一个 API，原有用法不变。需要时额外配置云端或本地 Worker，并通过 `worker_profiles` 显式开启，主 Agent 才能按子任务选择模型。不会自动下载本地模型；具体小模型需要支持工具调用并经过任务验证。[配置示例](docs/UPGRADE-v0.13.md)
 
 ## 能做什么
 
@@ -167,7 +171,7 @@ eca --changes --json
 ## 数据、权限与当前边界
 
 - **本地存储，模型远程推理。** 会话、修改快照和项目记忆存放在目标项目的 `.eca/` 中；发送给模型的上下文会交给你配置的 API。请将 `.eca/` 加入目标项目的 `.gitignore`。
-- **默认 Shell 仍在宿主机执行。** 可显式选择实验性 `--sandbox docker`；本地 Linux 引擎和预装可信镜像必需，后端失败不降级。容器内写入丢弃，MCP/LSP 禁用。详见 [v0.11](docs/UPGRADE-v0.12.md)。
+- **默认 Shell 仍在宿主机执行。** 可显式选择实验性 `--sandbox docker`；本地 Linux 引擎和预装可信镜像必需，后端失败不降级。容器内写入丢弃，MCP/LSP 禁用。详见 [v0.11](docs/UPGRADE-v0.13.md)。
 - **历史成功不代表现在正确。** 记忆中的测试命令只证明当时返回了成功退出码；指纹不覆盖依赖安装状态、环境变量或外部服务。
 - **本地恢复不依赖模型配置。** 即使 `.env` 或 `eca.toml` 损坏，仍可使用 `--list-sessions`、`--changes`、`--undo ID` 和 `--accept-change ID`。
 - **恢复和摘要也有边界。** 摘要可能遗漏信息；结果不确定的操作不会自动重放。一个项目同时只允许一个 ECA 进程。

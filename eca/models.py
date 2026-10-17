@@ -36,3 +36,28 @@ def select(settings, name):
             setattr(result, name, default)
     result.validate()
     return result
+
+
+def worker_settings(settings, profile=None):
+    """Only explicitly enabled profiles may receive delegated source/context."""
+    if profile is None:
+        return settings
+    if not isinstance(profile, str) or profile not in settings.worker_profiles:
+        raise ValueError('Worker model is not enabled in agent.worker_profiles')
+    return select(settings, profile)
+
+
+def delegation_schemas(schemas, settings):
+    if not settings.worker_profiles:
+        return schemas
+    from copy import deepcopy
+    result = deepcopy(schemas)
+    option = {'type': 'string', 'enum': list(settings.worker_profiles),
+              'description': 'Optional worker model profile; omit to use the current main model.'}
+    for schema in result:
+        fn = schema['function']
+        if fn['name'] == 'delegate':
+            fn['parameters']['properties']['model_profile'] = option
+        elif fn['name'] == 'delegate_parallel':
+            fn['parameters']['properties']['tasks']['items']['properties']['model_profile'] = option
+    return result
