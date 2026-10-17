@@ -13,14 +13,15 @@ class StreamHandler:
     
     def __init__(self):
         self.client: Optional[object] = None
-        if not Config.MODELSCOPE_API_KEY:
-            logger.warning("MODELSCOPE_API_KEY 未配置，无法调用 ModelScope API")
+        if not Config.api_key():
+            logger.warning(f"{Config.provider_label()} API key 未配置，无法调用模型 API")
         else:
-            self.client = OpenAI(base_url="https://api-inference.modelscope.cn/v1", api_key=Config.MODELSCOPE_API_KEY)
+            self.client = OpenAI(base_url=Config.base_url(), api_key=Config.api_key())
+            logger.info(f"LLM provider initialized: {Config.provider_label()} / {Config.MODEL_NAME}")
         self.executor = ThreadPoolExecutor(max_workers=1)
 
     async def chat(self, messages, tools):
-        """Async wrapper for ModelScope streaming chat."""
+        """Async wrapper for OpenAI-compatible streaming chat."""
         if not self.client:
             raise ValueError("API Key missing")
 
@@ -65,6 +66,38 @@ class StreamHandler:
                 break
             yield chunk
 
+    async def complete(self, messages, tools=None):
+        """Non-streaming chat call for hidden guard/repair passes."""
+        if not self.client:
+            raise ValueError("API Key missing")
+
+        loop = asyncio.get_running_loop()
+
+        def _call():
+            payload = {
+                "model": Config.MODEL_NAME,
+                "messages": messages,
+                "stream": False,
+                "temperature": Config.LLM_TEMPERATURE,
+            }
+            if tools:
+                payload["tools"] = tools
+            response = self.client.chat.completions.create(**payload)
+            message = response.choices[0].message
+            tool_calls = []
+            for tc in getattr(message, "tool_calls", None) or []:
+                tool_calls.append({
+                    "id": getattr(tc, "id", "") or "",
+                    "type": getattr(tc, "type", "function") or "function",
+                    "function": {
+                        "name": getattr(getattr(tc, "function", None), "name", "") or "",
+                        "arguments": getattr(getattr(tc, "function", None), "arguments", "") or "",
+                    },
+                })
+            return message.content or "", tool_calls
+
+        return await loop.run_in_executor(self.executor, _call)
+
     async def render_stream(self, stream_generator, mode_name: str = None):
         """Render stream to console and aggregate full response."""
         full_content = ""
@@ -108,7 +141,11 @@ class StreamHandler:
                 # For more advanced Markdown rendering, we would need a Live display,
                 # but partial markdown is hard to render correctly.
                 # Printing raw text is safer for code blocks.
-                print(content_chunk, end="", flush=True)
+                safe_chunk = content_chunk.encode("utf-8", errors="replace").decode("utf-8", errors="replace")
+                try:
+                    print(safe_chunk, end="", flush=True)
+                except UnicodeEncodeError:
+                    print(safe_chunk.encode("ascii", errors="replace").decode("ascii"), end="", flush=True)
                 full_content += content_chunk
                 
             # Handle Tool Calls

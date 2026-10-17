@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">Easy-Coding-Agent icon</title>
+  <desc id="desc">A warm minimal vector mark for Easy-Coding-Agent with code brackets and a memory core.</desc>
+  <rect width="128" height="128" rx="30" fill="#f3eadc"/>
+
+  <g fill="none" stroke="#211a14" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M48 36 28 64l20 28"/>
+    <path d="M80 36 100 64 80 92"/>
+  </g>
+
+  <circle cx="64" cy="64" r="10" fill="#b86b2b"/>
+</svg>

@@ -112,3 +112,7 @@ python -B -m unittest discover -s tests -v
 [验证记录](docs/VALIDATION-v0.2.md) · [升级说明](docs/UPGRADE-v0.2.md) · [原版 README](docs/legacy/README-v0.1.md)
 
 暂未实现 MCP、原生 Anthropic/Responses 协议、OAuth 登录、LSP、子 Agent 或 Shell 沙箱。优先把现有开发闭环做好，再逐项扩展。
+
+## 记忆研究模块
+
+保留远端已有的 `agent_memory_core/`、`benchmark/` 及其测试，作为独立研究模块；新版 CLI 尚未自动接入该模块。原研究入口与说明见 [记忆研究 README](docs/legacy/README-memory.md)。旧入口 `legacy_main.py` 使用 `requirements-legacy.txt` 依赖。

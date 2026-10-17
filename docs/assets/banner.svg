@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" role="img" aria-label="Easy-Coding-Agent">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0e0b08"/>
+      <stop offset="100%" stop-color="#171210"/>
+    </linearGradient>
+    <linearGradient id="hair" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#3a2e25" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#5a4636"/>
+      <stop offset="100%" stop-color="#3a2e25" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#e69552"/>
+      <stop offset="60%" stop-color="#b86b2b"/>
+      <stop offset="100%" stop-color="#7a4418"/>
+    </radialGradient>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="360" fill="url(#bg)"/>
+
+  <g transform="translate(600 180)">
+    <circle r="56" fill="url(#core)" opacity="0.18" filter="url(#soft)"/>
+  </g>
+
+  <g font-family="ui-sans-serif, -apple-system, 'Helvetica Neue', 'Segoe UI', sans-serif"
+     text-anchor="middle">
+    <g transform="translate(600 170)" fill="none" stroke="#e8ddcb" stroke-width="2.4"
+       stroke-linecap="round" stroke-linejoin="round" opacity="0.92">
+      <path d="M-46 -22 L-66 0 L-46 22"/>
+      <path d="M 46 -22 L 66 0 L 46 22"/>
+      <circle cx="0" cy="0" r="6.5" fill="url(#core)" stroke="none"/>
+    </g>
+
+    <text x="600" y="248" font-size="44" font-weight="200" letter-spacing="6"
+          fill="#f1ebdd">EASY<tspan fill="#8a7a66">·</tspan>CODING<tspan fill="#8a7a66">·</tspan>AGENT</text>
+
+    <line x1="540" y1="270" x2="660" y2="270" stroke="url(#hair)" stroke-width="1"/>
+
+    <text x="600" y="300" font-size="13" font-weight="400" letter-spacing="5"
+          fill="#9a8a76">EVIDENCE-GATED MEMORY FOR LONG-RUNNING CODING AGENTS</text>
+  </g>
+</svg>

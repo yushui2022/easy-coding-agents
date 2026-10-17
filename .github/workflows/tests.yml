@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - run: python -m pip install -e .
-      - run: python -B -m unittest discover -s tests -v
+      - run: python -m pip install -e . -r requirements-dev.txt
+      - run: python -B -m pytest -q
         env:
           PYTHONUTF8: '1'

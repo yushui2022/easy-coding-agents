@@ -20,12 +20,12 @@ LOGO = """
 
 def get_random_tip():
     tips = [
-        "💡 Press [bold]Shift+Tab[/bold] to toggle modes (Plan/Code/Chat).",
-        "💡 Use [bold]/exit[/bold] to quit the application.",
-        "💡 Files created are stored in [bold]workspace/[/bold] by default.",
-        "💡 I automatically manage memory to keep context relevant.",
-        "💡 Use [bold]manage_core_memory[/bold] to save reusable rules.",
-        "💡 In Plan Mode, I can help you architect before coding.",
+        "Tip: Press [bold]Shift+Tab[/bold] to toggle modes (Plan/Code/Chat).",
+        "Tip: Use [bold]/exit[/bold] to quit the application.",
+        "Tip: Files created are stored in [bold]workspace/[/bold] by default.",
+        "Tip: I automatically manage memory to keep context relevant.",
+        "Tip: Use [bold]manage_core_memory[/bold] to save reusable rules.",
+        "Tip: In Plan Mode, I can help you architect before coding.",
     ]
     return random.choice(tips)
 

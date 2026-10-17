@@ -1,5 +1,7 @@
 import asyncio
 import json
+import os
+import re
 import time
 from typing import Any, Dict, List, Optional, Callable
 from dataclasses import dataclass, field
@@ -168,9 +170,9 @@ class AgentEngine:
     async def handle_user_input(self, content: str):
         self.memory.add("user", content)
         # Start the autonomous loop
-        await self._run_autonomous_loop()
+        await self._run_autonomous_loop(content)
 
-    async def _run_autonomous_loop(self):
+    async def _run_autonomous_loop(self, user_request: str = ""):
         """
         The Core Control Loop (n0): Task-Driven Autonomous Execution.
         This replaces the simple request-response model.
@@ -182,10 +184,17 @@ class AgentEngine:
         empty_response_retries = 0
         last_tool_signature = None # To detect repetitive loops
         interaction_loop_count = 0 # To detect repetitive interaction loops
+        task_profile = self._classify_task(user_request)
+        requested_files = self._extract_requested_files(user_request)
+        tool_budget = Config.SIMPLE_TASK_TOOL_BUDGET if task_profile == "simple_answer" else Config.DEFAULT_TASK_TOOL_BUDGET
+        tool_call_count = 0
+        evidence_count = 0
+        if task_profile == "simple_answer" and requested_files:
+            evidence_count += await self._preload_requested_files(requested_files)
         
         while turn_count < max_turns:
             if self.stop_requested:
-                console.print("[bold red]🛑 操作已中断 (User Interrupted)[/bold red]")
+                console.print("[bold red][STOP] 操作已中断 (User Interrupted)[/bold red]")
                 break
                 
             turn_count += 1
@@ -238,6 +247,14 @@ class AgentEngine:
             if interaction_reminder:
                 state_prompt += interaction_reminder
 
+            state_prompt += self._render_completion_boundary(
+                task_profile=task_profile,
+                tool_budget=tool_budget,
+                tool_call_count=tool_call_count,
+                evidence_count=evidence_count,
+                requested_files=requested_files,
+            )
+
             
             # Dynamic Prompt Injection (Sandwich Strategy)
             # 1. System Prompt (Top) - Already set in memory
@@ -247,11 +264,28 @@ class AgentEngine:
             # We append this temporary system state to the end of messages for this turn only
             # This ensures the model sees the Todo List LAST, satisfying the recency bias.
             current_messages = messages + [{"role": "system", "content": f"<system_state>\n{state_prompt}\n</system_state>"}]
+            if task_profile == "simple_answer" and self._is_one_sentence_request(user_request):
+                current_messages.append({
+                    "role": "user",
+                    "content": (
+                        "<final_answer_contract>\n"
+                        "你现在必须直接回答原始用户请求。\n"
+                        "只输出一句中文自然语言总结。\n"
+                        "不要输出标题、表格、列表、代码块、分隔线或额外分析。\n"
+                        "如果已经读取了指定文件，只基于当前读取证据回答。\n"
+                        "</final_answer_contract>"
+                    ),
+                })
 
             # 2. Call LLM (wu streamed)
             try:
-                response_gen = self.stream_handler.chat(current_messages, self.tools_schema)
-                full_content, tool_calls = await self.stream_handler.render_stream(response_gen, mode_name=self.mode.value)
+                if self._should_use_guarded_final_answer(task_profile, user_request, evidence_count):
+                    full_content, tool_calls = await self.stream_handler.complete(current_messages, tools=None)
+                    full_content = await self._repair_simple_answer_if_needed(user_request, full_content)
+                    console.print(f"\n[bold cyan][{self.mode.value}模式][/bold cyan] {full_content}")
+                else:
+                    response_gen = self.stream_handler.chat(current_messages, self.tools_schema)
+                    full_content, tool_calls = await self.stream_handler.render_stream(response_gen, mode_name=self.mode.value)
             except Exception as e:
                 console.print(f"[red]LLM 错误: {e}[/red]")
                 break
@@ -276,6 +310,20 @@ class AgentEngine:
                 
                 # Reset retry counter on successful content
                 empty_response_retries = 0
+                gate = await self.memory.validate_final_answer(full_content, task_profile=task_profile)
+                if not gate.accepted:
+                    repair_instruction = self._render_gate_repair_instruction(gate)
+                    self.memory.add(
+                        "tool",
+                        repair_instruction,
+                        tool_call_id=f"quality_gate_{turn_count}",
+                        name="quality_gate",
+                        tool_args={"violations": gate.violations, "task_profile": task_profile},
+                    )
+                    console.print(f"[yellow]{repair_instruction}[/yellow]")
+                    if task_profile == "simple_answer":
+                        break
+                    continue
 
                 # If LLM didn't call any tools:
                 # - If tasks are pending/in_progress: It might be a "thinking" step or a refusal.
@@ -300,6 +348,22 @@ class AgentEngine:
             
             # 5. Execute Tools
             for tc in tool_calls:
+                if tool_call_count >= tool_budget:
+                    budget_result = (
+                        "SYSTEM TOOL BUDGET REACHED: Stop calling tools for this request. "
+                        "Use the evidence already collected and answer the user now. "
+                        "If evidence is insufficient, state exactly what is missing instead of exploring further."
+                    )
+                    self.memory.add(
+                        "tool",
+                        budget_result,
+                        tool_call_id=tc.get("id", f"budget_{tool_call_count}"),
+                        name="tool_budget_guard",
+                        tool_args={"budget": tool_budget, "task_profile": task_profile},
+                    )
+                    console.print(f"[yellow]{budget_result}[/yellow]")
+                    break
+
                 func_name = tc["function"]["name"]
                 args_str = tc["function"]["arguments"]
                 call_id = tc["id"]
@@ -356,7 +420,7 @@ class AgentEngine:
                     # Use a distinct color for tool execution (e.g. blue/cyan instead of default)
                     console.print(Panel(
                         Syntax(args_pretty, "json", theme="monokai", word_wrap=True),
-                        title=f"[bold cyan]🛠️ 正在执行: {func_name}[/bold cyan]",
+                        title=f"[bold cyan][TOOL] 正在执行: {func_name}[/bold cyan]",
                         border_style="cyan",
                         expand=False
                     ))
@@ -386,7 +450,7 @@ class AgentEngine:
                         
                     # 1. Standard Loop Detection (Strict for non-interactive)
                     if current_signature == last_tool_signature and func_name not in ["ask_user", "ask_selection"]:
-                        console.print("[bold red]⚠️ 检测到重复工具调用 (Loop Detection)[/bold red]")
+                        console.print("[bold red][WARN] 检测到重复工具调用 (Loop Detection)[/bold red]")
                         
                         # Active Intervention: Ask user what to do
                         question = f"Agent 正在重复执行相同的操作 ({func_name})，可能已陷入死循环。\n请选择下一步操作："
@@ -432,7 +496,7 @@ class AgentEngine:
 
                     # 2. Interactive Loop Detection (Allow retry once or twice, but not infinite)
                     elif interaction_loop_count >= 3:
-                        console.print("[bold red]⚠️ 检测到重复交互死循环 (Interaction Loop)[/bold red]")
+                        console.print("[bold red][WARN] 检测到重复交互死循环 (Interaction Loop)[/bold red]")
                         result = (
                             "SYSTEM ERROR: You are stuck in a loop asking the user the same question repeatedly.\n"
                             "The user has likely already answered you in the previous turn.\n"
@@ -453,7 +517,10 @@ class AgentEngine:
                 console.print() # Spacer
 
                 # 6. Add Tool Result to Memory
-                self.memory.add("tool", result, tool_call_id=call_id, name=func_name)
+                self.memory.add("tool", result, tool_call_id=call_id, name=func_name, tool_args=args)
+                tool_call_count += 1
+                if func_name in ["read", "glob", "grep", "smart_search", "bash"]:
+                    evidence_count += 1
 
                 # 7. Check if we should break the loop after interaction
                 # If the tool was 'ask_selection' or 'ask_user', we should NOT break anymore!
@@ -508,6 +575,194 @@ class AgentEngine:
         # We can't await here because stop() is often called from sync signal handlers
         # But we can try to fire-and-forget or rely on previous auto-saves.
         self.running = False
+
+    def _classify_task(self, user_request: str) -> str:
+        text = (user_request or "").lower()
+        requested_files = self._extract_requested_files(user_request)
+        simple_patterns = [
+            r"读.*总结",
+            r"读取.*总结",
+            r"看.*总结",
+            r"一句.*总结",
+            r"简要.*总结",
+            r"解释",
+            r"说明",
+            r"总结",
+            r"概括",
+            r"brief",
+            r"summarize",
+            r"explain",
+            r"read .* summarize",
+        ]
+        complex_markers = ["修复", "修改", "实现", "重构", "创建", "build", "implement", "fix", "refactor", "write"]
+        if any(marker in text for marker in complex_markers):
+            return "coding_task"
+        if any(re.search(pattern, user_request or "", re.IGNORECASE) for pattern in simple_patterns):
+            return "simple_answer"
+        if requested_files:
+            return "simple_answer"
+        return "coding_task"
+
+    def _extract_requested_files(self, user_request: str) -> List[str]:
+        candidates = re.findall(r"[\w./\\-]+\.[A-Za-z0-9_]+", user_request or "")
+        normalized = []
+        for item in candidates:
+            path = item.replace("\\", os.sep).replace("/", os.sep)
+            if os.path.isabs(path):
+                normalized.append(path)
+            else:
+                normalized.append(os.path.join(os.getcwd(), path))
+        return normalized
+
+    def _is_one_sentence_request(self, user_request: str) -> bool:
+        text = user_request or ""
+        patterns = [
+            r"一句",
+            r"一句话",
+            r"一段话",
+            r"简短",
+            r"简要",
+            r"brief",
+            r"one sentence",
+            r"single sentence",
+        ]
+        return any(re.search(pattern, text, re.IGNORECASE) for pattern in patterns)
+
+    def _should_use_guarded_final_answer(self, task_profile: str, user_request: str, evidence_count: int) -> bool:
+        return task_profile == "simple_answer" and evidence_count > 0 and self._is_one_sentence_request(user_request)
+
+    async def _repair_simple_answer_if_needed(self, user_request: str, answer: str) -> str:
+        answer = (answer or "").strip()
+        if not self._is_one_sentence_request(user_request) or not self._violates_one_sentence_contract(answer):
+            return answer
+
+        repair_messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a strict answer formatter. Rewrite the assistant answer without adding facts. "
+                    "Output exactly one Chinese sentence as plain text. No markdown, no table, no heading, no bullet list."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Original user request:\n{user_request}\n\n"
+                    f"Assistant answer to rewrite:\n{answer}\n\n"
+                    "Rewrite now as exactly one Chinese sentence."
+                ),
+            },
+        ]
+        try:
+            repaired, _ = await self.stream_handler.complete(repair_messages, tools=None)
+            repaired = (repaired or "").strip()
+        except Exception as exc:
+            logger.warning(f"Simple answer repair failed: {exc}")
+            repaired = ""
+
+        if not repaired or self._violates_one_sentence_contract(repaired):
+            return self._fallback_one_sentence_answer(repaired or answer)
+        return repaired
+
+    def _violates_one_sentence_contract(self, answer: str) -> bool:
+        text = (answer or "").strip()
+        if not text:
+            return False
+        non_empty_lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if len(non_empty_lines) > 1:
+            return True
+        markdown_markers = ("|", "#", "```", "- ", "* ", "1. ", "##")
+        if any(marker in text for marker in markdown_markers):
+            return True
+        sentence_endings = re.findall(r"[。！？!?]", text)
+        return len(sentence_endings) > 1
+
+    def _fallback_one_sentence_answer(self, answer: str) -> str:
+        lines = []
+        for raw_line in (answer or "").splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            if line.startswith(("#", "|", "-", "*")):
+                continue
+            if set(line) <= {"-", "|", " "}:
+                continue
+            lines.append(re.sub(r"[*_`]+", "", line))
+        collapsed = "，".join(lines) if lines else re.sub(r"[*_`#|]+", "", answer or "")
+        collapsed = re.sub(r"\s+", " ", collapsed).strip(" ，。")
+        if not collapsed:
+            return "已读取指定文件，但无法在不丢失事实的情况下压缩为一句话。"
+        parts = re.split(r"[。！？!?]", collapsed)
+        first = next((part.strip(" ，") for part in parts if part.strip(" ，")), collapsed)
+        return f"{first}。"
+
+    def _render_gate_repair_instruction(self, gate) -> str:
+        required = "\n".join(f"- {item}" for item in gate.required_actions) or "- Gather evidence before making the claim."
+        violations = ", ".join(gate.violations) or gate.blocked_reason
+        return (
+            "QUALITY GATE BLOCKED THE FINAL ANSWER.\n"
+            f"Violations: {violations}\n"
+            "Required actions:\n"
+            f"{required}\n"
+            "Do not claim completion or explain unsupported file/error facts yet. "
+            "Use tools to gather the missing evidence, or explicitly state that verification was not run."
+        )
+
+    def _render_completion_boundary(
+        self,
+        task_profile: str,
+        tool_budget: int,
+        tool_call_count: int,
+        evidence_count: int,
+        requested_files: Optional[List[str]] = None,
+    ) -> str:
+        lines = [
+            "",
+            "\n<completion_boundary>",
+            f"Task profile: {task_profile}.",
+            f"Tool budget: {tool_call_count}/{tool_budget}.",
+        ]
+        if requested_files:
+            lines.append(f"Exact requested file(s): {', '.join(requested_files)}.")
+        if task_profile == "simple_answer":
+            lines.extend(
+                [
+                    "This is a simple read/explain/summarize request.",
+                    "Do not create todos or expand scope unless the user explicitly asks.",
+                    "If the user names a specific file, read that exact file path first and do not substitute a broader project audit.",
+                    "After reading the requested file or collecting one direct evidence item, answer directly.",
+                    "Do not keep exploring unrelated project files after the requested evidence is available.",
+                    "If the user asks for one sentence or a brief summary, answer in one sentence only.",
+                    "Hard output contract for one-sentence requests: plain text only, no heading, no table, no bullet list, no extra analysis.",
+                ]
+            )
+            if evidence_count > 0:
+                lines.append("Current-request direct evidence has already been collected. Answer now unless that evidence is an error.")
+                lines.append("Do not answer from older retrieved evidence if it conflicts with the current-request direct evidence.")
+        else:
+            lines.extend(
+                [
+                    "Use tools only while they reduce uncertainty.",
+                    "When the task is satisfied, summarize with evidence and stop.",
+                ]
+            )
+        lines.append("</completion_boundary>")
+        return "\n".join(lines)
+
+    async def _preload_requested_files(self, requested_files: List[str]) -> int:
+        loaded = 0
+        for path in requested_files[:2]:
+            result = await registry.execute("read", {"path": path, "offset": 0, "limit": 200}, context=self.context)
+            self.memory.add(
+                "tool",
+                result,
+                tool_call_id=f"preload_read_{loaded + 1}",
+                name="read",
+                tool_args={"path": path, "preloaded_for_simple_task": True},
+            )
+            if not str(result).startswith("Error:"):
+                loaded += 1
+        return loaded
         
     def interrupt(self):
         """

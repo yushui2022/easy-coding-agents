@@ -1,0 +1,3 @@
+-r requirements.txt
+-r requirements-legacy.txt
+pytest>=7.0.0
