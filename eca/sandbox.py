@@ -4,6 +4,7 @@ import json
 import shutil
 import tempfile
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -76,6 +77,18 @@ async def run(tools, command, timeout, runner):
     with tempfile.TemporaryDirectory(prefix='source-', dir=base) as directory:
         # Synchronous bounded copy avoids a cancelled background thread outliving cleanup.
         snapshot(tools, Path(directory))
+        records = tools.state.setdefault('sandbox_runs', [])
+        unresolved = [r for r in records if r.get('cleanup') != 'removed']
+        if len(unresolved) >= 100:
+            raise ValueError('Too many unconfirmed sandbox runs; inspect their containers before continuing')
+        completed = [r for r in records if r.get('cleanup') == 'removed']
+        records[:] = unresolved + completed[-19:]
+        record = {'container': name, 'endpoint': endpoint, 'image': tools.settings.sandbox_image,
+                  'created_at': datetime.now(timezone.utc).isoformat(),
+                  'execution': 'unknown', 'cleanup': 'pending'}
+        records.append(record)
+        # Persist identity before dispatch: a crash must not erase the cleanup target.
+        tools.checkpoint()
         tools.emit('notice', f'Sandbox container {name}: network disabled; command writes are discarded.')
         try:
             args = argv(executable, name, Path(directory), tools.settings.sandbox_image, command, timeout)
@@ -83,15 +96,24 @@ async def run(tools, command, timeout, runner):
                                              root, timeout + 10, max(1, tools.settings.output_limit // 3)))
             if result.get('exit_code') in {124, 137}:
                 result['timed_out'] = True
+            record['execution'] = 'timed_out' if result.get('timed_out') else 'finished'
+            record['exit_code'] = result.get('exit_code')
             result['sandbox'] = {'backend': 'docker', 'container': name, 'writes': 'discarded', 'network': 'none'}
             return json.dumps(result, ensure_ascii=False)
         finally:
             # Killing the Docker client does not stop its container. Always remove by unique name.
-            cleanup = asyncio.create_task(runner([*prefix, 'rm', '-f', name], root, 10, 2000))
+            async def remove():
+                record['cleanup'] = 'unconfirmed'
+                try:
+                    outcome = json.loads(await runner([*prefix, 'rm', '-f', name], root, 10, 2000))
+                    if outcome.get('timed_out') or (outcome.get('exit_code') != 0 and 'No such container' not in outcome.get('stderr', '')):
+                        raise RuntimeError(f'Sandbox cleanup unconfirmed: inspect docker container {name}; do not retry automatically')
+                    record['cleanup'] = 'removed'
+                finally:
+                    tools.checkpoint()
+            cleanup = asyncio.create_task(remove())
             try:
-                outcome = json.loads(await asyncio.shield(cleanup))
+                await asyncio.shield(cleanup)
             except asyncio.CancelledError:
-                outcome = json.loads(await cleanup)
+                await cleanup
                 raise
-            if outcome.get('timed_out') or (outcome.get('exit_code') != 0 and 'No such container' not in outcome.get('stderr', '')):
-                raise RuntimeError(f'Sandbox cleanup unconfirmed: inspect docker container {name}; do not retry automatically')

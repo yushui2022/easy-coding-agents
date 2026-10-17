@@ -29,6 +29,7 @@ from .usage import UsageLedger
 HELP = {
     '/map [QUERY]': 'Show local indexed symbols/imports without a model request',
     '/search QUERY': 'Search indexed source without a model request',
+    "/sandbox": "Show durable container execution and cleanup records (no Docker calls)",
     "/progress": "Show recent runtime observations retained across compaction",
     "/verify COMMAND": "Run a user-selected check with normal shell approval",
     "/usage": "Show durable usage and priced subtotals, including child agents",
@@ -259,6 +260,8 @@ class App:
             self.store.save(self.state)
             self.agent = self.make_agent()
             self.status()
+        elif command == '/sandbox':
+            self.emit('notice', json.dumps({'sandbox_runs': self.state.get('sandbox_runs', [])}, ensure_ascii=False))
         elif command == '/progress':
             from .workflow import suite_status
             self.emit('notice', json.dumps({'observations': self.state.get('progress', []),

@@ -145,6 +145,7 @@ class Tools:
     def __init__(self, settings, state, approve, ask, emit):
         self.settings, self.state = settings, state
         self.approve, self.question, self.emit = approve, ask, emit
+        self.checkpoint = lambda: None
         self.changes = None
         self.mcp = None
         self.language_servers = None
@@ -237,12 +238,18 @@ class Tools:
         return await self._indexed(query, limit, True)
 
     async def _indexed(self, query, limit, outline):
-        from .code_index import CodeIndex
-        task = asyncio.create_task(asyncio.to_thread(CodeIndex(self).query, query, limit, outline))
+        from .code_index import CodeIndex, IndexCancelled
+        from threading import Event
+        cancelled = Event()
+        task = asyncio.create_task(asyncio.to_thread(CodeIndex(self, cancelled).query, query, limit, outline))
         try:
             return await asyncio.shield(task)
         except asyncio.CancelledError:
-            await task
+            cancelled.set()
+            try:
+                await task
+            except IndexCancelled:
+                pass
             raise
 
     async def glob(self, pattern):

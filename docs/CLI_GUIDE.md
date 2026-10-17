@@ -218,3 +218,12 @@ eca --cwd ./your-project --resume SESSION_ID --undo CHANGE_ID --json
 ## v0.8 可靠性与配置
 
 `/models`、`/model @NAME`、`--model-profile NAME`、`/agents ID`、`/lsp [disconnect NAME]` 见 [v0.8 升级手册](UPGRADE-v0.8.md)。模型配置不是 `/agent` 的行为提示词配置。
+
+
+### v0.12：定义定位与容器记录
+
+`/search Agent`、`/map Agent` 对单个标识符优先返回同名定义，并提供 `matched_symbols` 行号。Python 使用 AST，其他语言仍是词法提示；这不是跨语言语义引用分析。
+
+索引可取消：扫描会在文件边界检查取消信号，并回滚未完成的更新。当前文件解析、文件系统调用和 Git 枚举仍可能延迟响应（Git 枚举超时为 10 秒）。
+
+`/sandbox` 查看当前会话保存的容器名称、endpoint、镜像、执行结果和清理结果，不连接 Docker。`pending` 表示尚无持久清理结论，`unconfirmed` 表示清理未确认，`removed` 表示清理已确认；`execution=unknown` 不能解释为未执行。中断后需要人工核对记录中的容器，不会自动重跑。记录保留最近 20 次已清理运行及未确认记录；未确认达到 100 条时阻止新容器执行。

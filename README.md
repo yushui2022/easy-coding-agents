@@ -11,10 +11,10 @@
   <a href="#快速开始">快速开始</a> ·
   <a href="docs/CLI_GUIDE.md">使用手册</a> ·
   <a href="CHANGELOG.md">更新记录</a> ·
-  <a href="docs/UPGRADE-v0.11.md">验证记录</a>
+  <a href="docs/UPGRADE-v0.12.md">验证记录</a>
 </p>
 
-<p align="center"><code>Python 3.11+</code> · <code>v0.11.0</code> · <code>开发中</code></p>
+<p align="center"><code>Python 3.11+</code> · <code>v0.12.0</code> · <code>开发中</code></p>
 
 ---
 
@@ -167,7 +167,7 @@ eca --changes --json
 ## 数据、权限与当前边界
 
 - **本地存储，模型远程推理。** 会话、修改快照和项目记忆存放在目标项目的 `.eca/` 中；发送给模型的上下文会交给你配置的 API。请将 `.eca/` 加入目标项目的 `.gitignore`。
-- **默认 Shell 仍在宿主机执行。** 可显式选择实验性 `--sandbox docker`；本地 Linux 引擎和预装可信镜像必需，后端失败不降级。容器内写入丢弃，MCP/LSP 禁用。详见 [v0.11](docs/UPGRADE-v0.11.md)。
+- **默认 Shell 仍在宿主机执行。** 可显式选择实验性 `--sandbox docker`；本地 Linux 引擎和预装可信镜像必需，后端失败不降级。容器内写入丢弃，MCP/LSP 禁用。详见 [v0.11](docs/UPGRADE-v0.12.md)。
 - **历史成功不代表现在正确。** 记忆中的测试命令只证明当时返回了成功退出码；指纹不覆盖依赖安装状态、环境变量或外部服务。
 - **本地恢复不依赖模型配置。** 即使 `.env` 或 `eca.toml` 损坏，仍可使用 `--list-sessions`、`--changes`、`--undo ID` 和 `--accept-change ID`。
 - **恢复和摘要也有边界。** 摘要可能遗漏信息；结果不确定的操作不会自动重放。一个项目同时只允许一个 ECA 进程。

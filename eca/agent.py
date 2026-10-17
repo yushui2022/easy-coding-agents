@@ -27,6 +27,7 @@ class Agent:
         self.emit = emit
         self.provider = provider or Provider(settings)
         self.tools = Tools(settings, state, approve, question, emit)
+        self.tools.checkpoint = lambda: store.save(state)
         self.changes = self.tools.changes = Changes(store, state["id"], self.tools.path)
         self.knowledge = None
         self.memory_context = ""
