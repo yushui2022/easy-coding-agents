@@ -104,15 +104,37 @@ eca --cwd G:\Projects\demo --list-sessions
 ```powershell
 $env:ECA_TEST_TMP = "G:\DevCache\Temp\easy-coding-agents\tests"
 $env:PYTHONUTF8 = "1"
-python -B -m unittest discover -s tests -v
+python -m pip install -r requirements-dev.txt
+python -B -m pytest -q
 ```
 
 测试使用离线响应和本地 HTTP 流式服务器，不调用付费模型。核心模块在 `eca/`，旧 `core/` 等模块不再由默认入口调用。新增工具同时定义 schema 和执行方法，并补充与真实失败相关的测试。
 
 [验证记录](docs/VALIDATION-v0.2.md) · [升级说明](docs/UPGRADE-v0.2.md) · [原版 README](docs/legacy/README-v0.1.md)
 
-暂未实现 MCP、原生 Anthropic/Responses 协议、OAuth 登录、LSP、子 Agent 或 Shell 沙箱。优先把现有开发闭环做好，再逐项扩展。
+暂未实现 MCP、Responses 协议、OAuth 登录、LSP、子 Agent 或 Shell 沙箱。优先把现有开发闭环做好，再逐项扩展。
 
 ## 记忆研究模块
 
 保留远端已有的 `agent_memory_core/`、`benchmark/` 及其测试，作为独立研究模块；新版 CLI 尚未自动接入该模块。原研究入口与说明见 [记忆研究 README](docs/legacy/README-memory.md)。旧入口 `legacy_main.py` 使用 `requirements-legacy.txt` 依赖。
+
+## v0.3：直接连接 Anthropic
+
+兼容接口仍为默认值。使用 Claude 原生 Messages API 时，在目标项目 `.env` 配置：
+
+```dotenv
+ECA_API_FORMAT=anthropic
+ANTHROPIC_API_KEY=your_key_here
+ECA_MODEL=your-claude-model-id
+ANTHROPIC_BASE_URL=https://api.anthropic.com/v1
+```
+
+模型 ID 使用你的账号实际可用值。也可通过 `--api-format anthropic --model MODEL_ID` 指定。
+若已有 `eca.toml`，同步修改其中的 `api_key_env`、`base_url` 和 `model`；配置了 `api_key_env` 时会从指定变量读取密钥；否则优先使用 `ECA_API_KEY`。`ECA_BASE_URL` 优先于 TOML 地址。
+先运行 `python -B -m eca --doctor` 检查协议、地址和密钥是否配置（不会发起 API 请求）。
+
+支持文本流、工具调用、多个工具结果回传、会话恢复与 `/compact`。`[agent].max_output_tokens` 控制原生接口响应预算，默认 8192。
+断流、输出截断、损坏的工具参数或错误事件不会交给工具执行。原生接口暂不自动重试，不启用 Thinking、服务端工具、图片或订阅 OAuth。
+
+CI 模板保存在 [docs/ci-workflow.yml](docs/ci-workflow.yml)。当前 GitHub 凭据缺少 `workflow` 权限，尚未启用 Actions；取得权限后将模板放入 `.github/workflows/tests.yml`。
+协议实现依据 [Anthropic 流式协议文档](https://platform.claude.com/docs/en/build-with-claude/streaming)，验证记录见 [v0.3 验证说明](docs/VALIDATION-v0.3.md)。

@@ -9,8 +9,14 @@ class Provider:
     def __init__(self, settings):
         self.settings = settings
         self.client = None
+        self.native = None
 
     async def complete(self, messages, tools, emit):
+        if self.settings.api_format == "anthropic":
+            from .anthropic import AnthropicProvider
+            if self.native is None:
+                self.native = AnthropicProvider(self.settings)
+            return await self.native.complete(messages, tools, emit)
         if not self.settings.api_key:
             raise ValueError("Missing API key. Set ECA_API_KEY, OPENAI_API_KEY or MODELSCOPE_API_KEY in the environment/.env.")
         if self.client is None:
@@ -64,5 +70,7 @@ class Provider:
         return message, usage
 
     async def close(self):
+        if self.native:
+            await self.native.close()
         if self.client:
             await self.client.close()

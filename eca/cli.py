@@ -42,6 +42,7 @@ def parser():
     p.add_argument("--json", action="store_true", help="JSONL events for --prompt")
     p.add_argument("--model")
     p.add_argument("--base-url")
+    p.add_argument("--api-format", choices=["openai", "anthropic"], help="Model wire protocol")
     p.add_argument("--mode", choices=["code", "plan", "chat"])
     p.add_argument("--accept-edits", action="store_true", help="Approve file edits inside project; shell still requires approval")
     p.add_argument("--allow-shell", action="store_true", help="Explicitly approve ALL shell commands (including outside project); for trusted one-shot tasks only")
@@ -157,7 +158,7 @@ class App:
 
     def status(self):
         data = {"project": str(self.settings.root), "session": self.state["id"], "status": self.state["status"],
-                "model": self.settings.model, "mode": self.settings.mode, "permission": self.settings.permission,
+                "model": self.settings.model, "api_format": self.settings.api_format, "mode": self.settings.mode, "permission": self.settings.permission,
                 "messages": len(self.state["messages"]), "last_reported_usage": self.state.get("usage", {})}
         if self.args.json:
             self.emit("status", data)
@@ -280,11 +281,11 @@ async def async_main(args):
         raise ValueError("--json requires --prompt, --list-sessions or --doctor")
     if args.allow_shell and args.prompt is None:
         raise ValueError("--allow-shell is only for explicit one-shot tasks")
-    settings = Settings.load(args.cwd, model=args.model, base_url=args.base_url, mode=args.mode,
+    settings = Settings.load(args.cwd, model=args.model, base_url=args.base_url, api_format=args.api_format, mode=args.mode,
                              permission="accept-edits" if args.accept_edits else None)
     if args.doctor:
         print(json.dumps({"version": __version__, "python": sys.version.split()[0], "project": str(settings.root),
-              "model": settings.model, "base_url": settings.base_url, "api_key_configured": bool(settings.api_key),
+              "model": settings.model, "api_format": settings.api_format, "base_url": settings.base_url, "api_key_configured": bool(settings.api_key),
               "permission": settings.permission, "mode": settings.mode, "state_dir": str(settings.state_dir),
               "network_checked": False}, ensure_ascii=False, indent=None if args.json else 2))
         return 0

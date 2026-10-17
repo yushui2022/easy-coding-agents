@@ -12,6 +12,12 @@ import unittest
 
 class CLITests(unittest.TestCase):
     def test_real_http_stream_tool_execution_and_resume(self):
+        self.run_fixture("openai")
+
+    def test_anthropic_http_stream_tool_execution_and_resume(self):
+        self.run_fixture("anthropic")
+
+    def run_fixture(self, api_format):
         requests = []
         class Handler(BaseHTTPRequestHandler):
             def log_message(self, *_):
@@ -20,13 +26,30 @@ class CLITests(unittest.TestCase):
             def do_POST(self):
                 payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
                 requests.append(payload)
-                if payload["messages"][-1]["role"] == "tool" or "Continue" in payload["messages"][-1].get("content", ""):
+                if len(requests) > 1:
                     delta, reason = {"content": "Fixture completed."}, "stop"
                 else:
                     delta = {"tool_calls": [{"index": 0, "id": "fixture-1", "type": "function", "function": {"name": "write", "arguments": json.dumps({"path": "hello.py", "content": "print('hello')\n"})}}]}
                     reason = "tool_calls"
                 chunk = {"id": "fixture", "object": "chat.completion.chunk", "created": 1, "model": "fixture", "choices": [{"index": 0, "delta": delta, "finish_reason": reason}]}
                 data = ("data: " + json.dumps(chunk) + "\n\ndata: [DONE]\n\n").encode()
+                if api_format == "anthropic":
+                    if reason == "tool_calls":
+                        fn = delta["tool_calls"][0]["function"]
+                        block = {"type": "tool_use", "id": "fixture-1", "name": fn["name"], "input": {}}
+                        change = {"type": "input_json_delta", "partial_json": fn["arguments"]}
+                    else:
+                        block = {"type": "text", "text": ""}
+                        change = {"type": "text_delta", "text": delta["content"]}
+                    events = [
+                        {"type": "message_start", "message": {"usage": {"input_tokens": 5}}},
+                        {"type": "content_block_start", "index": 0, "content_block": block},
+                        {"type": "content_block_delta", "index": 0, "delta": change},
+                        {"type": "content_block_stop", "index": 0},
+                        {"type": "message_delta", "delta": {"stop_reason": "tool_use" if reason == "tool_calls" else "end_turn"}},
+                        {"type": "message_stop"},
+                    ]
+                    data = "".join("data: " + json.dumps(e) + "\n\n" for e in events).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "text/event-stream")
                 self.send_header("Content-Length", str(len(data)))
@@ -40,7 +63,7 @@ class CLITests(unittest.TestCase):
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
             env = {**{k: v for k, v in os.environ.items() if not k.lower().endswith("_proxy")}, "ECA_API_KEY": "fixture-secret", "ECA_MODEL": "fixture", "PYTHONUTF8": "1",
-                   "ECA_BASE_URL": f"http://127.0.0.1:{server.server_port}/v1"}
+                   "ECA_BASE_URL": f"http://127.0.0.1:{server.server_port}/v1", "ECA_API_FORMAT": api_format}
             command = [sys.executable, "-B", "-m", "eca", "--cwd", tmp, "--json"]
             try:
                 first = subprocess.run([*command, "--accept-edits", "-p", "Create hello.py"], env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
@@ -52,8 +75,12 @@ class CLITests(unittest.TestCase):
                 second = subprocess.run([*command, "--resume", "latest", "-p", "Continue with summary"], env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
                 self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
                 self.assertEqual(len(requests), 3)
-                self.assertIn("tool", [m["role"] for m in requests[-1]["messages"]])
-                self.assertEqual(requests[-1]["messages"][-1]["content"], "Continue with summary")
+                if api_format == "anthropic":
+                    self.assertTrue(any(b["type"] == "tool_result" for m in requests[-1]["messages"] for b in m["content"]))
+                    self.assertEqual(requests[-1]["messages"][-1]["content"][0]["text"], "Continue with summary")
+                else:
+                    self.assertIn("tool", [m["role"] for m in requests[-1]["messages"]])
+                    self.assertEqual(requests[-1]["messages"][-1]["content"], "Continue with summary")
             finally:
                 server.shutdown()
                 server.server_close()

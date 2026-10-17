@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 — 2026-10-17
+
+- Native Anthropic Messages streaming and normalized tool-use history, selected by config/environment/CLI.
+- Strict completion checks before tools execute; output budget, usage, credential isolation and protocol diagnostics.
+- Native protocol fixtures plus real HTTP CLI execution and cross-process session recovery tests.
+- Preserve upstream memory research and legacy entry point; test both runtimes together.
+- CI template retained under docs because current GitHub credentials lack workflow scope.
+
 ## 0.2.0 — 2026-10-17
 
 - New `eca` package and CLI; original application retained as `legacy_main.py`.

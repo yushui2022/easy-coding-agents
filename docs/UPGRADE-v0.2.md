@@ -58,7 +58,7 @@ Todo completion and the idle status do not assert code correctness. The agent is
 
 Tests use fake responses and a localhost SSE server; no real model key or paid request is needed. They cover approval denial, ambiguous edits, CRLF, conflict checks, modes, protected paths, session roundtrips, crash repair, cancellation, timeouts, context handling, fragmented streams, incomplete responses, and an actual CLI subprocess that writes a file then resumes.
 
-CI is configured for Windows/Linux with Python 3.11/3.12; adding the workflow is not evidence those hosted jobs have run. Local results are documented in `docs/VALIDATION-v0.2.md`.
+A CI template for Windows/Linux with Python 3.11/3.12 is saved as `docs/ci-workflow.yml`. It is not active: the current GitHub credential lacks workflow scope. Local results are documented in `docs/VALIDATION-v0.2.md`.
 
 Not included: native Anthropic/Responses protocol, OAuth subscriptions, MCP, LSP diagnostics, autonomous subagents, automatic compaction, shell sandboxing, reliable live cost accounting, or legacy session migration. OpenAI-compatible Chat Completions streaming with tool calling is required; compatibility varies by provider and model.
 

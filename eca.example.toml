@@ -1,11 +1,13 @@
 # Copy to eca.toml in the project you want to work on.
 [agent]
+api_format = "openai" # or "anthropic"; then set matching model, base_url and api_key_env
 model = "Qwen/Qwen2.5-Coder-32B-Instruct"
 base_url = "https://api-inference.modelscope.cn/v1"
 api_key_env = "MODELSCOPE_API_KEY"
 mode = "code"
 permission = "ask"
 max_turns = 40
+max_output_tokens = 8192 # Anthropic response token budget
 context_chars = 100000
 command_timeout = 120
 request_timeout = 120
