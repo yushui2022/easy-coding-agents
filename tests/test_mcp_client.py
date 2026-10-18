@@ -96,20 +96,40 @@ for line in sys.stdin:
 
     async def test_cancel_waiting_request_does_not_disconnect_active_operation(self):
         client=MCPTools(self.settings,yes,persistent=True)
+        started, release, waiting = asyncio.Event(), asyncio.Event(), asyncio.Event()
+        # Exercise the real lock/dispatch/owner cancellation path, without making
+        # it depend on SDK import time, process startup or a one-second file poll.
+        # Actual stdio/HTTP transport behavior is covered by the other tests.
+        async def owner(cfg, values, tool, arguments, queue=None):
+            client.ready.add(asyncio.current_task())
+            while True:
+                operation, args, future = await queue.get()
+                if operation == 'echo':
+                    started.set()
+                    await release.wait()
+                if not future.done():
+                    future.set_result({'content':[{'type':'text','text':args.get('text','ready')}]})
+        async def queued_request():
+            waiting.set()
+            return await client.invoke('fixture')
         first=second=None
         try:
-            await client.invoke('fixture')
-            first=asyncio.create_task(client.invoke('fixture','echo',{'text':'slow'}))
-            for _ in range(100):
-                if (self.root/'called').exists(): break
-                await asyncio.sleep(0.01)
-            self.assertTrue((self.root/'called').exists())
-            second=asyncio.create_task(client.invoke('fixture'))
-            await asyncio.sleep(0)
-            second.cancel()
-            with self.assertRaises(asyncio.CancelledError): await second
-            self.assertTrue(client.connected('fixture'))
-            self.assertFalse(first.done())
+            with patch.object(client, '_operate', side_effect=owner):
+                await client.invoke('fixture')
+                worker = client.workers['fixture'][1]
+                self.assertTrue(client.connected('fixture'))
+                first=asyncio.create_task(client.invoke('fixture','echo',{'text':'slow'}))
+                await asyncio.wait_for(started.wait(), 5)
+                second=asyncio.create_task(queued_request())
+                await asyncio.wait_for(waiting.wait(), 5)
+                self.assertFalse(second.done())
+                second.cancel()
+                with self.assertRaises(asyncio.CancelledError): await second
+                self.assertTrue(client.connected('fixture'))
+                self.assertIs(client.workers['fixture'][1], worker)
+                self.assertFalse(first.done())
+                release.set()
+                self.assertEqual(json.loads(await first)['content'][0]['text'], 'slow')
         finally:
             if first:
                 first.cancel()

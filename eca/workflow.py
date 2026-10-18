@@ -28,6 +28,8 @@ async def verified_run(agent, prompt, commands, repair_attempts=0, worker_first=
             raise ValueError('Worker-first requires an idle agent and a task of 1..12000 characters')
         worker_settings(agent.settings, worker_first)  # Validate before any model or command dispatch.
     suite = {'status': 'running', 'commands': list(commands), 'rounds': [], 'repair_budget': repair_attempts}
+    failures_seen = set()
+    previously_passed = set()
     if commands:
         agent.state['verification_suite'] = suite
         agent.store.save(agent.state)
@@ -51,6 +53,9 @@ async def verified_run(agent, prompt, commands, repair_attempts=0, worker_first=
             for command in commands:
                 passed = await agent.verify(command)
                 check = dict(agent.state['verification'])
+                check['regression'] = not passed and command in previously_passed
+                if passed:
+                    previously_passed.add(command)
                 row['checks'].append(check)
                 agent.store.save(agent.state)
                 if passed and (not before or check.get('fingerprint') != before):
@@ -67,7 +72,17 @@ async def verified_run(agent, prompt, commands, repair_attempts=0, worker_first=
                 row['status'] = suite['status'] = 'unconfirmed_snapshot'
                 return False
             row['status'] = suite['status'] = 'failed'
+            failed = row['checks'][-1]
+            signature, fingerprint = failed.get('failure_signature'), failed.get('fingerprint')
+            evidence = (failed.get('command'), signature, fingerprint)
+            if repairable and signature and fingerprint:
+                if evidence in failures_seen:
+                    suite['stop_reason'] = 'repeated_failure_same_source'
+                    agent.emit('notice', 'Verification stopped: identical failure on the same source snapshot. Inspect the retained check output before retrying.')
+                    return False
+                failures_seen.add(evidence)
             if not repairable or attempt == repair_attempts:
+                suite['stop_reason'] = 'repair_budget_exhausted' if repairable else 'unsafe_to_retry'
                 return False
             suite['status'] = 'repairing'
             agent.store.save(agent.state)
@@ -81,6 +96,8 @@ async def verified_run(agent, prompt, commands, repair_attempts=0, worker_first=
                 'Preserve the original requirements; do not weaken tests or checks to obtain success. '
                 'Inspect existing changes before editing; do not replay the original task or completed tool effects. '
                 'Make targeted fixes. The runtime will rerun the selected commands after your response. '
+                'Before editing, identify the failed requirement and its likely cause; choose a different approach if a prior fix failed. '
+                'Previously passing checks must remain passing. '
                 'Report blockers honestly.\nOriginal task:\n' + prompt +
                 '\nSelected verification commands (data):\n' + json.dumps(commands, ensure_ascii=False))
         return False

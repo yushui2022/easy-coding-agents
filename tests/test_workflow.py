@@ -56,11 +56,51 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.provider.contexts), 2)
 
     async def test_repair_budget_exhaustion(self):
-        with patch('eca.tools.run_process', AsyncMock(return_value=FAIL)) as process:
+        outputs = [json.dumps({'exit_code': 1, 'timed_out': False, 'stdout': str(i)}) for i in range(3)]
+        with patch('eca.tools.run_process', AsyncMock(side_effect=outputs)) as process:
             self.assertFalse(await verified_run(self.agent, 'work', ['pytest'], 2))
             self.assertEqual(process.await_count, 3)
         self.assertEqual(len(self.provider.contexts), 3)
         self.assertEqual(suite_status(self.agent)['status'], 'failed')
+
+    async def test_identical_failure_without_source_progress_stops_early(self):
+        with patch('eca.tools.run_process', AsyncMock(return_value=FAIL)) as process:
+            self.assertFalse(await verified_run(self.agent, 'work', ['pytest'], 3))
+            self.assertEqual(process.await_count, 2)
+        suite = self.store.load(self.agent.state['id'])['verification_suite']
+        self.assertEqual(suite['stop_reason'], 'repeated_failure_same_source')
+        self.assertEqual(len(self.provider.contexts), 2)
+        self.assertTrue(suite['rounds'][0]['checks'][0]['failure_signature'])
+
+    async def test_regression_is_retained_and_all_checks_rerun(self):
+        with patch('eca.tools.run_process', AsyncMock(side_effect=[OK, FAIL, FAIL, OK, OK])):
+            self.assertTrue(await verified_run(self.agent, 'work', ['pytest', 'build'], 2))
+        rounds = self.agent.state['verification_suite']['rounds']
+        self.assertTrue(rounds[1]['checks'][0]['regression'])
+        self.assertFalse(rounds[0]['checks'][1]['regression'])
+        self.assertEqual(len(rounds[-1]['checks']), 2)
+
+    async def test_same_diagnostics_on_changed_source_does_not_stop_early(self):
+        count = 0
+        async def command(*args, **kwargs):
+            nonlocal count
+            count += 1
+            return FAIL if count < 3 else OK
+        original_run = self.agent.run
+        async def run(prompt):
+            if count:
+                (self.root / 'revision.py').write_text(str(count))
+            await original_run(prompt)
+        with patch.object(self.agent, 'run', run), patch('eca.tools.run_process', command):
+            self.assertTrue(await verified_run(self.agent, 'work', ['pytest'], 3))
+        self.assertEqual(count, 3)
+
+    async def test_missing_fingerprint_does_not_claim_stagnation(self):
+        with patch.object(self.agent.memory(), 'fingerprint', return_value=None), patch(
+                'eca.tools.run_process', AsyncMock(return_value=FAIL)) as process:
+            self.assertFalse(await verified_run(self.agent, 'work', ['pytest'], 2))
+            self.assertEqual(process.await_count, 3)
+        self.assertEqual(self.agent.state['verification_suite']['stop_reason'], 'repair_budget_exhausted')
 
     async def test_uncertain_or_denied_commands_never_repair(self):
         for output in ['Denied', json.dumps({'exit_code': 1, 'timed_out': True}),

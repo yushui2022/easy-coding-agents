@@ -23,6 +23,8 @@ class Settings:
     permission: str = "ask"
     max_turns: int = 40
     context_chars: int = 100_000
+    context_window_tokens: int = 32768
+    context_reserve_tokens: int = 1024
     command_timeout: int = 120
     request_timeout: int = 120
     output_limit: int = 24_000
@@ -76,6 +78,9 @@ class Settings:
                       base_url=env.get("ECA_BASE_URL") or env.get("ANTHROPIC_BASE_URL" if native else "OPENAI_BASE_URL") or cfg.get("base_url", default_url))
         values.update(mcp_servers=data.get("mcp_servers", {}), pricing=data.get("pricing", {}), lsp_servers=data.get("lsp_servers", {}), model_profiles=data.get("model_profiles", {}))
         for name in ("sandbox", "sandbox_image", "reasoning_effort", "mode", "permission", "max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "network_retries", "auto_compact", "project_memory", "stream_usage", "subagent_max_turns", "subagent_max_calls", "subagent_timeout", "subagent_concurrency", "worker_profiles"):
+            if name in cfg:
+                values[name] = cfg[name]
+        for name in ('context_window_tokens', 'context_reserve_tokens'):
             if name in cfg:
                 values[name] = cfg[name]
         selected = model_profile if model_profile is not None else cfg.get('model_profile', '')
@@ -141,6 +146,11 @@ class Settings:
                 raise ValueError(f"{name} must be a positive integer")
         if self.subagent_concurrency > 8:
             raise ValueError("subagent_concurrency must be 1..8")
+        for name in ('context_window_tokens', 'context_reserve_tokens'):
+            if type(getattr(self, name)) is not int or getattr(self, name) <= 0:
+                raise ValueError(f'{name} must be a positive integer')
+        if self.context_window_tokens <= self.max_output_tokens + self.context_reserve_tokens:
+            raise ValueError('context_window_tokens must exceed max_output_tokens + context_reserve_tokens')
         if not isinstance(self.base_url, str):
             raise ValueError("base_url must be text")
         url = urlsplit(self.base_url)

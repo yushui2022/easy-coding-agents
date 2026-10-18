@@ -27,6 +27,7 @@ from .usage import UsageLedger
 
 
 HELP = {
+    '/context': 'Show estimated context tokens and output/safety reservations (no API call)',
     '/map [QUERY]': 'Show local indexed symbols/imports without a model request',
     '/search QUERY': 'Search indexed source without a model request',
     "/sandbox": "Show durable container execution and cleanup records (no Docker calls)",
@@ -150,6 +151,11 @@ class App:
                 self.console.print(f"  [{task['status']}] {task['content']}", markup=False)
         elif event == 'verification_suite':
             self.console.print(f"Verification suite: {data['status']} ({len(data.get('rounds', []))} round(s))", markup=False)
+            if data.get('stop_reason'):
+                self.console.print(f"Stop reason: {data['stop_reason']}", markup=False)
+            regressions = sum(bool(check.get('regression')) for row in data.get('rounds', []) for check in row.get('checks', []))
+            if regressions:
+                self.console.print(f"Previously passing checks failed in {regressions} recorded check(s); inspect verification_suite.rounds.", markup=False)
         elif event == 'subagent_progress' and data['event'] in {'turn', 'tool', 'error', 'status'}:
             value = data['data']
             label = value.get('name', '') if isinstance(value, dict) else str(value)
@@ -318,6 +324,11 @@ class App:
         elif command == "/compact":
             await self.agent.compact()
             self.emit("notice", "Context summarized; full session retained.")
+        elif command == '/context':
+            schemas = self.agent.tool_schemas()
+            data = self.agent.context_budget.report(self.agent.raw_context(), schemas)
+            data['note'] = 'Local estimate with enabled tools; runtime guidance may add tokens. Not billing usage.'
+            self.emit('notice', json.dumps(data, ensure_ascii=False))
         elif command == "/tasks":
             self.emit("tasks", self.state["tasks"])
         elif command == "/status":

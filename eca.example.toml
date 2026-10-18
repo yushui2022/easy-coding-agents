@@ -14,6 +14,8 @@ project_memory = true # sourced project memory; false disables automatic capture
 auto_compact = true # summarizes older context near budget; consumes model requests
 max_output_tokens = 8192 # response token cap for both OpenAI-compatible and Anthropic APIs
 context_chars = 100000
+context_window_tokens = 32768 # application budget, NOT autodetected; set <= your endpoint's actual window
+context_reserve_tokens = 1024 # extra safety margin; max_output_tokens is reserved separately
 command_timeout = 120
 request_timeout = 120
 output_limit = 24000

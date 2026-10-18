@@ -31,7 +31,10 @@ SCHEMAS = [
     schema("glob", "Find workspace files; ignores build/cache/secret directories.", {"pattern": STR}, ["pattern"]),
     schema("grep", "Search literal text in workspace files; optional filename glob.", {"query": STR, "include": STR}, ["query"]),
     schema("write", "Create or overwrite a UTF-8 file with diff approval; prefer edit for existing files.", {"path": STR, "content": STR}, ["path", "content"]),
-    schema("edit", "Replace exactly one occurrence. Ambiguous matches are rejected.", {"path": STR, "old": STR, "new": STR}, ["path", "old", "new"]),
+    schema("edit", "Replace one unique range; read first. Auto mode permits trailing spaces in whole multiline blocks only; exact disables fallback. Reject stale reads and ambiguity.", {"path": STR, "old": STR, "new": STR, "match_mode": {"type": "string", "enum": ["auto", "exact"]}}, ["path", "old", "new"]),
+    schema("edit_many", "Preflight 1..100 disjoint replacements against the ORIGINAL file, then save once with one undo record. No partial writes; read first.",
+           {"path": STR, "edits": {"type": "array", "minItems": 1, "maxItems": 100, "items": {"type": "object", "properties": {"old": STR, "new": STR}, "required": ["old", "new"], "additionalProperties": False}},
+            "match_mode": {"type": "string", "enum": ["auto", "exact"]}}, ["path", "edits"]),
     schema("delete", "Delete one UTF-8 text file with diff approval and recoverable journal. No directories or binary files.", {"path": STR}, ["path"]),
     schema("shell", "Run the configured shell with approval: host PowerShell/sh, or /bin/sh in disposable Docker mode. Docker writes are discarded. Includes exit code.", {"command": STR, "timeout": INT}, ["command"]),
     schema("todo", "Replace task plan. Completion is a planning label, not proof tests passed.", {"items": {"type": "array", "items": {"type": "object", "properties": {"content": STR, "status": {"type": "string", "enum": ["pending", "in_progress", "completed"]}}, "required": ["content", "status"], "additionalProperties": False}}}, ["items"]),
@@ -222,6 +225,7 @@ class Tools:
         text = raw.decode("utf-8-sig")
         if "\x00" in text:
             raise ValueError("Binary files are not supported")
+        self.remember_file(target, raw)
         lines = text.splitlines()
         result = "\n".join(f"{i+offset}: {line}" for i, line in enumerate(lines[offset-1:offset-1+limit])) + f"\n[total lines: {len(lines)}]"
         if target.name == "AGENTS.md" and offset == 1 and limit >= len(lines) and len(result) <= self.settings.output_limit:
@@ -293,7 +297,23 @@ class Tools:
                 continue
         return "\n".join(results) or "No matches."
 
+    def remember_file(self, path: Path, raw: bytes | None) -> None:
+        versions = self.state.setdefault('file_versions', {})
+        key = path.relative_to(self.settings.root).as_posix()
+        versions.pop(key, None)
+        versions[key] = hashlib.sha256(raw).hexdigest() if raw is not None else None
+        while len(versions) > 1000:
+            versions.pop(next(iter(versions)))
+
+    def check_file_version(self, path: Path, before: bytes | None) -> None:
+        key = path.relative_to(self.settings.root).as_posix()
+        versions = self.state.get('file_versions', {})
+        digest = hashlib.sha256(before).hexdigest() if before is not None else None
+        if key in versions and versions[key] != digest:
+            raise ValueError('File changed since it was last read or saved by this session. File unchanged; read it again before editing.')
+
     async def change(self, path, before, content):
+        self.check_file_version(path, before)
         rules = self.file_guidance(path)
         if rules:
             return "File unchanged. Read these applicable rules before retrying the edit:\n" + rules
@@ -329,6 +349,7 @@ class Tools:
             atomic_write(path, content)
         if ident is not None:
             self.changes.mark(ident, "applied")
+        self.remember_file(path, content.encode('utf-8') if content is not None else None)
         review = f" Change #{ident}; review with /changes {ident}, undo with /undo {ident}." if ident is not None else ""
         return f"{'Deleted' if content is None else 'Saved'} {relative}.{review} This is not a test result; run appropriate checks."
 
@@ -351,18 +372,22 @@ class Tools:
         before = target.read_bytes() if target.exists() else None
         return await self.change(target, before, content)
 
-    async def edit(self, path, old, new):
+    async def edit(self, path: str, old: str, new: str, match_mode: str = 'auto') -> str:
+        return await self.edit_many(path, [{'old': old, 'new': new}], match_mode)
+
+    async def edit_many(self, path: str, edits: list[dict], match_mode: str = 'auto') -> str:
+        from .editing import plan_edits
         target = self.path(path)
         if target.stat().st_size > 2_000_000:
             raise ValueError("Existing file exceeds 2 MB limit")
         before = target.read_bytes()
+        self.check_file_version(target, before)
         content = before.decode("utf-8")
-        if "\r\n" in content:
-            old = old.replace("\r\n", "\n").replace("\n", "\r\n")
-            new = new.replace("\r\n", "\n").replace("\n", "\r\n")
-        if not old or content.count(old) != 1:
-            raise ValueError("old must match exactly once; read a larger unique section")
-        return await self.change(target, before, content.replace(old, new, 1))
+        content, relaxed = plan_edits(content, edits, match_mode)
+        result = await self.change(target, before, content)
+        if relaxed and result.startswith('Saved '):
+            result += f' Matched {relaxed} block(s) ignoring trailing spaces/tabs only; review the diff.'
+        return result
 
     async def shell(self, command, timeout=None):
         timeout = timeout or self.settings.command_timeout

@@ -1,6 +1,16 @@
 """Conservative hints from retained runner output, never a proof of correctness."""
 import re
 import json
+import hashlib
+
+
+def failure_signature(command, result):
+    """Hash exact retained diagnostics; never normalize away meaningful differences."""
+    if not repair_allowed(result):
+        return None
+    output = json.loads(result)
+    evidence = {key: output.get(key) for key in ('exit_code', 'stdout', 'stderr', 'test_status')}
+    return hashlib.sha256(json.dumps([command, evidence], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
 
 def repair_allowed(result):

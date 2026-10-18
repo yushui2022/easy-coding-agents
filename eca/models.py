@@ -5,7 +5,7 @@ import re
 from dotenv import dotenv_values
 
 FIELDS = {'model', 'base_url', 'api_format', 'api_key_env', 'reasoning_effort',
-          'max_output_tokens', 'context_chars', 'stream_usage'}
+          'max_output_tokens', 'context_chars', 'stream_usage', 'context_window_tokens', 'context_reserve_tokens'}
 
 
 def validate_profiles(profiles, root):
@@ -31,7 +31,8 @@ def select(settings, name):
                      api_key=env.get(cfg['api_key_env'], ''), model_profile=name)
     # Reset model-specific optional knobs instead of inheriting another endpoint's values.
     for name, default in [('reasoning_effort', ''), ('stream_usage', True),
-                          ('max_output_tokens', 8192), ('context_chars', 100_000)]:
+                          ('max_output_tokens', 8192), ('context_chars', 100_000),
+                          ('context_window_tokens', 32768), ('context_reserve_tokens', 1024)]:
         if name not in cfg:
             setattr(result, name, default)
     result.validate()

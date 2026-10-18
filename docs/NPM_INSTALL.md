@@ -9,7 +9,7 @@
 下载或构建本项目的安装包后：
 
 ```sh
-npm install -g ./easy-coding-agent-cli-0.15.0.tgz
+npm install -g ./easy-coding-agent-cli-0.18.0.tgz
 ecs --version
 ecs --setup
 cd your-project
@@ -25,7 +25,7 @@ Windows PowerShell 通常也可以输入大写 `ECS`；跨平台统一使用小�
 npm 默认全局目录可能在 C 盘。可显式安装到 G 盘：
 
 ```powershell
-npm install -g --prefix G:\DevTools\npm .\easy-coding-agent-cli-0.15.0.tgz --cache G:\DevCache\npm
+npm install -g --prefix G:\DevTools\npm .\easy-coding-agent-cli-0.18.0.tgz --cache G:\DevCache\npm
 G:\DevTools\npm\ecs.cmd --setup
 ```
 
