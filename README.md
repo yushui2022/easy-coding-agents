@@ -11,10 +11,10 @@
   <a href="#快速开始">快速开始</a> ·
   <a href="docs/CLI_GUIDE.md">使用手册</a> ·
   <a href="CHANGELOG.md">更新记录</a> ·
-  <a href="docs/UPGRADE-v0.14.md">验证记录</a>
+  <a href="docs/UPGRADE-v0.15.md">验证记录</a>
 </p>
 
-<p align="center"><code>Python 3.11+</code> · <code>v0.14.0</code> · <code>开发中</code></p>
+<p align="center"><code>Python 3.11+</code> · <code>v0.15.0</code> · <code>开发中</code></p>
 
 ---
 
@@ -56,7 +56,20 @@ Easy Coding Agent（ECA）是一个可自行配置模型的 Python CLI 编程助
 
 需要 **Python 3.11+** 和支持工具调用的模型 API。
 
-### 1. 获取项目并安装
+### 1. 安装终端命令
+
+已有本地 npm 安装包时（需要 Node.js 20+ 和 Python 3.11+）：
+
+```sh
+npm install -g ./easy-coding-agent-cli-0.15.0.tgz
+ecs
+```
+
+首次启动自动建立独立 Python 环境并安装依赖，之后直接输入 `ecs` 即可。当前包尚未发布到 npm 官网；使用本地安装包无需 npm 账号。[G 盘安装、运行目录与故障处理](docs/NPM_INSTALL.md)
+
+也可以继续通过 Python 安装，安装后 `eca` 和 `ecs` 都可使用：
+
+#### 从源码安装
 
 ```sh
 git clone https://github.com/yushui2022/easy-coding-agents.git

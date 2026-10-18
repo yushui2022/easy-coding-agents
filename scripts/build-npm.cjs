@@ -1,0 +1,19 @@
+'use strict';
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const {spawnSync} = require('node:child_process');
+const {findPython} = require('../bin/ecs.cjs');
+const pkg = require('../package.json');
+const root = path.resolve(__dirname, '..');
+const vendor = path.join(root, 'vendor');
+const pyproject = fs.readFileSync(path.join(root, 'pyproject.toml'), 'utf8');
+if (!pyproject.includes(`version = "${pkg.version}"`)) throw new Error('npm/Python versions differ');
+fs.mkdirSync(vendor, {recursive:true});
+const py = findPython();
+const result = spawnSync(py.command, [...py.prefix, '-I', '-m', 'pip', 'wheel', root, '--no-deps', '--no-build-isolation', '--wheel-dir', vendor], {stdio:'inherit', windowsHide:true});
+if (result.error || result.status !== 0) process.exit(1);
+const wheel = `easy_coding_agent-${pkg.version}-py3-none-any.whl`;
+// Remove only superseded, generated wheels inside this package's vendor directory.
+for (const name of fs.readdirSync(vendor)) if (/^easy_coding_agent-[A-Za-z0-9_.-]+\.whl$/.test(name) && name !== wheel) fs.unlinkSync(path.join(vendor, name));
+fs.writeFileSync(path.join(vendor, 'runtime.json'), JSON.stringify({version:pkg.version, wheel, sha256:crypto.createHash('sha256').update(fs.readFileSync(path.join(vendor,wheel))).digest('hex')}, null, 2));

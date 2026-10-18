@@ -237,3 +237,8 @@ eca --cwd ./your-project --resume SESSION_ID --undo CHANGE_ID --json
 ### Worker 优先验收链路（v0.14）
 
 `--worker-first helper` 与 `-p`、`--verify-command`、`--allow-shell` 搭配：先执行 Worker，再检查。需要失败后由主模型接手时，另加 `--repair-attempts 1`（默认 0）。Worker 使用共享目录，修改保留；取消、超时和未知结果不会自动重放。[完整示例](UPGRADE-v0.14.md)。
+
+
+### ecs 与 npm 安装（v0.15）
+
+`ecs` 与已有 `eca` 使用相同引擎和模型配置。npm 包在首次启动时自动准备独立 Python 环境；`ecs --setup` 可提前准备，`ecs --version` 无需初始化。[完整安装说明](NPM_INSTALL.md)。当前仅提供本地 tgz，尚未发布到 npm registry。
