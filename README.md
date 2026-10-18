@@ -24,6 +24,8 @@ Easy Coding Agent（ECA）是一个可自行配置模型的 Python CLI 编程助
 
 > 当前适合个人试用、开发与研究。基础机制已有自动化测试，但真实复杂任务的稳定性仍在验证中；尚未达到成熟编码 CLI 的功能覆盖与可靠性。
 
+大仓库定位：`/related SYMBOL` 查看定义与 Python 调用/导入候选；模型的 `code_search`、`repo_map`、`code_relations` 支持目录筛选与增量读取统计。[用法与验证边界](docs/REPOSITORY_NAVIGATION.md)。
+
 ## 可选多模型协作
 
 默认只需一个 API，原有用法不变。需要时额外配置云端或本地 Worker，并通过 `worker_profiles` 显式开启，主 Agent 才能按子任务选择模型。不会自动下载本地模型；具体小模型需要支持工具调用并经过任务验证。[配置示例](docs/UPGRADE-v0.13.md)

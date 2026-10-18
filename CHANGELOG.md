@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — 大仓库关联定位
+
+- 全量回归 273 passed、6 skipped（179.27 秒）；最后补充根路径拒绝后，定位专项 7 项再次通过。跳过为未开启的 Docker/MCP 可选验收，本轮未调用模型 API。
+- 新增 `code_relations` 与 `/related SYMBOL`：返回定义、Python 调用/导入位置和测试文件标识；明确同名、别名、动态调用及语法版本限制。
+- `code_search`、`repo_map` 支持相对目录/文件筛选，增量索引报告复用、读取量、删除量和解析降级。
+- 修复全文索引逐文件按路径删除造成的重复扫描，改为事务内读取 rowid 后定点删除，并增加关系表路径索引。
+- 增加重命名、删除、真实分支切换、目录边界和语法降级回归；DeerFlow 4,014 文件仓库三项定位任务通过，详见 [定位验收](docs/REPOSITORY_NAVIGATION.md)。仍未验证模型驱动的大仓库跨文件修改成功率。
+
 ## Unreleased — 真实隔离验收与取消状态
 
 - 开启全部 Docker 实测后的全量回归：271 passed、1 skipped（174.79 秒）；5 项真实容器测试通过，无遗留 ECA 容器，未调用模型 API。

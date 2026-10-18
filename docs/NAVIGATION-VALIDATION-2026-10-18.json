@@ -1,0 +1,208 @@
+{
+  "repository": "https://github.com/bytedance/deer-flow",
+  "revision": "34316550dffbe8fbaed5678a6be87c5d3c65155b",
+  "tracked_files": 4014,
+  "python": "3.11.1",
+  "source_status_unchanged": true,
+  "tracked_changes_before": true,
+  "expected_source_unchanged": true,
+  "expected_source_sha256": {
+    "backend/app/channels/allowed_users.py": "5241c6ec81b9fc4e269b7a9571a181ae8b70e7b4a290269f5978ced38d078ce2",
+    "backend/app/channels/connection_identity.py": "13a6da581b8ab3e47e3ace4a67b01508697a152c650aed6087368765b37e15a3",
+    "backend/app/channels/dingtalk.py": "aa9c8c6bafcb7f92b34777169b8618a0a71069de8e6c6e15ad4bda1b5e6f4bff",
+    "backend/app/channels/discord.py": "f9c751f24f96e6968a55c5e9aa5012d2567c445b2afc40ec048781d9eb426a0e",
+    "backend/app/channels/feishu.py": "d94b4a6eeb600ae9b4ce97aad2e7e22b444dfe59105cde828e7be218867e3062",
+    "backend/tests/blocking_io/test_channel_thread_binding_store.py": "dc8af35434e4ddb124c4115a3adb2fa59e98c1b1463daef52f2e100288a89797",
+    "backend/tests/test_allowed_users.py": "3b79cbb397e4571e6459a1b5c10c2a7a039b29c1c0f1103a66ada4b705f9a175"
+  },
+  "manifest_sha256": "aa22113c6db00d092d4a8fe64491a145e73c53994f3e6568b3ae367c7c7af9e1",
+  "cold_index": {
+    "files": 3969,
+    "updated": 3969,
+    "reused": 0,
+    "removed": 0,
+    "files_read": 4009,
+    "bytes_read": 64083178,
+    "elapsed_ms": 20703.84,
+    "syntax_fallback_files": 33,
+    "skipped": 38,
+    "partial": false
+  },
+  "limitations": "Three navigation tasks only; no model-driven edits, repository tests or semantic precision measurement. Warm queries still enumerate/stat source files. Per-file structure caps apply.",
+  "tasks": [
+    {
+      "symbol": "lookup_thread_id",
+      "expected": [
+        "backend/app/channels/connection_identity.py",
+        "backend/app/channels/feishu.py",
+        "backend/tests/blocking_io/test_channel_thread_binding_store.py"
+      ],
+      "text": {
+        "recall": 1.0,
+        "index": {
+          "files": 3969,
+          "updated": 0,
+          "reused": 3969,
+          "removed": 0,
+          "files_read": 48,
+          "bytes_read": 14640554,
+          "elapsed_ms": 5440.53,
+          "syntax_fallback_files": 33,
+          "skipped": 38,
+          "partial": false
+        },
+        "paths": [
+          "backend/app/channels/connection_identity.py",
+          "backend/tests/blocking_io/test_channel_thread_binding_store.py",
+          "backend/tests/blocking_io/test_feishu_receive_file.py",
+          "backend/tests/test_wecom_group_bindings.py",
+          "backend/tests/test_feishu_card_delivery.py",
+          "backend/app/channels/manager.py",
+          "backend/app/gateway/github/dispatcher.py",
+          "backend/app/channels/feishu.py",
+          "backend/app/channels/buzz.py",
+          "backend/app/channels/AGENTS.md",
+          "backend/tests/test_buzz_channel.py",
+          "backend/tests/test_channels.py",
+          "CHANGELOG_zh.md",
+          "CHANGELOG.md"
+        ]
+      },
+      "relations": {
+        "recall": 1.0,
+        "index": {
+          "files": 3969,
+          "updated": 0,
+          "reused": 3969,
+          "removed": 0,
+          "files_read": 40,
+          "bytes_read": 12307803,
+          "elapsed_ms": 6624.68,
+          "syntax_fallback_files": 33,
+          "skipped": 38,
+          "partial": false
+        },
+        "paths": [
+          "backend/app/channels/connection_identity.py",
+          "backend/app/channels/buzz.py",
+          "backend/app/channels/feishu.py",
+          "backend/app/channels/manager.py",
+          "backend/tests/blocking_io/test_channel_thread_binding_store.py",
+          "backend/tests/test_wecom_group_bindings.py"
+        ]
+      }
+    },
+    {
+      "symbol": "parse_channel_ids",
+      "expected": [
+        "backend/app/channels/allowed_users.py",
+        "backend/app/channels/discord.py",
+        "backend/tests/test_allowed_users.py"
+      ],
+      "text": {
+        "recall": 1.0,
+        "index": {
+          "files": 3969,
+          "updated": 0,
+          "reused": 3969,
+          "removed": 0,
+          "files_read": 39,
+          "bytes_read": 12131494,
+          "elapsed_ms": 7265.13,
+          "syntax_fallback_files": 33,
+          "skipped": 38,
+          "partial": false
+        },
+        "paths": [
+          "backend/app/channels/allowed_users.py",
+          "backend/tests/test_allowed_users.py",
+          "backend/app/channels/discord.py",
+          "backend/app/channels/buzz.py",
+          "backend/app/channels/AGENTS.md"
+        ]
+      },
+      "relations": {
+        "recall": 1.0,
+        "index": {
+          "files": 3969,
+          "updated": 0,
+          "reused": 3969,
+          "removed": 0,
+          "files_read": 38,
+          "bytes_read": 12082354,
+          "elapsed_ms": 6282.84,
+          "syntax_fallback_files": 33,
+          "skipped": 38,
+          "partial": false
+        },
+        "paths": [
+          "backend/app/channels/allowed_users.py",
+          "backend/app/channels/buzz.py",
+          "backend/app/channels/discord.py",
+          "backend/tests/test_allowed_users.py"
+        ]
+      }
+    },
+    {
+      "symbol": "parse_allowed_users",
+      "expected": [
+        "backend/app/channels/allowed_users.py",
+        "backend/app/channels/dingtalk.py",
+        "backend/tests/test_allowed_users.py"
+      ],
+      "text": {
+        "recall": 1.0,
+        "index": {
+          "files": 3969,
+          "updated": 0,
+          "reused": 3969,
+          "removed": 0,
+          "files_read": 45,
+          "bytes_read": 12978270,
+          "elapsed_ms": 6555.41,
+          "syntax_fallback_files": 33,
+          "skipped": 38,
+          "partial": false
+        },
+        "paths": [
+          "backend/app/channels/allowed_users.py",
+          "backend/tests/test_allowed_users.py",
+          "backend/app/channels/qq.py",
+          "backend/tests/test_wechat_allowed_file_extensions.py",
+          "backend/app/channels/slack.py",
+          "backend/tests/test_dingtalk_channel.py",
+          "backend/app/channels/dingtalk.py",
+          "backend/app/channels/telegram.py",
+          "backend/app/channels/wechat.py",
+          "backend/app/channels/buzz.py",
+          "backend/tests/test_channels.py"
+        ]
+      },
+      "relations": {
+        "recall": 1.0,
+        "index": {
+          "files": 3969,
+          "updated": 0,
+          "reused": 3969,
+          "removed": 0,
+          "files_read": 42,
+          "bytes_read": 12286822,
+          "elapsed_ms": 7258.43,
+          "syntax_fallback_files": 33,
+          "skipped": 38,
+          "partial": false
+        },
+        "paths": [
+          "backend/app/channels/allowed_users.py",
+          "backend/app/channels/buzz.py",
+          "backend/app/channels/dingtalk.py",
+          "backend/app/channels/qq.py",
+          "backend/app/channels/slack.py",
+          "backend/app/channels/telegram.py",
+          "backend/app/channels/wechat.py",
+          "backend/tests/test_allowed_users.py"
+        ]
+      }
+    }
+  ]
+}

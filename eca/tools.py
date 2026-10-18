@@ -25,8 +25,9 @@ def schema(name, description, properties, required):
 STR = {"type": "string"}
 INT = {"type": "integer"}
 SCHEMAS = [
-    schema('code_search', 'Search a local incremental source index. Returns ranked files and matching lines. Prefer before broad repeated reads.', {'query': STR, 'limit': INT}, ['query']),
-    schema('repo_map', 'Get bounded file symbols and import summaries. Python uses AST; other languages use lexical hints. Optional search query.', {'query': STR, 'limit': INT}, []),
+    schema('code_search', 'Search an incremental source index. Optional path restricts results to a relative file/directory. Returns ranked files, lines and read statistics.', {'query': STR, 'limit': INT, 'path': STR}, ['query']),
+    schema('repo_map', 'Get bounded file symbols and import summaries. Python uses AST; other languages use lexical hints. Optional query and relative path.', {'query': STR, 'limit': INT, 'path': STR}, []),
+    schema('code_relations', 'Find definitions and Python call/import sites for one symbol, with test-file hints. Syntactic candidates only: same names may be unrelated, aliases/dynamic calls may be missed. Optional relative path.', {'query': STR, 'limit': INT, 'path': STR}, ['query']),
     schema("read", "Read a UTF-8 text file with 1-based lines. Read before editing.", {"path": STR, "offset": INT, "limit": INT}, ["path"]),
     schema("glob", "Find workspace files; ignores build/cache/secret directories.", {"pattern": STR}, ["pattern"]),
     schema("grep", "Search literal text in workspace files; optional filename glob.", {"query": STR, "include": STR}, ["query"]),
@@ -58,7 +59,7 @@ SCHEMAS = [
 
 
 def allowed(mode):
-    return {"read", "glob", "grep", "code_search", "repo_map", "todo", "ask", "delegate", "delegate_parallel", "lsp"} if mode == "plan" else (set() if mode == "chat" else {s["function"]["name"] for s in SCHEMAS})
+    return {"read", "glob", "grep", "code_search", "repo_map", "code_relations", "todo", "ask", "delegate", "delegate_parallel", "lsp"} if mode == "plan" else (set() if mode == "chat" else {s["function"]["name"] for s in SCHEMAS})
 
 
 def atomic_write(path, content):
@@ -236,17 +237,20 @@ class Tools:
                                        hashlib.sha256(rules.encode()).hexdigest()))
         return result
 
-    async def code_search(self, query, limit=10):
-        return await self._indexed(query, limit, False)
+    async def code_search(self, query, limit=10, path=''):
+        return await self._indexed(query, limit, False, path)
 
-    async def repo_map(self, query='', limit=20):
-        return await self._indexed(query, limit, True)
+    async def repo_map(self, query='', limit=20, path=''):
+        return await self._indexed(query, limit, True, path)
 
-    async def _indexed(self, query, limit, outline):
+    async def code_relations(self, query, limit=20, path=''):
+        return await self._indexed(query, limit, False, path, True)
+
+    async def _indexed(self, query, limit, outline, path='', related=False):
         from .code_index import CodeIndex, IndexCancelled
         from threading import Event
         cancelled = Event()
-        task = asyncio.create_task(asyncio.to_thread(CodeIndex(self, cancelled).query, query, limit, outline))
+        task = asyncio.create_task(asyncio.to_thread(CodeIndex(self, cancelled).query, query, limit, outline, path, related))
         try:
             return await asyncio.shield(task)
         except asyncio.CancelledError:

@@ -1,0 +1,30 @@
+{
+  "repository": "https://github.com/bytedance/deer-flow",
+  "revision": "34316550dffbe8fbaed5678a6be87c5d3c65155b",
+  "tasks": [
+    {
+      "symbol": "lookup_thread_id",
+      "expected": [
+        "backend/app/channels/connection_identity.py",
+        "backend/app/channels/feishu.py",
+        "backend/tests/blocking_io/test_channel_thread_binding_store.py"
+      ]
+    },
+    {
+      "symbol": "parse_channel_ids",
+      "expected": [
+        "backend/app/channels/allowed_users.py",
+        "backend/app/channels/discord.py",
+        "backend/tests/test_allowed_users.py"
+      ]
+    },
+    {
+      "symbol": "parse_allowed_users",
+      "expected": [
+        "backend/app/channels/allowed_users.py",
+        "backend/app/channels/dingtalk.py",
+        "backend/tests/test_allowed_users.py"
+      ]
+    }
+  ]
+}

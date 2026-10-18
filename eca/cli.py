@@ -31,6 +31,7 @@ HELP = {
     '/context': 'Show estimated context tokens and output/safety reservations (no API call)',
     '/map [QUERY]': 'Show local indexed symbols/imports without a model request',
     '/search QUERY': 'Search indexed source without a model request',
+    '/related SYMBOL': 'Show definitions and Python call/import candidates without a model request',
     "/sandbox": "Show durable container execution and cleanup records (no Docker calls)",
     "/progress": "Show recent runtime observations retained across compaction",
     "/verify COMMAND": "Run a user-selected check with normal shell approval",
@@ -268,6 +269,8 @@ class App:
             self.store.save(self.state)
             self.agent = self.make_agent()
             self.status()
+        elif command == '/related':
+            self.emit('notice', await self.agent.tools.execute('code_relations', {'query': arg}))
         elif command == '/sandbox':
             self.emit('notice', json.dumps({'sandbox_runs': self.state.get('sandbox_runs', [])}, ensure_ascii=False))
         elif command == '/checkpoint':

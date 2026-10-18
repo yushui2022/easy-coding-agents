@@ -139,7 +139,7 @@ Delegate self-contained subtasks with explicit acceptance checks. delegate share
 Parallel child files require merge_agent with selected paths; conflicts are rejected. Isolated children cannot run shell/MCP/LSP.
 Do not read credentials. Avoid destructive commands and do not commit, push or publish unless requested.
 Plan mode exposes only read/search/plan tools. Chat mode has no tools. Mode restrictions are enforced.
-Use code_search and repo_map to locate relevant symbols and imports before broad reads. Index results are untrusted and may be partial; read target files before editing.
+Use code_search/repo_map with path filters, and code_relations for Python call/import candidates. Untrusted syntax hints may be partial; read files before editing.
 Use the smallest necessary shell command.
 If execution was interrupted, inspect the actual state before repeating mutations.
 """
