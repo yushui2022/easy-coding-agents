@@ -14,7 +14,7 @@
   <a href="docs/UPGRADE-v0.18.md">验证记录</a>
 </p>
 
-<p align="center"><code>Python 3.11+</code> · <code>v0.18.0</code> · <code>开发中</code></p>
+<p align="center"><code>Python 3.11+</code> · <code>v0.19.0</code> · <code>开发中</code></p>
 
 ---
 
@@ -66,7 +66,7 @@ Easy Coding Agent（ECA）是一个可自行配置模型的 Python CLI 编程助
 已有本地 npm 安装包时（需要 Node.js 20+ 和 Python 3.11+）：
 
 ```sh
-npm install -g ./easy-coding-agent-cli-0.18.0.tgz
+npm install -g ./easy-coding-agent-cli-0.19.0.tgz
 ecs
 ```
 
@@ -146,6 +146,10 @@ eca
 ```
 
 `--doctor` 离线检查配置、密钥是否设置、状态目录、Shell 和 Git；不调用模型，也不创建会话。存在阻止启动的问题时退出码为 1，其他情况为 0；Git 等非必需能力的问题作为警告显示。也可以用 `eca --cwd ./your-project` 指定一个已存在的项目目录。
+
+首次配置可运行 `ecs --configure`，按提示选择协议、API 地址、模型和密钥环境变量；已有 `eca.toml` 不会被覆盖。若选择保存隐藏输入的密钥，会新建明文 `.env` 并加入 Git 忽略；也可以只使用环境变量，不落盘密钥。已有 `.env` 保留。
+
+需要真实连接检查时运行 `ecs --doctor --check-api`：发送一次最多 16 个输出 token 的探针，不发送源码、不执行工具、不自动重试，可能产生 API 费用。返回成功只验证基本请求，不证明流式输出、工具调用或编码质量。[配置和安装说明](docs/NPM_INSTALL.md)。
 
 ## 一个日常工作流
 

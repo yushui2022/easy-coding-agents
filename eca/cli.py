@@ -80,6 +80,8 @@ def parser():
     p.add_argument("--resume", nargs="?", const="latest", help="Resume session ID prefix, or latest")
     p.add_argument("--list-sessions", action="store_true")
     p.add_argument("--doctor", action="store_true", help="Check local configuration without an API request")
+    p.add_argument('--configure', action='store_true', help='Interactive first-run configuration; never overwrite existing eca.toml')
+    p.add_argument('--check-api', action='store_true', help='With --doctor, send one small API probe (may incur cost; no project content)')
     review = p.add_mutually_exclusive_group()
     review.add_argument("--changes", nargs="?", const="all", metavar="ID", help="Review saved file edits; defaults to latest session")
     review.add_argument("--undo", type=int, metavar="ID", help="Undo a recorded file edit without overwriting newer edits")
@@ -449,7 +451,7 @@ class App:
         self.console.print(Panel(f"[bold cyan]Easy Coding Agent[/]  {__version__}\nYour project. Your model. Your terminal.", border_style="cyan", expand=False))
         self.console.print(f"Project: {self.settings.root}\nModel: {self.settings.model}\n/help · Shift+Tab mode · Ctrl+J newline · Ctrl+C stop · /exit", markup=False)
         if not self.settings.api_key:
-            self.emit("notice", "No API key configured. See README or run eca --doctor.")
+            self.emit("notice", "No API key configured. Run ecs --configure for first-time setup, or ecs --doctor to diagnose existing configuration.")
         bindings = KeyBindings()
 
         @bindings.add("s-tab")
@@ -490,6 +492,25 @@ class App:
 
 
 async def async_main(args):
+    if args.check_api and not args.doctor:
+        raise ValueError('--check-api requires --doctor; it sends one API request and may incur cost')
+    if args.configure:
+        if any((args.prompt is not None, args.doctor, args.usage, args.list_sessions, args.resume,
+                args.json, args.changes is not None, args.undo is not None, args.accept_change is not None,
+                args.verify_command, args.worker_first, args.allow_shell, args.allow_lsp, args.allow_mcp,
+                args.model, args.base_url, args.api_format, args.model_profile, args.mode,
+                args.sandbox, args.sandbox_image, args.accept_edits, args.repair_attempts)):
+            raise ValueError('--configure only accepts --cwd; do not combine it with other actions or overrides')
+        import getpass
+        from .onboarding import configure
+        def read_secret(prompt):
+            if not sys.stdin.isatty():
+                raise ValueError('For piped setup, set the key environment variable first; hidden key entry requires a terminal')
+            return getpass.getpass(prompt)
+        configure(args.cwd, secret=read_secret)
+        return 0
+    if args.doctor and any((args.prompt is not None, args.resume, args.list_sessions)):
+        raise ValueError('--doctor cannot be combined with prompt, resume or session listing')
     if args.worker_first is not None and (not args.worker_first or args.prompt is None or not args.verify_command):
         raise ValueError('--worker-first requires a profile, -p and --verify-command')
     if args.verify_command and (args.prompt is None or not args.allow_shell or any(not c.strip() for c in args.verify_command)):
@@ -527,6 +548,15 @@ async def async_main(args):
     if args.doctor:
         report = diagnose(args.cwd, model_profile=args.model_profile, model=args.model, base_url=args.base_url, api_format=args.api_format, mode=args.mode,
                           permission="accept-edits" if args.accept_edits else None, sandbox=args.sandbox, sandbox_image=args.sandbox_image)
+        if args.check_api:
+            from .connectivity import check_api
+            if any(c['status'] == 'error' and c['name'] in {'configuration', 'project', 'api_key'} for c in report['checks']):
+                report['checks'].append({'name': 'api_connection', 'status': 'error', 'message': 'Fix local configuration before the API probe.', 'request_sent': False})
+            else:
+                settings = Settings.load(args.cwd, model_profile=args.model_profile, model=args.model, base_url=args.base_url, api_format=args.api_format)
+                report['checks'].append(await check_api(settings))
+                report['network_checked'] = True
+            report['ready'] = not any(c['status'] == 'error' for c in report['checks'])
         print(json.dumps(report, ensure_ascii=False, indent=None if args.json else 2))
         return 0 if report["ready"] else 1
     if review or args.list_sessions:

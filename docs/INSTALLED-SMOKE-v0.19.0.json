@@ -1,0 +1,20 @@
+{
+  "version": "ecs 0.19.0",
+  "configuration": "passed",
+  "offline_doctor": "passed",
+  "api_doctor": "passed",
+  "installed_streaming_task": "passed",
+  "session_listing": "passed",
+  "workspace_module_isolation": "passed",
+  "fixture_requests": [
+    {
+      "path": "/v1/chat/completions",
+      "stream": false
+    },
+    {
+      "path": "/v1/chat/completions",
+      "stream": true
+    }
+  ],
+  "paid_api_calls": 0
+}

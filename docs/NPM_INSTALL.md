@@ -9,10 +9,12 @@
 下载或构建本项目的安装包后：
 
 ```sh
-npm install -g ./easy-coding-agent-cli-0.18.0.tgz
+npm install -g ./easy-coding-agent-cli-0.19.0.tgz
 ecs --version
 ecs --setup
 cd your-project
+ecs --configure
+ecs --doctor
 ecs
 ```
 
@@ -25,7 +27,7 @@ Windows PowerShell 通常也可以输入大写 `ECS`；跨平台统一使用小�
 npm 默认全局目录可能在 C 盘。可显式安装到 G 盘：
 
 ```powershell
-npm install -g --prefix G:\DevTools\npm .\easy-coding-agent-cli-0.18.0.tgz --cache G:\DevCache\npm
+npm install -g --prefix G:\DevTools\npm .\easy-coding-agent-cli-0.19.0.tgz --cache G:\DevCache\npm
 G:\DevTools\npm\ecs.cmd --setup
 ```
 
@@ -41,6 +43,11 @@ G:\DevTools\npm\ecs.cmd --setup
 运行环境按版本和内置 wheel 摘要区分。新版本首次启动会创建新环境，旧环境不会自动删除。npm 卸载启动器也不会删除独立环境或项目 `.eca` 数据。
 
 ## 行为和诊断
+
+- `ecs --configure` 是项目配置向导，区别于创建 Python 环境的 `--setup`。只创建新的 `eca.toml`，不覆盖已有配置；取消不会写文件。
+- 默认配置一个 API。协议支持 OpenAI Chat、Responses 和 Anthropic Messages。密钥可通过环境变量提供；如果没有 `.env` 或对应环境变量，向导允许隐藏输入并新建 `.env`，会明确提示明文保存，并追加 `.env`/`.eca/` 的 Git 忽略规则。已有或被 Git 跟踪的 `.env` 不会被写入；不要把真实密钥作为命令行参数。
+- `ecs --doctor` 完全离线。`ecs --doctor --check-api` 显式发送一次小请求，可能产生费用；不附带项目内容，不跟随重定向，不重试，总耗时上限 25 秒、响应体上限 64 KiB。诊断不展示服务商错误原文或生成内容。返回的 token 用量仅供诊断，费用未知，不写入任务会话账本。
+- API 探针使用 16 个输出 token；某些模型有额外参数或最小预算要求，可能拒绝它。连接成功不代表工具调用/流式协议完整可用。环境变量仍优先于 `eca.toml`；向导保存后请用 doctor 核对实际模型和 endpoint。
 
 - npm 的 bin 映射创建终端命令，保留工作目录、参数和退出码；从当前项目读取配置和保存会话。
 - 原有模型配置、`--worker-first`、`--verify-command` 等功能全部透传。
