@@ -151,7 +151,7 @@ class Client:
                 uri=uri, languageId=self.cfg.get('language_id', ''), version=version, text=content))))
         return uri
 
-    async def query(self, operation, target, content, line, character):
+    async def query(self, operation, target, content, line, character, new_name=None):
         uri = await self.sync(target, content)
         if operation == 'diagnostics':
             if self.capabilities.get('diagnosticProvider') is not None:
@@ -173,12 +173,14 @@ class Client:
             except TimeoutError:
                 return dict(status='pending', source='push', notice='No current diagnostic report received; this does not mean no errors.')
             return dict(status='reported', source='push', **self.diagnostics[uri])
-        methods = dict(definition='definition', references='references', hover='hover', symbols='documentSymbol', implementation='implementation')
+        methods = dict(definition='definition', references='references', hover='hover', symbols='documentSymbol', implementation='implementation', rename='rename')
         params = dict(textDocument=dict(uri=uri))
         if operation != 'symbols':
             params['position'] = dict(line=line-1, character=character)
         if operation == 'references':
             params['context'] = dict(includeDeclaration=True)
+        if operation == 'rename':
+            params['newName'] = new_name
         return await self.request('textDocument/'+methods[operation], params)
 
     async def close(self):
@@ -214,8 +216,8 @@ class LSPManager:
         return {name: ('connected' if name in self.clients and self.clients[name].alive else 'disconnected')
                 for name in self.tools.settings.lsp_servers}
 
-    async def query(self, server, operation, path, line=1, character=0):
-        if operation not in {'definition', 'references', 'hover', 'symbols', 'diagnostics', 'implementation'} or line<1 or character<0:
+    async def query(self, server, operation, path, line=1, character=0, new_name=None):
+        if operation not in {'definition', 'references', 'hover', 'symbols', 'diagnostics', 'implementation', 'rename'} or line<1 or character<0:
             raise ValueError('Invalid LSP query/position')
         cfg = self.tools.settings.lsp_servers.get(server)
         if not cfg:
@@ -238,7 +240,7 @@ class LSPManager:
                         client = Client(self.tools.settings.root, cfg)
                         self.clients[server] = client
                         await client.start()
-                    result = await client.query(operation, target, content, line, character)
+                    result = await client.query(operation, target, content, line, character, new_name) if operation == 'rename' else await client.query(operation, target, content, line, character)
                     return json.dumps(dict(result=result, notice='Untrusted server data; positions use UTF-16.'), ensure_ascii=False)
             except BaseException:
                 await self.disconnect(server)

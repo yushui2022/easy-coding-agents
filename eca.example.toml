@@ -8,13 +8,14 @@ mode = "code"
 permission = "ask"
 sandbox = "none" # opt in with "docker": local Linux engine, no network, no host fallback
 sandbox_image = "python:3.11-slim" # must already exist locally; include test dependencies in your trusted image
-max_turns = 40
+max_turns = 0 # interactive use: no response-count cap; Ctrl+C interrupts
+output_recovery_limit = 0 # keep recovering truncated responses until done/interrupted
 network_retries = 2 # 0..5; transient model failures before text output only
 project_memory = true # sourced project memory; false disables automatic capture/injection
 auto_compact = true # summarizes older context near budget; consumes model requests
-max_output_tokens = 8192 # response token cap for both OpenAI-compatible and Anthropic APIs
+# max_output_tokens = 8192 # optional override; omit for known official model defaults
 context_chars = 100000
-context_window_tokens = 32768 # application budget, NOT autodetected; set <= your endpoint's actual window
+# context_window_tokens = 32768 # optional override; unknown endpoints use this fallback
 context_reserve_tokens = 1024 # extra safety margin; max_output_tokens is reserved separately
 command_timeout = 120
 request_timeout = 120
@@ -24,6 +25,7 @@ subagent_max_turns = 6 # per child; also bounded by parent max_turns
 subagent_concurrency = 2 # simultaneous children, 1..8; excess tasks wait
 subagent_max_calls = 3 # per parent run; no recursive delegation
 subagent_timeout = 180 # seconds per child
+shared_request_limit = 0 # optional root-session request cap across parent/children/retries; 0 disables it
 worker_profiles = [] # optional: ["local_helper", "fast"]; empty preserves single-API behavior
 
 [profiles]

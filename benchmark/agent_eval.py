@@ -94,6 +94,13 @@ async def run_case(name: str, root: Path, args: argparse.Namespace, key: str, pr
         subagent_max_turns=8, subagent_timeout=args.timeout, context_window_tokens=32768,
         context_chars=16000 if name == 'compact' else 100000,
         pricing={args.model: args.rates} if args.rates else {})
+    settings.shared_request_limit = getattr(args, 'shared_request_limit', 0)
+    worker = getattr(args, 'worker_model', None)
+    if worker:
+        settings.model_profiles = {'eval_worker': {'model': worker, 'base_url': args.worker_base_url,
+            'api_format': 'openai', 'api_key_env': args.worker_api_key_env,
+            'max_output_tokens': args.max_output_tokens}}
+        settings.worker_profiles = ['eval_worker']
     settings.validate()
     denied, questions, interrupted, fault = 0, 0, False, False
     events = []
@@ -139,7 +146,7 @@ async def run_case(name: str, root: Path, args: argparse.Namespace, key: str, pr
     started, error = time.monotonic(), None
     try:
         job = asyncio.create_task(verified_run(agent, CASES[name][1],
-            [TEST_COMMAND] if args.verify else [], args.repair_attempts))
+            [TEST_COMMAND] if args.verify else [], args.repair_attempts, worker_first='eval_worker' if worker else None))
         try:
             await asyncio.wait_for(job, args.timeout)
         except asyncio.CancelledError:
@@ -247,6 +254,11 @@ def report(root: Path, manifest: dict, results: list[dict]) -> None:
 
 
 async def main(args: argparse.Namespace, key: str) -> Path:
+    if getattr(args, 'worker_model', None):
+        if not args.verify or not os.environ.get(args.worker_api_key_env):
+            raise ValueError('Worker comparison requires --verify and a worker credential environment variable')
+        if any(name in {'compact', 'resume'} for name in args.cases):
+            raise ValueError('Worker-first comparison currently excludes compact/resume fixtures')
     if not key:
         raise ValueError('Missing API credential; set the selected environment variable')
     if not 1 <= args.repeats <= 10 or not 1 <= args.max_turns <= 60 or not 10 <= args.timeout <= 1800:
@@ -270,6 +282,7 @@ async def main(args: argparse.Namespace, key: str) -> Path:
                                   subagent_timeout=args.timeout, request_timeout=90, network_retries=1,
                                   reasoning_effort='', temperature='provider default',
                                   mode='code', sandbox='none', permission='accept-edits', concurrency=1),
+                    worker_model=getattr(args, 'worker_model', None), shared_request_limit=getattr(args, 'shared_request_limit', 0),
                     rates=args.rates, human_assistance_policy='none; fixed replies to clarification requests',
                     fixture_hashes={name: digest(json.dumps(CASES[name], ensure_ascii=False, sort_keys=True).encode()) for name in args.cases})
     write_json(root / 'manifest.json', manifest)
@@ -310,6 +323,10 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument('--timeout', type=int, default=360)
     p.add_argument('--rates', type=json.loads, help='Verified per-million rates; omit to keep costs unknown')
     p.add_argument('--verify', action='store_true', help='Run the explicit runtime verification workflow after each task')
+    p.add_argument('--worker-model', help='Use the existing worker-first/check/main-repair pipeline for comparison')
+    p.add_argument('--worker-base-url', default='https://api.deepseek.com/v1')
+    p.add_argument('--worker-api-key-env', default='DEEPSEEK_API_KEY')
+    p.add_argument('--shared-request-limit', type=int, default=0)
     p.add_argument('--repair-attempts', type=int, default=0, help='With --verify, permit 0..3 automatic repair rounds')
     return p
 

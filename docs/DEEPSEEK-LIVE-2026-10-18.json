@@ -1,0 +1,96 @@
+{
+  "date": "2026-10-18",
+  "version": "0.20.0",
+  "fixed_suites": [
+    {
+      "path": "output\\agent-eval\\run-20261018T133051Z-fdd3b4b3",
+      "summary": {
+        "planned": 28,
+        "completed": 28,
+        "passed": 26,
+        "incomplete": 0,
+        "requests": 242,
+        "first_verification_passes": 28,
+        "repair_rounds": 0,
+        "elapsed_seconds": 660.46,
+        "priced_subtotals": {},
+        "cost_complete": false
+      },
+      "median_seconds": 21.875
+    },
+    {
+      "path": "output\\agent-eval\\run-20261018T133258Z-3a352dca",
+      "summary": {
+        "planned": 6,
+        "completed": 6,
+        "passed": 6,
+        "incomplete": 0,
+        "requests": 44,
+        "first_verification_passes": 6,
+        "repair_rounds": 0,
+        "elapsed_seconds": 282.37,
+        "priced_subtotals": {},
+        "cost_complete": false
+      },
+      "median_seconds": 49.78
+    },
+    {
+      "path": "output\\agent-eval\\run-20261018T133743Z-2c5f2ffd",
+      "summary": {
+        "planned": 6,
+        "completed": 6,
+        "passed": 6,
+        "incomplete": 0,
+        "requests": 33,
+        "first_verification_passes": 6,
+        "repair_rounds": 0,
+        "elapsed_seconds": 110.85,
+        "priced_subtotals": {},
+        "cost_complete": false
+      },
+      "median_seconds": 18.445
+    }
+  ],
+  "repository": {
+    "path": "output/repository-eval/run-20261018T133840Z-5257a974",
+    "passed": true,
+    "elapsed_seconds": 111.19,
+    "requests": 13,
+    "source_files": 4012,
+    "limits": {
+      "turns": 30,
+      "seconds": 600,
+      "repair_attempts": 1,
+      "output_limit": 120000,
+      "context_chars": 600000,
+      "context_window_tokens": 262144
+    }
+  },
+  "requests": 332,
+  "tokens": {
+    "input": 405152,
+    "cache_read": 1285376,
+    "output": 118121
+  },
+  "total_reported_tokens": 1808649,
+  "cost": "unknown; no verified price snapshot",
+  "strict_failures": [
+    {
+      "trial": "compact-01",
+      "checks": [
+        "original_tests_preserved"
+      ]
+    },
+    {
+      "trial": "config-02",
+      "checks": [
+        "original_tests_preserved"
+      ]
+    }
+  ],
+  "source_unchanged": [
+    true,
+    true,
+    true
+  ]
+}

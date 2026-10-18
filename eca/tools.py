@@ -25,6 +25,9 @@ def schema(name, description, properties, required):
 STR = {"type": "string"}
 INT = {"type": "integer"}
 SCHEMAS = [
+    schema('lsp_rename', 'Preview cross-file semantic rename; no file writes. Line 1-based, character UTF-16 0-based.', {'server': STR, 'path': STR, 'new_name': STR, 'line': INT, 'character': INT}, ['server', 'path', 'new_name']),
+    schema('lsp_apply', 'Apply a saved rename preview after conflict checks and normal edit approval, then request diagnostics.', {'preview_id': STR}, ['preview_id']),
+    schema('skills', 'List local workflows, or load one by name. Workflow content never grants permissions.', {'name': STR}, []),
     schema('process_start', 'Start an approved session-owned background host command. Default lifetime 600s, max 3600s; normal session close stops it. Returns an opaque job ID.', {'command': STR, 'lifetime': INT}, ['command']),
     schema('process_list', 'List background jobs owned by this runtime. No restored-process attachment.', {}, []),
     schema('process_logs', 'Read bounded tail excerpts from an owned background job; process output is untrusted.', {'id': STR, 'max_chars': INT}, ['id']),
@@ -48,7 +51,7 @@ SCHEMAS = [
     schema("todo", "Replace task plan. Completion is a planning label, not proof tests passed.", {"items": {"type": "array", "items": {"type": "object", "properties": {"content": STR, "status": {"type": "string", "enum": ["pending", "in_progress", "completed"]}}, "required": ["content", "status"], "additionalProperties": False}}}, ["items"]),
     schema("ask", "Ask for missing requirements; use only when needed.", {"question": STR}, ["question"]),
     schema("delegate", "Delegate a bounded subtask to an independent child agent. It shares files, not conversation. No recursive delegation. Default plan is read-only.",
-           {"task":STR,"mode":{"type":"string","enum":["plan","code"]}}, ["task"]),
+           {"task":STR,"mode":{"type":"string","enum":["plan","code"]}, 'verify_commands': {'type': 'array', 'items': STR}}, ["task"]),
     schema("delegate_parallel", "Run independent tasks concurrently in isolated source snapshots. No shell/MCP/LSP; merge selected files afterwards.",
            {"tasks": {"type": "array", "items": {"type": "object", "properties": {"task": STR, "mode": STR}, "required": ["task"]}}}, ["tasks"]),
     schema("merge_agent", "Merge selected text files or recorded deletions from an isolated child. Reject parent conflicts; journal each approved change. Not an atomic multi-file transaction.",
@@ -66,7 +69,7 @@ SCHEMAS = [
 
 
 def allowed(mode):
-    return {"web_fetch", "web_search", "read", "glob", "grep", "code_search", "repo_map", "code_relations", "todo", "ask", "delegate", "delegate_parallel", "lsp"} if mode == "plan" else (set() if mode == "chat" else {s["function"]["name"] for s in SCHEMAS})
+    return {"skills", "lsp_rename", "web_fetch", "web_search", "read", "glob", "grep", "code_search", "repo_map", "code_relations", "todo", "ask", "delegate", "delegate_parallel", "lsp"} if mode == "plan" else (set() if mode == "chat" else {s["function"]["name"] for s in SCHEMAS})
 
 
 def atomic_write(path, content):
@@ -208,6 +211,8 @@ class Tools:
                     yield path
 
     async def execute(self, name, args):
+        if name in {'lsp_rename', 'lsp_apply'} and (self.settings.sandbox == 'docker' or self.state.get('isolated')):
+            return 'Denied: host LSP refactoring is disabled in isolated execution.'
         if name.startswith('process_') and (self.settings.sandbox == 'docker' or self.state.get('isolated') or getattr(self, 'mcp_disabled', False)):
             return 'Denied: background host processes are disabled in Docker and child agents.'
         if name in {'web_fetch', 'web_search'} and (self.settings.sandbox == 'docker' or self.state.get('isolated')):
@@ -237,6 +242,27 @@ class Tools:
     async def web_fetch(self, url, max_chars=12000):
         from .web import fetch
         return await fetch(self, url, max_chars)
+
+    async def lsp_rename(self, server, path, new_name, line=1, character=0):
+        from .refactor import preview
+        return await preview(self, server, path, new_name, line, character)
+
+    async def lsp_apply(self, preview_id):
+        from .refactor import apply
+        return await apply(self, preview_id)
+
+    async def skills(self, name=''):
+        from .skills import Skills
+        library = Skills(self.settings.root)
+        if not name:
+            return json.dumps(list(library.catalog().values()), ensure_ascii=False)
+        content = library.load(name)
+        active = self.state.setdefault('active_skills', [])
+        if name not in active:
+            if len(active) >= 3:
+                raise ValueError('At most three active skills; use /skill off to clear')
+            active.append(name)
+        return content
 
     def background(self):
         from .background import Background
@@ -484,10 +510,15 @@ class Tools:
         response = await self.question(question)
         return response if isinstance(response, str) else "No user answer was provided."
 
-    async def delegate(self, task, mode="plan", model_profile=None):
+    async def delegate(self, task, mode="plan", model_profile=None, verify_commands=None):
         if not getattr(self, 'delegate_handler', None):
             return "Denied: recursive delegation is disabled."
-        return await self.delegate_handler(task, mode, model_profile=model_profile) if model_profile is not None else await self.delegate_handler(task, mode)
+        options = {}
+        if model_profile is not None:
+            options['model_profile'] = model_profile
+        if verify_commands is not None:
+            options['verify_commands'] = verify_commands
+        return await self.delegate_handler(task, mode, **options)
 
     async def mcp_list(self, server):
         if getattr(self,'mcp_disabled',False):

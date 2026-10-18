@@ -115,7 +115,7 @@ async def parallel(agent, tasks):
 
     async def run(task, state, config):
         settings = replace(config, mode=state['mode'], max_turns=min(
-            agent.settings.max_turns, agent.settings.subagent_max_turns))
+            agent.settings.max_turns or agent.settings.subagent_max_turns, agent.settings.subagent_max_turns))
         def emit(event, data):
             if event != 'text':
                 agent.emit('subagent_progress', dict(session=state['id'], event=event, data=data))
@@ -125,6 +125,7 @@ async def parallel(agent, tasks):
         try:
             async with semaphore:
                 child = Agent(settings, agent.store, state, child_approve, question, emit, child=True)
+                child.budget = agent.budget
                 emit('status', 'running')
                 await asyncio.wait_for(child.run(task['task']), agent.settings.subagent_timeout)
         except TimeoutError:

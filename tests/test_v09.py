@@ -44,6 +44,7 @@ class UpgradeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Split remaining edits', str(self.provider.contexts[-1]))
 
     async def test_recovery_bounded_and_disconnection_not_retried(self):
+        self.settings.output_recovery_limit = 2
         self.provider.responses = iter([OutputLimitError()] * 4)
         with self.assertRaises(OutputLimitError):
             await self.agent.run('implement')

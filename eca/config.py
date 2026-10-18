@@ -21,7 +21,8 @@ class Settings:
     project_memory: bool = True
     mode: str = "code"
     permission: str = "ask"
-    max_turns: int = 40
+    max_turns: int = 0
+    output_recovery_limit: int = 0
     context_chars: int = 100_000
     context_window_tokens: int = 32768
     context_reserve_tokens: int = 1024
@@ -33,6 +34,7 @@ class Settings:
     subagent_max_calls: int = 3
     subagent_timeout: int = 180
     subagent_concurrency: int = 2
+    shared_request_limit: int = 0
     mcp_servers: dict = field(default_factory=dict, repr=False)
     pricing: dict = field(default_factory=dict)
     lsp_servers: dict = field(default_factory=dict)
@@ -81,7 +83,7 @@ class Settings:
         for name in ("sandbox", "sandbox_image", "reasoning_effort", "mode", "permission", "max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "network_retries", "auto_compact", "project_memory", "stream_usage", "subagent_max_turns", "subagent_max_calls", "subagent_timeout", "subagent_concurrency", "worker_profiles"):
             if name in cfg:
                 values[name] = cfg[name]
-        for name in ('context_window_tokens', 'context_reserve_tokens'):
+        for name in ('context_window_tokens', 'context_reserve_tokens', 'shared_request_limit', 'output_recovery_limit'):
             if name in cfg:
                 values[name] = cfg[name]
         selected = model_profile if model_profile is not None else cfg.get('model_profile', '')
@@ -95,6 +97,14 @@ class Settings:
         values.update({k: v for k, v in overrides.items() if v is not None})
         if any(overrides.get(k) is not None for k in ('model', 'base_url', 'api_format')):
             values['model_profile'] = ''
+        from .model_limits import apply_defaults
+        explicit = set(values['model_profiles'][selected]) if selected else set(cfg)
+        explicit |= {k for k, v in overrides.items() if v is not None}
+        if selected and any(overrides.get(k) is not None for k in ('model', 'base_url', 'api_format')):
+            for name in ('context_window_tokens', 'max_output_tokens'):
+                if name not in explicit:
+                    values[name] = getattr(cls, name)
+        apply_defaults(values, explicit)
         settings = cls(**values)
         settings.validate()
         return settings
@@ -104,6 +114,11 @@ class Settings:
         return select(self, name)
 
     def validate(self):
+        for name in ('max_turns', 'output_recovery_limit'):
+            if type(getattr(self, name)) is not int or getattr(self, name) < 0:
+                raise ValueError(f'{name} must be a nonnegative integer (0 means unlimited)')
+        if type(self.shared_request_limit) is not int or not 0 <= self.shared_request_limit <= 10000:
+            raise ValueError('shared_request_limit must be 0..10000 (0 disables the cap)')
         import re
         from .web import validate
         validate(self.web)
@@ -143,7 +158,7 @@ class Settings:
             raise ValueError("mode must be code, plan or chat")
         if self.permission not in {"ask", "accept-edits"}:
             raise ValueError("permission must be ask or accept-edits")
-        for name in ("max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "subagent_max_turns", "subagent_max_calls", "subagent_timeout", "subagent_concurrency"):
+        for name in ("context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "subagent_max_turns", "subagent_max_calls", "subagent_timeout", "subagent_concurrency"):
             value = getattr(self, name)
             if type(value) is not int or value <= 0:
                 raise ValueError(f"{name} must be a positive integer")

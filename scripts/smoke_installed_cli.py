@@ -73,9 +73,13 @@ def main():
         assert 'READY' in response and len(calls) == 2
         sessions = json.loads(run('--list-sessions', '--json'))
         assert len(sessions) == 1
+        resumed = run('--resume', 'latest', '-p', 'Continue and say READY.', '--json')
+        assert 'READY' in resumed and len(calls) == 3
+        assert len(json.loads(run('--list-sessions', '--json'))) == 1
         report = {'version': version, 'configuration': 'passed', 'offline_doctor': 'passed',
                   'api_doctor': 'passed', 'installed_streaming_task': 'passed', 'session_listing': 'passed',
                   'workspace_module_isolation': 'passed', 'fixture_requests': calls, 'paid_api_calls': 0}
+        report['installed_session_resume'] = 'passed'
         (root.parent/'installed-smoke.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
         print(json.dumps(report))
     finally:

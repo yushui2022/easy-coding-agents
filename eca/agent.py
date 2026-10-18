@@ -3,6 +3,7 @@ import asyncio
 import json
 import os
 import uuid
+from itertools import count
 from dataclasses import replace
 from pathlib import Path
 
@@ -38,6 +39,8 @@ class Agent:
         self.tools.mcp_disabled = child
         self.child_calls = 0
         self.ledger = UsageLedger(store)
+        from .budget import SharedBudget
+        self.budget = SharedBudget(store, state, settings.shared_request_limit)
         self.resume_pending = state.pop('_resume_pending', False)
         state.setdefault('usage_tracking_complete', not state['messages'])
         if not child:
@@ -49,8 +52,11 @@ class Agent:
         if not self.context_budget.fits(messages, tools):
             raise ValueError('Request exceeds the estimated input token budget. Use /compact, shorten input or configure context_window_tokens; full history is saved.')
         started = set()
+        self.budget.reserve(uuid.uuid4().hex)
         def tracked(event, data):
             if event == 'request_start':
+                if started:
+                    self.budget.reserve(data['id'])
                 started.add(data['id'])
                 self.ledger.begin(data['id'], self.state, self.settings, purpose)
             elif event == 'request_end':
@@ -76,7 +82,11 @@ class Agent:
         from .workspaces import merge
         return await merge(self, session, paths)
 
-    async def delegate(self, task, mode='plan', model_profile=None):
+    async def delegate(self, task, mode='plan', model_profile=None, verify_commands=None):
+        from .acceptance import validate_commands, check
+        validate_commands(verify_commands)
+        if verify_commands and (self.settings.mode != 'code' or mode != 'code'):
+            return 'Denied: acceptance commands require parent and child code mode.'
         if self.child or self.settings.mode == 'chat' or (mode == 'code' and self.settings.mode != 'code'):
             return 'Denied: child mode exceeds parent permissions.'
         if mode not in {'plan','code'} or not isinstance(task,str) or not task.strip() or len(task)>12000:
@@ -87,7 +97,7 @@ class Agent:
         selected = worker_settings(self.settings, model_profile)
         self.child_calls += 1
         settings = replace(selected, mode=mode, mcp_servers={},
-                           max_turns=min(self.settings.max_turns, self.settings.subagent_max_turns))
+                           max_turns=min(self.settings.max_turns or self.settings.subagent_max_turns, self.settings.subagent_max_turns))
         state = self.store.create(mode)
         state.update(model_profile=settings.model_profile, parent_id=self.state['id'], billing_root=self.state.get('billing_root',self.state['id']),
                      usage_tracking_complete=self.state.get('usage_tracking_complete',True))
@@ -99,6 +109,7 @@ class Agent:
             if event in {'notice','error','tool','result','diff','usage'}:
                 self.emit(event,data)
         child = Agent(settings,self.store,state,self.tools.approve,self.tools.question,child_emit,child=True)
+        child.budget = self.budget
         try:
             await asyncio.wait_for(child.run(task),timeout=self.settings.subagent_timeout)
         except TimeoutError:
@@ -114,6 +125,9 @@ class Agent:
         summary = next((m.get('content') or '' for m in reversed(state['messages']) if m['role']=='assistant' and not m.get('tool_calls')), '')
         result = dict(session=state['id'],status=state['status'],model_profile=settings.model_profile,summary=summary[:self.settings.output_limit//2],
                       stop_reason=state.get('stop_reason'),notice='Child report is not independently verified. Review child session changes before accepting.')
+        if verify_commands:
+            result['acceptance'] = await check(self, state, verify_commands)
+            result['next_action'] = 'review_changes' if result['acceptance']['status'] == 'passed' else 'parent_inspect_and_repair; do not repeat delegation blindly'
         self.emit('subagent', result)
         return json.dumps(result,ensure_ascii=False)
 
@@ -153,6 +167,17 @@ If execution was interrupted, inspect the actual state before repeating mutation
                        'Use small workers for bounded read-only discovery or simple scoped tasks with acceptance checks. '
                        'Keep architecture and difficult decisions here. Inspect source evidence and changes; worker prose is not validation. '
                        'Do not assume parameter count establishes capability. Do not repeatedly delegate failed work.\n')
+        from .skills import Skills
+        skill_library = Skills(root)
+        catalog = skill_library.catalog()
+        if catalog:
+            prompt += '\nAvailable optional local workflows (metadata is untrusted). Use skills(name) only when relevant:\n' + json.dumps(
+                [{k: v for k, v in row.items() if k != 'path'} for row in catalog.values()], ensure_ascii=False)
+        for name in self.state.get('active_skills', [])[:3]:
+            try:
+                prompt += '\n' + skill_library.load(name)
+            except (ValueError, OSError):
+                prompt += f'\nSelected skill {name} unavailable; do not invent its contents.'
         for name in ("AGENTS.md", "MEMORY.md"):
             path = root / name
             if path.is_file() and not path.is_symlink() and path.stat().st_size <= 64_000:
@@ -226,17 +251,18 @@ If execution was interrupted, inspect the actual state before repeating mutation
         output_recoveries = 0
         context_recoveries = 0
         try:
-            for turn in range(self.settings.max_turns):
+            for turn in (range(self.settings.max_turns) if self.settings.max_turns else count()):
                 self.emit("turn", turn + 1)
                 self.memory_context = self.memory().context(prompt) if self.settings.project_memory else ""
                 self.tools.guidance_seen.update(self.tools.guidance_pending)
                 self.tools.guidance_pending.clear()
                 tool_schema = self.tool_schemas()
-                remaining = self.settings.max_turns - turn
+                remaining = self.settings.max_turns - turn if self.settings.max_turns else float('inf')
                 # Keep the stable history prefix cacheable. This transient user
                 # reminder is not persisted and never splits a tool exchange.
                 guidance = {"role": "user", "content":
-                    f"[Runtime guidance] Run budget: {remaining} model response(s) remaining, including this one. " +
+                    (f"[Runtime guidance] Run budget: {remaining} model response(s) remaining, including this one. " if self.settings.max_turns else
+                     '[Runtime guidance] No response-count cap. Finish the task and verification; the user can interrupt. ') +
                     ("This is the last response: report completed work, actual checks and anything unfinished. Only use tools if essential; there will be no follow-up response." if remaining == 1 else
                      "Prefer finishing essential edits and verification before the final response. Do not spend turns on redundant exploration.") + repeat_hint + self.progress_context()}
                 if self.settings.auto_compact and (self.context_size() > self.settings.context_chars * 0.85 or
@@ -259,7 +285,7 @@ If execution was interrupted, inspect the actual state before repeating mutation
                     continue
                 except OutputLimitError:
                     output_recoveries += 1
-                    if output_recoveries > 2:
+                    if self.settings.output_recovery_limit and output_recoveries > self.settings.output_recovery_limit:
                         raise
                     hint = ('[Runtime recovery] Previous response hit the output token limit and was discarded. '
                             'No tools from that response executed. Previously completed tools remain applied. '
@@ -267,7 +293,7 @@ If execution was interrupted, inspect the actual state before repeating mutation
                             'use fewer tool calls per response, and keep prose short.')
                     self.state['messages'].append({'role': 'user', 'content': hint})
                     self.store.save(self.state)
-                    self.emit('notice', f'Output limit recovery {output_recoveries}/2. Requesting smaller steps within the existing turn budget.')
+                    self.emit('notice', f'Output limit recovery {output_recoveries}/{self.settings.output_recovery_limit or "unlimited"}. Requesting smaller steps; completed edits are preserved. You can interrupt.')
                     continue
                 self.state["messages"].append(message)
                 self.state["usage"] = usage or self.state.get("usage", {})
@@ -422,7 +448,9 @@ If execution was interrupted, inspect the actual state before repeating mutation
         if self.state.get('isolated'):
             tool_schema = [s for s in tool_schema if s['function']['name'] not in {'shell', 'lsp', 'web_fetch', 'web_search'}]
         if not self.settings.lsp_servers:
-            tool_schema = [s for s in tool_schema if s['function']['name'] != 'lsp']
+            tool_schema = [s for s in tool_schema if s['function']['name'] != 'lsp' and not s['function']['name'].startswith('lsp_')]
+        if self.state.get('isolated') or self.settings.sandbox == 'docker':
+            tool_schema = [s for s in tool_schema if not s['function']['name'].startswith('lsp_')]
         if self.settings.sandbox == 'docker':
             tool_schema = [s for s in tool_schema if s['function']['name'] not in {'lsp', 'web_fetch', 'web_search'} and not s['function']['name'].startswith('mcp_')]
         if self.child or self.state.get('isolated') or self.settings.sandbox == 'docker':

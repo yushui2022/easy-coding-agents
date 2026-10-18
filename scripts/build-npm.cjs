@@ -9,6 +9,7 @@ const root = path.resolve(__dirname, '..');
 const vendor = path.join(root, 'vendor');
 const pyproject = fs.readFileSync(path.join(root, 'pyproject.toml'), 'utf8');
 if (!pyproject.includes(`version = "${pkg.version}"`)) throw new Error('npm/Python versions differ');
+if (!fs.readFileSync(path.join(root, 'eca', '__init__.py'), 'utf8').includes(`__version__ = "${pkg.version}"`)) throw new Error('Runtime/package versions differ');
 fs.mkdirSync(vendor, {recursive:true});
 const py = findPython();
 const result = spawnSync(py.command, [...py.prefix, '-I', '-m', 'pip', 'wheel', root, '--no-deps', '--no-build-isolation', '--wheel-dir', vendor], {stdio:'inherit', windowsHide:true});

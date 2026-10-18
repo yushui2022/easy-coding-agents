@@ -232,7 +232,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(Settings.load(self.root).model, "environment")
             self.assertEqual(Settings.load(self.root, model="flag").model, "flag")
         with self.assertRaises(ValueError):
-            Settings.load(self.root, max_turns=0)
+            Settings.load(self.root, max_turns=-1)
 
 
 class ProviderTests(unittest.IsolatedAsyncioTestCase):

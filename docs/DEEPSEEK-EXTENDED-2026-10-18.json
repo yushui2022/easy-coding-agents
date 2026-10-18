@@ -1,0 +1,137 @@
+{
+  "date": "2026-10-18",
+  "version": "0.20.0",
+  "additional_trials": 38,
+  "passed": 36,
+  "requests": 364,
+  "reported_tokens": {
+    "input": 480684,
+    "cache_read": 1248896,
+    "output": 239130
+  },
+  "reported_token_sum": 1968710,
+  "cost": "unknown",
+  "groups": [
+    {
+      "path": "output\\agent-eval\\run-20261018T134608Z-a527ccec",
+      "model": "deepseek-flash",
+      "worker_model": null,
+      "max_output_tokens": 4096,
+      "summary": {
+        "planned": 24,
+        "completed": 24,
+        "passed": 24,
+        "incomplete": 0,
+        "requests": 241,
+        "first_verification_passes": 24,
+        "repair_rounds": 0,
+        "elapsed_seconds": 703.67,
+        "priced_subtotals": {},
+        "cost_complete": false
+      },
+      "median_seconds": 27.155,
+      "max_seconds": 60.59,
+      "denied_actions": 3,
+      "handoffs": 0,
+      "source_unchanged": true
+    },
+    {
+      "path": "output\\agent-eval\\run-20261018T134617Z-183c590f",
+      "model": "deepseek-v4-pro",
+      "worker_model": null,
+      "max_output_tokens": 4096,
+      "summary": {
+        "planned": 6,
+        "completed": 6,
+        "passed": 5,
+        "incomplete": 0,
+        "requests": 50,
+        "first_verification_passes": 5,
+        "repair_rounds": 0,
+        "elapsed_seconds": 519.97,
+        "priced_subtotals": {},
+        "cost_complete": false
+      },
+      "median_seconds": 83.265,
+      "max_seconds": 120.83,
+      "denied_actions": 1,
+      "handoffs": 0,
+      "source_unchanged": true
+    },
+    {
+      "path": "output\\agent-eval\\run-20261018T135459Z-aca85570",
+      "model": "deepseek-v4-pro",
+      "worker_model": "deepseek-flash",
+      "max_output_tokens": 4096,
+      "summary": {
+        "planned": 6,
+        "completed": 6,
+        "passed": 5,
+        "incomplete": 0,
+        "requests": 49,
+        "first_verification_passes": 5,
+        "repair_rounds": 0,
+        "elapsed_seconds": 397.0,
+        "priced_subtotals": {},
+        "cost_complete": false
+      },
+      "median_seconds": 38.035,
+      "max_seconds": 224.12,
+      "denied_actions": 3,
+      "handoffs": 1,
+      "source_unchanged": true
+    },
+    {
+      "path": "output\\agent-eval\\run-20261018T135206Z-8df83e75",
+      "model": "deepseek-v4-pro",
+      "worker_model": null,
+      "max_output_tokens": 8192,
+      "summary": {
+        "planned": 2,
+        "completed": 2,
+        "passed": 2,
+        "incomplete": 0,
+        "requests": 24,
+        "first_verification_passes": 2,
+        "repair_rounds": 0,
+        "elapsed_seconds": 350.78,
+        "priced_subtotals": {},
+        "cost_complete": false
+      },
+      "median_seconds": 175.39,
+      "max_seconds": 202.76,
+      "denied_actions": 0,
+      "handoffs": 0,
+      "source_unchanged": true
+    }
+  ],
+  "failures": [
+    {
+      "path": "output\\agent-eval\\run-20261018T134617Z-183c590f\\shop_migration-02.json",
+      "error_type": "OutputLimitError",
+      "failed_checks": [
+        "external_assertions",
+        "agent_finished",
+        "agent_ran_nonempty_tests",
+        "verification_suite_passed"
+      ],
+      "handoff": null
+    },
+    {
+      "path": "output\\agent-eval\\run-20261018T135459Z-aca85570\\shop_migration-01.json",
+      "error_type": "OutputLimitError",
+      "failed_checks": [
+        "unittest_exit_zero",
+        "agent_finished",
+        "agent_ran_nonempty_tests",
+        "verification_suite_passed"
+      ],
+      "handoff": {
+        "model": "deepseek-v4-pro",
+        "attempt": 1,
+        "reason": "repairable_check_failure"
+      }
+    }
+  ],
+  "notice": "Reported tokens are incomplete for some failed requests; not a billing total. Supplementary 8192-token retests do not replace original failures."
+}

@@ -19,7 +19,10 @@ def validate_profiles(profiles, root):
             raise ValueError('Model profiles require model, base_url, api_format, api_key_env; unknown options rejected')
         if not isinstance(cfg['api_key_env'], str) or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', cfg['api_key_env']):
             raise ValueError('Model profile api_key_env must name an environment variable')
-        Settings(root=root, **{k:v for k,v in cfg.items() if k != 'api_key_env'}).validate()
+        from .model_limits import apply_defaults
+        values = {k:v for k,v in cfg.items() if k != 'api_key_env'}
+        apply_defaults(values, set(cfg))
+        Settings(root=root, **values).validate()
 
 
 def select(settings, name):
@@ -35,6 +38,11 @@ def select(settings, name):
                           ('context_window_tokens', 32768), ('context_reserve_tokens', 1024)]:
         if name not in cfg:
             setattr(result, name, default)
+    from .model_limits import apply_defaults
+    limits = {k: getattr(result, k) for k in ('model', 'base_url', 'context_window_tokens', 'max_output_tokens')}
+    apply_defaults(limits, set(cfg))
+    result.max_output_tokens = limits['max_output_tokens']
+    result.context_window_tokens = limits['context_window_tokens']
     result.validate()
     return result
 

@@ -4,6 +4,8 @@
 
 <h1 align="center">Easy Coding Agent</h1>
 
+主 Agent 默认不限响应轮数和输出截断恢复次数，可用 Ctrl+C 中断。旧配置中的显式上限仍有效，可运行 `ecs --max-turns 0 --output-recovery-limit 0` 取消这两项限制。模型单次输出上限、子 Agent 限额和共享预算的区别见 [输出与持续执行配置](docs/OUTPUT_LIMITS.md)。
+
 <p align="center"><strong>你的项目，你的模型，你的终端。</strong></p>
 <p align="center">在终端里理解代码、执行修改，并检查每一步留下的结果。</p>
 
@@ -14,7 +16,7 @@
   <a href="docs/UPGRADE-v0.18.md">验证记录</a>
 </p>
 
-<p align="center"><code>Python 3.11+</code> · <code>v0.19.0</code> · <code>开发中</code></p>
+<p align="center"><code>Python 3.11+</code> · <code>v0.20.0</code> · <code>开发中</code></p>
 
 ---
 
@@ -37,6 +39,9 @@ Easy Coding Agent（ECA）是一个可自行配置模型的 Python CLI 编程助
 | 能力 | 实际行为 |
 | --- | --- |
 | **终端编码** | 流式输出；读取、搜索、编辑文件；执行需要确认的 Shell 命令。 |
+| **本地 Skills（源码新增）** | 项目/用户 SKILL.md，`/skills`、`/skill` 显式调用；技能不绕过授权。[说明](docs/SKILLS_REFACTOR_COLLABORATION.md)。 |
+| **LSP 重命名（源码新增）** | 跨文件预览、冲突检查、审批和修改后诊断；逐文件记录撤销。[边界](docs/SKILLS_REFACTOR_COLLABORATION.md)。 |
+| **协作验收与额度（源码新增）** | 主子 Agent 共享请求次数上限，子任务可指定验收命令，提供单模型/Worker-first 对照评测入口。[配置](docs/SKILLS_REFACTOR_COLLABORATION.md)。 |
 | **后台服务（源码新增）** | `/run` 启动服务，`/jobs` 查看状态，`/logs` 读取日志，`/stop` 停止；有并发、日志和存活时间上限，正常会话关闭时清理。[用法与边界](docs/BACKGROUND_PROCESSES.md)。 |
 | **联网查资料（源码新增）** | `web_fetch` 授权读取公共 HTTPS 网页；`web_search` 可选接入 Brave Search。提供来源、正文限制和不可信数据标记。[配置说明](docs/WEB_TOOLS.md)。 |
 | **浏览器接入示例** | 通过现有 MCP 桥接配置 Playwright，使用页面结构进行操作；本轮未做真实浏览器验收，图片结果尚不传给模型。[边界与示例](docs/WEB_TOOLS.md#浏览器playwright-mcp-配置示例)。 |
@@ -46,7 +51,7 @@ Easy Coding Agent（ECA）是一个可自行配置模型的 Python CLI 编程助
 | **会话恢复** | 持久化任务检查点；继续前核对已读写文件、过期验证与不确定操作。`/checkpoint` 查看证据，恢复检查不执行命令。 |
 | **上下文超限恢复** | 对明确的供应商上下文超限拒绝，缩小会话预算、压缩历史后最多恢复一次；普通错误和已输出文本的错误不走此路径。 |
 | **长任务上下文** | 按 token 估算与字符双预算压缩，计入工具定义并预留输出空间；保留完整历史与最近的完整工具调用组。`/context` 查看本地估算。 |
-| **进度与截断恢复** | 最近 12 项文件/命令观察跨摘要保留；确认输出达到上限后最多恢复两次，提示拆分操作。 |
+| **进度与截断恢复** | 最近 12 项文件/命令观察跨摘要保留；输出截断后提示拆分操作，默认不限恢复次数，可配置上限或手动中断。 |
 | **显式验收** | 指定任务后的验证命令；检查失败返回退出码 3，文件快照改变后结果标为过期。 |
 | **修复与复验** | 最多 10 项顺序检查；显式开启最多 3 轮修复，修复后复验整组，保存各轮结果。 |
 | **可选执行隔离** | 实验性 Docker 后端：禁网、受限资源、只读源码副本、命令写入丢弃；后端缺失拒绝执行。 |
@@ -69,7 +74,7 @@ Easy Coding Agent（ECA）是一个可自行配置模型的 Python CLI 编程助
 已有本地 npm 安装包时（需要 Node.js 20+ 和 Python 3.11+）：
 
 ```sh
-npm install -g ./easy-coding-agent-cli-0.19.0.tgz
+npm install -g ./easy-coding-agent-cli-0.20.0.tgz
 ecs
 ```
 

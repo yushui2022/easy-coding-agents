@@ -27,6 +27,9 @@ from .usage import UsageLedger
 
 
 HELP = {
+    '/skills': 'List project/user workflows',
+    '/skill NAME|off': 'Load a workflow or clear selected workflows',
+    '/budget': 'Show the shared session model request cap',
     '/run COMMAND': 'Start an approved background command (600-second lifetime)',
     '/jobs': 'List background processes owned by this runtime',
     '/logs ID': 'Read recent background process output',
@@ -69,6 +72,10 @@ def parser():
     p.add_argument("--verify-command", action='append', default=[], help="Run a check after the task; repeat for up to 10 checks; requires --allow-shell")
     p.add_argument('--repair-attempts', type=int, default=0, help='Opt in to 1..3 repair rounds and rerunning selected checks (default: 0)')
     p.add_argument("--model")
+    p.add_argument('--max-output-tokens', type=int, help='Explicit per-response output cap; omit to use model defaults')
+    p.add_argument('--context-window-tokens', type=int, help='Explicit model context window')
+    p.add_argument('--max-turns', type=int, help='Response-count limit; 0 allows running until completion or interruption')
+    p.add_argument('--output-recovery-limit', type=int, help='Output truncation recovery attempts; 0 removes this count limit')
     p.add_argument("--worker-first", help="Opt-in worker-first pipeline; requires an enabled worker profile and --verify-command")
     p.add_argument("--model-profile", help="Select [model_profiles.NAME] with its own endpoint and credential variable")
     p.add_argument("--base-url")
@@ -259,6 +266,16 @@ class App:
             for key, value in HELP.items():
                 table.add_row(key, value)
             self.console.print(table)
+        elif command == '/budget':
+            self.emit('notice', json.dumps(self.agent.budget.status()))
+        elif command in {'/skill', '/skills'}:
+            if command == '/skill' and arg == 'off':
+                self.state['active_skills'] = []
+                result = 'Selected skills cleared.'
+            else:
+                result = await self.agent.tools.skills(arg if command == '/skill' else '')
+            self.store.save(self.state)
+            self.emit('notice', result)
         elif command in {"/new", "/resume"}:
             state = self.store.create(self.settings.mode) if command == "/new" else self.store.load(arg or "latest")
             selected = self.settings.select_profile(state['model_profile']) if state.get('model_profile') else self.settings
@@ -562,14 +579,16 @@ async def async_main(args):
     if args.allow_mcp and args.prompt is None:
         raise ValueError('--allow-mcp is only for one-shot tasks')
     if args.doctor:
+        limits = dict(max_output_tokens=args.max_output_tokens, context_window_tokens=args.context_window_tokens,
+                      max_turns=args.max_turns, output_recovery_limit=args.output_recovery_limit)
         report = diagnose(args.cwd, model_profile=args.model_profile, model=args.model, base_url=args.base_url, api_format=args.api_format, mode=args.mode,
-                          permission="accept-edits" if args.accept_edits else None, sandbox=args.sandbox, sandbox_image=args.sandbox_image)
+                          permission="accept-edits" if args.accept_edits else None, sandbox=args.sandbox, sandbox_image=args.sandbox_image, **limits)
         if args.check_api:
             from .connectivity import check_api
             if any(c['status'] == 'error' and c['name'] in {'configuration', 'project', 'api_key'} for c in report['checks']):
                 report['checks'].append({'name': 'api_connection', 'status': 'error', 'message': 'Fix local configuration before the API probe.', 'request_sent': False})
             else:
-                settings = Settings.load(args.cwd, model_profile=args.model_profile, model=args.model, base_url=args.base_url, api_format=args.api_format)
+                settings = Settings.load(args.cwd, model_profile=args.model_profile, model=args.model, base_url=args.base_url, api_format=args.api_format, **limits)
                 report['checks'].append(await check_api(settings))
                 report['network_checked'] = True
             report['ready'] = not any(c['status'] == 'error' for c in report['checks'])
@@ -583,7 +602,9 @@ async def async_main(args):
         settings = Settings(root)
     else:
         settings = Settings.load(args.cwd, model_profile=args.model_profile, model=args.model, base_url=args.base_url, api_format=args.api_format, mode=args.mode,
-                                 permission="accept-edits" if args.accept_edits else None, sandbox=args.sandbox, sandbox_image=args.sandbox_image)
+                                 permission="accept-edits" if args.accept_edits else None, sandbox=args.sandbox, sandbox_image=args.sandbox_image,
+                                 max_output_tokens=args.max_output_tokens, context_window_tokens=args.context_window_tokens,
+                                 max_turns=args.max_turns, output_recovery_limit=args.output_recovery_limit)
     if args.list_sessions:
         if not settings.state_dir.exists():
             print("[]")

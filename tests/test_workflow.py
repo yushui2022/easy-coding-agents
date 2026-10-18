@@ -121,7 +121,9 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(restored['messages'][-1]['role'], 'tool')
 
     async def test_incomplete_model_does_not_run_checks(self):
-        self.agent.settings.max_turns = 0
+        from test_runtime import call
+        self.agent.settings.max_turns = 1
+        self.provider.responses = iter([call('read', {'path': 'missing.py'})])
         with patch('eca.tools.run_process', AsyncMock(return_value=OK)) as process:
             self.assertFalse(await verified_run(self.agent, 'work', ['pytest'], 1))
             process.assert_not_awaited()
