@@ -420,11 +420,13 @@ If execution was interrupted, inspect the actual state before repeating mutation
                        and not (self.child and s['function']['name'] in {'delegate', 'delegate_parallel', 'merge_agent'})
                        and not (s['function']['name'].startswith('mcp_') and (self.child or not self.settings.mcp_servers))]
         if self.state.get('isolated'):
-            tool_schema = [s for s in tool_schema if s['function']['name'] not in {'shell', 'lsp'}]
+            tool_schema = [s for s in tool_schema if s['function']['name'] not in {'shell', 'lsp', 'web_fetch', 'web_search'}]
         if not self.settings.lsp_servers:
             tool_schema = [s for s in tool_schema if s['function']['name'] != 'lsp']
         if self.settings.sandbox == 'docker':
-            tool_schema = [s for s in tool_schema if s['function']['name'] != 'lsp' and not s['function']['name'].startswith('mcp_')]
+            tool_schema = [s for s in tool_schema if s['function']['name'] not in {'lsp', 'web_fetch', 'web_search'} and not s['function']['name'].startswith('mcp_')]
+        if self.child or self.state.get('isolated') or self.settings.sandbox == 'docker':
+            tool_schema = [s for s in tool_schema if not s['function']['name'].startswith('process_')]
         from .models import delegation_schemas
         tool_schema = delegation_schemas(tool_schema, self.settings)
         return tool_schema

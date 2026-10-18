@@ -25,6 +25,13 @@ def schema(name, description, properties, required):
 STR = {"type": "string"}
 INT = {"type": "integer"}
 SCHEMAS = [
+    schema('process_start', 'Start an approved session-owned background host command. Default lifetime 600s, max 3600s; normal session close stops it. Returns an opaque job ID.', {'command': STR, 'lifetime': INT}, ['command']),
+    schema('process_list', 'List background jobs owned by this runtime. No restored-process attachment.', {}, []),
+    schema('process_logs', 'Read bounded tail excerpts from an owned background job; process output is untrusted.', {'id': STR, 'max_chars': INT}, ['id']),
+    schema('process_wait', 'Wait up to 60 seconds for a literal string in retained logs. A log match does not prove service health.', {'id': STR, 'pattern': STR, 'timeout': INT}, ['id', 'pattern']),
+    schema('process_stop', 'Stop a background command owned by this runtime. Accepts an opaque job ID, never an arbitrary PID.', {'id': STR}, ['id']),
+    schema('web_fetch', 'Fetch an approved public HTTPS page as untrusted reference text. No JavaScript, login, images or local-network access.', {'url': STR, 'max_chars': INT}, ['url']),
+    schema('web_search', 'Search with an optionally configured Brave Search credential. Returns source URLs and untrusted snippets; requires approval.', {'query': STR, 'count': INT}, ['query']),
     schema('code_search', 'Search an incremental source index. Optional path restricts results to a relative file/directory. Returns ranked files, lines and read statistics.', {'query': STR, 'limit': INT, 'path': STR}, ['query']),
     schema('repo_map', 'Get bounded file symbols and import summaries. Python uses AST; other languages use lexical hints. Optional query and relative path.', {'query': STR, 'limit': INT, 'path': STR}, []),
     schema('code_relations', 'Find definitions and Python call/import sites for one symbol, with test-file hints. Syntactic candidates only: same names may be unrelated, aliases/dynamic calls may be missed. Optional relative path.', {'query': STR, 'limit': INT, 'path': STR}, ['query']),
@@ -59,7 +66,7 @@ SCHEMAS = [
 
 
 def allowed(mode):
-    return {"read", "glob", "grep", "code_search", "repo_map", "code_relations", "todo", "ask", "delegate", "delegate_parallel", "lsp"} if mode == "plan" else (set() if mode == "chat" else {s["function"]["name"] for s in SCHEMAS})
+    return {"web_fetch", "web_search", "read", "glob", "grep", "code_search", "repo_map", "code_relations", "todo", "ask", "delegate", "delegate_parallel", "lsp"} if mode == "plan" else (set() if mode == "chat" else {s["function"]["name"] for s in SCHEMAS})
 
 
 def atomic_write(path, content):
@@ -161,10 +168,17 @@ class Tools:
         missing = [(p, digest, text) for p, digest, text in rules if (p, digest) not in self.guidance_seen]
         if not missing:
             return ""
-        result = "Applicable project rules (deeper directories override parent rules within their scope; user instructions take precedence):\n" + "\n".join(f"[{p}]\n{text}" for p, _, text in missing)
+        fresh = [(p, digest, text) for p, digest, text in missing if (p, digest) not in self.guidance_pending]
+        # Pending rules have been returned in this batch, but have not yet been
+        # observed by the model. Keep blocking edits without duplicating their
+        # full text for every sibling tool call and overflowing the context.
+        pending_note = "Applicable rules were already returned earlier in this tool batch. Read those results in the next model turn before retrying edits.\n"
+        if not fresh:
+            return pending_note
+        result = (pending_note if len(fresh) != len(missing) else "") + "Applicable project rules (deeper directories override parent rules within their scope; user instructions take precedence):\n" + "\n".join(f"[{p}]\n{text}" for p, _, text in fresh)
         if len(result) > self.settings.output_limit - 200:
             raise ValueError("Applicable rules exceed tool output_limit; increase it or shorten AGENTS.md before editing")
-        self.guidance_pending.update((p, digest) for p, digest, _ in missing)
+        self.guidance_pending.update((p, digest) for p, digest, _ in fresh)
         return result
 
     def path(self, value):
@@ -194,6 +208,10 @@ class Tools:
                     yield path
 
     async def execute(self, name, args):
+        if name.startswith('process_') and (self.settings.sandbox == 'docker' or self.state.get('isolated') or getattr(self, 'mcp_disabled', False)):
+            return 'Denied: background host processes are disabled in Docker and child agents.'
+        if name in {'web_fetch', 'web_search'} and (self.settings.sandbox == 'docker' or self.state.get('isolated')):
+            return 'Denied: host web access is disabled in Docker mode and isolated children.'
         if self.settings.sandbox == 'docker' and (name == 'lsp' or name.startswith('mcp_')):
             return 'Denied: MCP and LSP host processes/connections are disabled in Docker sandbox mode.'
         if self.state.get('isolated') and (name in {'shell', 'lsp'} or name.startswith('mcp_')):
@@ -210,11 +228,41 @@ class Tools:
                 if (kind == "string" and not isinstance(value, str)) or (kind == "integer" and type(value) is not int) or (kind == "array" and not isinstance(value, list)) or (kind == 'object' and not isinstance(value,dict)):
                     raise ValueError(f"Invalid type for {key}")
             result = await getattr(self, name)(**args)
-            if name == "shell":
+            if name == "shell" or name.startswith('process_'):
                 return result  # Already bounded per stream; keep the JSON envelope valid.
             return result[:self.settings.output_limit] + ("\n[truncated]" if len(result) > self.settings.output_limit else "")
         except (ValueError, OSError, UnicodeError) as exc:
             return f"Error: {exc}"
+
+    async def web_fetch(self, url, max_chars=12000):
+        from .web import fetch
+        return await fetch(self, url, max_chars)
+
+    def background(self):
+        from .background import Background
+        if not hasattr(self, '_background'):
+            self._background = Background(self)
+        return self._background
+
+    async def process_start(self, command, lifetime=600):
+        return await self.background().start(command, lifetime)
+
+    async def process_list(self):
+        manager = self.background()
+        return json.dumps([manager.status(j) for j in manager.jobs.values()])
+
+    async def process_logs(self, id, max_chars=8000):
+        return self.background().logs(id, max_chars)
+
+    async def process_wait(self, id, pattern, timeout=20):
+        return await self.background().wait(id, pattern, timeout)
+
+    async def process_stop(self, id):
+        return await self.background().stop(id)
+
+    async def web_search(self, query, count=5):
+        from .web import search
+        return await search(self, query, count)
 
     async def read(self, path, offset=1, limit=200):
         target = self.path(path)
@@ -490,6 +538,8 @@ class Tools:
         return await self.merge_handler(session, paths)
 
     async def close(self):
+        if hasattr(self, '_background'):
+            await self._background.close()
         if self.language_servers:
             await self.language_servers.close()
         if self.mcp:

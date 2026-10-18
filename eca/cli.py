@@ -27,6 +27,10 @@ from .usage import UsageLedger
 
 
 HELP = {
+    '/run COMMAND': 'Start an approved background command (600-second lifetime)',
+    '/jobs': 'List background processes owned by this runtime',
+    '/logs ID': 'Read recent background process output',
+    '/stop ID': 'Stop an owned background process',
     '/checkpoint': 'Show durable task checkpoint and last recovery inspection (no API call)',
     '/context': 'Show estimated context tokens and output/safety reservations (no API call)',
     '/map [QUERY]': 'Show local indexed symbols/imports without a model request',
@@ -172,13 +176,13 @@ class App:
             return json.loads(detail)['server'] in self.args.allow_lsp
         if message.startswith('Run MCP') and self.args.prompt is not None:
             return json.loads(detail)['server'] in self.args.allow_mcp
-        if message.startswith("Run shell") and self.args.allow_shell:
+        if message.startswith(("Run shell", "Start background command")) and self.args.allow_shell:
             return True
         if self.args.prompt is not None:
             self.emit("notice", "Approval unavailable in one-shot mode; action denied. Use --accept-edits / --allow-shell explicitly if appropriate.")
             return False
         self.console.print(message, style="yellow", markup=False)
-        if message.startswith(("Run shell", "Run MCP", "Start language server")):
+        if message.startswith(("Run shell", "Run MCP", "Start language server", "Start background command")):
             self.console.print(detail, markup=False)
         try:
             answer = await self.prompt.prompt_async("Allow once? [y/N] ", completer=None, bottom_toolbar=None)
@@ -338,6 +342,18 @@ class App:
             data = self.agent.context_budget.report(self.agent.raw_context(), schemas)
             data['note'] = 'Local estimate with enabled tools; runtime guidance may add tokens. Not billing usage.'
             self.emit('notice', json.dumps(data, ensure_ascii=False))
+        elif command in {'/run', '/jobs', '/logs', '/stop'}:
+            name = {'/run': 'process_start', '/jobs': 'process_list',
+                    '/logs': 'process_logs', '/stop': 'process_stop'}[command]
+            if command != '/jobs' and not arg:
+                raise ValueError('Usage: /run COMMAND, /jobs, /logs ID, /stop ID')
+            params = {} if command == '/jobs' else ({'command': arg} if command == '/run' else {'id': arg})
+            # Explicit user cleanup remains possible after switching to plan/chat mode.
+            if command == '/stop' and hasattr(self.agent.tools, '_background'):
+                result = await self.agent.tools.background().stop(arg)
+            else:
+                result = await self.agent.tools.execute(name, params)
+            self.emit('notice', result)
         elif command == "/tasks":
             self.emit("tasks", self.state["tasks"])
         elif command == "/status":

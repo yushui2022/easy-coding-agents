@@ -1,8 +1,6 @@
 """Evidence-qualified CLI integration with the existing memory storage/search core."""
-import hashlib
 import json
 import re
-import subprocess
 import time
 import uuid
 
@@ -21,44 +19,8 @@ class Knowledge:
         self.closed = False
 
     def fingerprint(self):
-        """Bounded content hash; unavailable fingerprints never validate evidence."""
-        try:
-            result = subprocess.run(["git", "-c", "core.fsmonitor=false", "ls-files", "-co", "--exclude-standard", "-z"],
-                                    cwd=self.settings.root, capture_output=True, timeout=5)
-            paths = []
-            if result.returncode == 0:
-                for raw in result.stdout.split(b"\0"):
-                    if not raw:
-                        continue
-                    value = raw.decode("utf-8")
-                    if any(part.lower() in SKIP for part in value.split("/")):
-                        continue
-                    try:
-                        paths.append(self.resolve(value))
-                    except ValueError:
-                        continue  # Secrets and paths outside the project are never read.
-            else:
-                paths = list(self.files())
-            digest, total = hashlib.sha256(), 0
-            if len(paths) > 20000:
-                return None
-            for path in sorted(set(paths)):
-                if not path.is_file():
-                    digest.update(str(path).encode())
-                    digest.update(b"missing")
-                    continue
-                total += path.stat().st_size
-                if total > 50_000_000 or path.stat().st_size > 2_000_000:
-                    return None
-                with path.open('rb') as stream:
-                    data = stream.read(2_000_001)
-                if len(data) > 2_000_000:
-                    return None
-                digest.update(path.relative_to(self.settings.root).as_posix().encode())
-                digest.update(b"\0" + hashlib.sha256(data).digest())
-            return digest.hexdigest()
-        except (OSError, ValueError, UnicodeError, subprocess.TimeoutExpired):
-            return None
+        from .snapshot import fingerprint
+        return fingerprint(self.settings.root, self.files, self.resolve, SKIP)
 
     def sanitize(self, value):
         key = self.settings.api_key

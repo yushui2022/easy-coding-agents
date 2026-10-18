@@ -1,0 +1,244 @@
+{
+  "revision": "34316550dffbe8fbaed5678a6be87c5d3c65155b",
+  "model": "deepseek-flash",
+  "source_files": 4012,
+  "setup_failure": "run-20261018T114851Z-c5942eb1",
+  "trials": [
+    {
+      "run": "run-20261018T114939Z-27ebdbfe",
+      "status": "interrupted",
+      "passed": false,
+      "usage": {
+        "scope": "root session and all descendants",
+        "requests": 16,
+        "reported_tokens": {
+          "input": 35992,
+          "cache_read": 169600,
+          "output": 11143
+        },
+        "priced_subtotals": {},
+        "incomplete_usage_requests": 1,
+        "incomplete_cost_requests": 16,
+        "historical_usage_untracked": false,
+        "billing_note": "Calculated from provider usage and configured price snapshots; not an invoice."
+      },
+      "limits": {
+        "turns": 30,
+        "seconds": 600,
+        "repair_attempts": 1
+      },
+      "excluded_snapshot_files": [
+        "backend/packages/harness/deerflow/skills/skillscan/orchestrator.py",
+        "backend/tests/test_skillscan_native.py"
+      ],
+      "interruption_note": "Stopped after repeated edit refusals: applicable AGENTS rules exceeded default 24000-character output limit. No manual source repairs; next run raises output limit and corrects unrelated-local-stub oracle."
+    },
+    {
+      "run": "run-20261018T115214Z-45691983",
+      "status": "error",
+      "passed": false,
+      "error_type": "ValueError",
+      "usage": {
+        "scope": "root session and all descendants",
+        "requests": 5,
+        "reported_tokens": {
+          "input": 23876,
+          "cache_read": 21504,
+          "output": 5017
+        },
+        "priced_subtotals": {},
+        "incomplete_usage_requests": 0,
+        "incomplete_cost_requests": 5,
+        "historical_usage_untracked": false,
+        "billing_note": "Calculated from provider usage and configured price snapshots; not an invoice."
+      },
+      "elapsed_seconds": 29.73,
+      "checks": {
+        "agent_finished": false,
+        "contract_passed": false,
+        "no_old_public_references": false,
+        "changed_files_parse": true,
+        "caller_and_test_semantics_preserved": false,
+        "unrelated_helper_preserved": true,
+        "no_unrelated_edits": true,
+        "no_unexpected_additions": true,
+        "contract_unchanged": true,
+        "index_preserved": true,
+        "source_status_unchanged": true,
+        "workflow_passed": false
+      },
+      "changed_files": [],
+      "verification": {
+        "status": "interrupted",
+        "commands": [
+          "python -B acceptance_test.py"
+        ],
+        "rounds": [],
+        "repair_budget": 1
+      },
+      "limits": {
+        "turns": 30,
+        "seconds": 600,
+        "repair_attempts": 1,
+        "output_limit": 120000,
+        "context_chars": 200000
+      },
+      "harness_sha256": "58ab3bc088b10ea1fdf869300d1e773dc4c7e5345fd49658876ccc1318fce477",
+      "contract_sha256": "0945cb29d389eb860586a2febe460c80115388f197db42bf8395240492483a07",
+      "excluded_snapshot_files": [
+        "backend/packages/harness/deerflow/skills/skillscan/orchestrator.py",
+        "backend/tests/test_skillscan_native.py"
+      ]
+    },
+    {
+      "run": "run-20261018T115413Z-a409d305",
+      "status": "interrupted",
+      "passed": false,
+      "usage": {
+        "scope": "root session and all descendants",
+        "requests": 25,
+        "reported_tokens": {
+          "input": 301439,
+          "cache_read": 186368,
+          "output": 26789
+        },
+        "priced_subtotals": {},
+        "incomplete_usage_requests": 1,
+        "incomplete_cost_requests": 25,
+        "historical_usage_untracked": false,
+        "billing_note": "Calculated from provider usage and configured price snapshots; not an invoice."
+      },
+      "limits": {
+        "turns": 30,
+        "seconds": 600,
+        "repair_attempts": 1,
+        "output_limit": 120000,
+        "context_chars": 200000
+      },
+      "harness_sha256": "58ab3bc088b10ea1fdf869300d1e773dc4c7e5345fd49658876ccc1318fce477",
+      "contract_sha256": "0945cb29d389eb860586a2febe460c80115388f197db42bf8395240492483a07",
+      "excluded_snapshot_files": [
+        "backend/packages/harness/deerflow/skills/skillscan/orchestrator.py",
+        "backend/tests/test_skillscan_native.py"
+      ],
+      "interruption_note": "Stopped after repeated compaction and guidance rereads with incomplete caller migration. Retained unchanged trial artifacts. Next independent trial increases context budget."
+    },
+    {
+      "run": "run-20261018T115747Z-aca1b1c5",
+      "status": "idle",
+      "passed": false,
+      "error_type": null,
+      "usage": {
+        "scope": "root session and all descendants",
+        "requests": 12,
+        "reported_tokens": {
+          "input": 49309,
+          "cache_read": 306688,
+          "output": 6670
+        },
+        "priced_subtotals": {},
+        "incomplete_usage_requests": 0,
+        "incomplete_cost_requests": 12,
+        "historical_usage_untracked": false,
+        "billing_note": "Calculated from provider usage and configured price snapshots; not an invoice."
+      },
+      "elapsed_seconds": 62.48,
+      "checks": {
+        "agent_finished": true,
+        "contract_passed": true,
+        "no_old_public_references": true,
+        "changed_files_parse": true,
+        "caller_and_test_semantics_preserved": true,
+        "unrelated_helper_preserved": true,
+        "no_unrelated_edits": true,
+        "no_unexpected_additions": true,
+        "contract_unchanged": true,
+        "index_preserved": true,
+        "source_status_unchanged": true,
+        "workflow_passed": false
+      },
+      "changed_files": [
+        "backend/app/channels/buzz.py",
+        "backend/app/channels/connection_identity.py",
+        "backend/app/channels/feishu.py",
+        "backend/app/channels/manager.py",
+        "backend/tests/test_channels.py",
+        "backend/tests/test_wecom_group_bindings.py",
+        "backend/tests/blocking_io/test_channel_thread_binding_store.py"
+      ],
+      "verification": {
+        "status": "failed",
+        "commands": [
+          "python -B acceptance_test.py"
+        ],
+        "rounds": [
+          {
+            "attempt": 0,
+            "checks": [
+              {
+                "command": "python -B acceptance_test.py",
+                "status": "unconfirmed_snapshot",
+                "fingerprint": null,
+                "action_id": 31,
+                "repair_allowed": false,
+                "regression": false
+              }
+            ],
+            "status": "failed"
+          }
+        ],
+        "repair_budget": 1,
+        "stop_reason": "unsafe_to_retry"
+      },
+      "limits": {
+        "turns": 30,
+        "seconds": 600,
+        "repair_attempts": 1,
+        "output_limit": 120000,
+        "context_chars": 600000,
+        "context_window_tokens": 262144
+      },
+      "harness_sha256": "4f6c0a201c3d8816074429992d16889a78e0ff641e957513cc26514d893b21c4",
+      "contract_sha256": "1db557913334376a83001916040b802770501f5e7d7a282eac88a01d5a34312c",
+      "runtime_sha256": {
+        "eca/__init__.py": "48d1e66b8b8efb33e790c0a2742a5577fdd388fca54557295fe4280cf1f3fb81",
+        "eca/__main__.py": "935a1c1166b0c1ea35a82256345000bf2c73ded718d77773bc27a71ecce28f7d",
+        "eca/agent.py": "9fcd5862f57d2a56ae9efcd245e1661d96b11203f28014bfb9fecd1241377d38",
+        "eca/anthropic.py": "d8925b31c9ddda2faa746e1d6cd979be34f257683805a9647201ffe115d939f4",
+        "eca/changes.py": "7bcd5cef3b020a9d6fe37f68d7f785875795a7fc4b80cdab0c1c4c465070a28b",
+        "eca/cli.py": "5a51bec4d9d570a5efcf3aa79b9b2d247ec1d85d156489984c29a6d7daa66d8c",
+        "eca/code_index.py": "45b85ad08d5cf80dbbee4b45f48c1abfad0d60d596c2e9e16aacf3599910543a",
+        "eca/config.py": "aef5c463e8bf9b9d8844028d778e8529db10a433ef687af2fcca32a37cf84c05",
+        "eca/connectivity.py": "c5895198f8c0594f5b1c9bdb19ccd34928d6702eded8de62bbc581b39447658e",
+        "eca/context.py": "301c3b28153b1bf2409e22c233c7e9961b054c7e6e73160df5aebaa2d7bca71b",
+        "eca/doctor.py": "24c15be0c7d338ae693af7b3e181d7b02c89f2dfa69397e38bb53c833839776a",
+        "eca/editing.py": "e034ee7a00c89fd10e960ea9ba16c5bbf988994e8feb425653a625594fdc570e",
+        "eca/errors.py": "da4a4553562d814acc2f7639573ab14ff2a3dda16c9e3804d0037d72c4c53be8",
+        "eca/guidance.py": "5ad4dcca7fa0bb9938bb878967279abdf6a5724e3787376ce19d524bcb82636c",
+        "eca/knowledge.py": "2a3708ef64a74178ff47dde72d851866ad7476fec53e92d18731c10254a958d5",
+        "eca/lsp.py": "c2c4765409371d64e886e6b68f1841cb2f2531f7f7b392973a5f776dacb493e6",
+        "eca/mcp_client.py": "6346a152e9ff41bdc3d83c8a6dcb195794c7ce3c70c85f12c0f163b2dfd2db9b",
+        "eca/models.py": "240bc43c4f08a93399c897220892ab2dfb1d21c531702b2c96953ae8f63b1ab3",
+        "eca/onboarding.py": "9cbb8fea8d6ed6c33ac5d752ec0d44b8266c41e1a8d809ca9ef50a74ed8ed5dd",
+        "eca/provider.py": "d25e5853db267f060ba40b2aa90de9461dcdd5b4918f22622cfb87581a64ada4",
+        "eca/recovery.py": "725ef2da6f17135e8f5ba0d24d26a78bd19fc08abe4424e3fa3053a15b35384f",
+        "eca/responses.py": "08090a57f5aec751f510e0d0e08c328a635ee0039f1a2b0da13c8ae3dba2634f",
+        "eca/retry.py": "1ceea07d8ce32ec489ce3aac5c85966f5c5e4dd8270e218ae0efbedccc0599cf",
+        "eca/sandbox.py": "145e29f873ffee2187197d313bbfe908ecf83b08f34171b75fbf8985e15f0145",
+        "eca/store.py": "02ff30256210b6914fdd6a9c2ca41d1bbbeb5126a4eac5811f0ccfc62c4a53fa",
+        "eca/tools.py": "c9d6beeff74ddb63fd34b4cd6b4bd4d31452caa21a6dfa5a77da9c3feb7eed0d",
+        "eca/usage.py": "de5cea6e3d824456e2137f3722d0fa4cc8cb91aba9bf635828c46d2307a1f1ce",
+        "eca/verification.py": "a74aad18d7c4dea5d1c831927fd33469fc8bc770de30168dabdaa17818206b9c",
+        "eca/workflow.py": "99f6fef10702828c00dbebc19b123e7b6c71599a52b64d0f4dac34593242c202",
+        "eca/workspaces.py": "e586bd4a0ad8f55987f4f933aacbeab61fd8d541b9f7c16020dddb0929d46ff4"
+      },
+      "excluded_snapshot_files": [
+        "backend/packages/harness/deerflow/skills/skillscan/orchestrator.py",
+        "backend/tests/test_skillscan_native.py"
+      ]
+    }
+  ],
+  "total_recorded_requests": 58,
+  "incomplete_usage_requests": 2,
+  "conclusion": "Final task behavior and migration passed; overall workflow failed because source fingerprint unavailable. Not a complete large-repository acceptance."
+}

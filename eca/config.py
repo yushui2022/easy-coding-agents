@@ -42,6 +42,7 @@ class Settings:
     worker_profiles: list = field(default_factory=list)
     sandbox: str = 'none'
     sandbox_image: str = 'python:3.11-slim'
+    web: dict = field(default_factory=dict)
 
     @property
     def state_dir(self):
@@ -58,7 +59,7 @@ class Settings:
         cfg = data.get("agent", {})
         if not isinstance(cfg, dict):
             raise ValueError("[agent] must be a TOML table")
-        supported = set(cls.__dataclass_fields__) - {"root", "api_key", "mcp_servers", "pricing", "lsp_servers", "model_profiles"} | {"api_key_env"}
+        supported = set(cls.__dataclass_fields__) - {"root", "api_key", "mcp_servers", "pricing", "lsp_servers", "model_profiles", "web"} | {"api_key_env"}
         if "api_key" in cfg:
             raise ValueError("Use api_key_env instead of storing a secret in eca.toml")
         if set(cfg) - supported:
@@ -76,7 +77,7 @@ class Settings:
                       api_format=api_format,
                       model=env.get("ECA_MODEL") or env.get("MODEL_NAME") or cfg.get("model", "" if native else cls.model),
                       base_url=env.get("ECA_BASE_URL") or env.get("ANTHROPIC_BASE_URL" if native else "OPENAI_BASE_URL") or cfg.get("base_url", default_url))
-        values.update(mcp_servers=data.get("mcp_servers", {}), pricing=data.get("pricing", {}), lsp_servers=data.get("lsp_servers", {}), model_profiles=data.get("model_profiles", {}))
+        values.update(mcp_servers=data.get("mcp_servers", {}), pricing=data.get("pricing", {}), lsp_servers=data.get("lsp_servers", {}), model_profiles=data.get("model_profiles", {}), web=data.get("web", {}))
         for name in ("sandbox", "sandbox_image", "reasoning_effort", "mode", "permission", "max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "network_retries", "auto_compact", "project_memory", "stream_usage", "subagent_max_turns", "subagent_max_calls", "subagent_timeout", "subagent_concurrency", "worker_profiles"):
             if name in cfg:
                 values[name] = cfg[name]
@@ -104,6 +105,8 @@ class Settings:
 
     def validate(self):
         import re
+        from .web import validate
+        validate(self.web)
         if self.sandbox not in {'none', 'docker'}:
             raise ValueError('sandbox must be none or docker')
         if not isinstance(self.sandbox_image, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9./_:@-]{0,255}', self.sandbox_image):

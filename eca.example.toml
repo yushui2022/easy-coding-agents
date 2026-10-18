@@ -44,6 +44,12 @@ builder = "Implement the requested change using existing project conventions, th
 # url = "https://example.com/mcp"
 # headers = { Authorization = "MY_MCP_AUTHORIZATION" } # env contains full Bearer value
 
+# Optional web search; web_fetch itself needs no extra key.
+# [web]
+# search_provider = "brave"
+# search_api_key_env = "BRAVE_SEARCH_API_KEY"
+# Browser setup and G-drive storage example: docs/WEB_TOOLS.md
+
 # EXAMPLE ONLY: replace model and rates with your actual provider contract.
 # Amounts per million tokens, decimal strings. Missing prices stay unknown.
 # [pricing."YOUR_MODEL_ID"]
