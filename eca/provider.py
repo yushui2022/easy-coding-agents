@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 import httpx
 from openai import AsyncOpenAI
 from .retry import retryable
-from .errors import OutputLimitError
+from .errors import OutputLimitError, ContextLimitError, context_rejection
 
 
 class Provider:
@@ -39,6 +39,8 @@ class Provider:
                 finally:
                     emit("request_end", {"id":ident,"usage":self.last_usage,"status":status})
             except Exception as exc:
+                if not emitted and context_rejection(getattr(exc, 'status_code', None), getattr(exc, 'body', None)):
+                    raise ContextLimitError() from None
                 if emitted or not retryable(exc) or attempt == self.settings.network_retries:
                     raise
                 delay = min(2 ** attempt, 8)

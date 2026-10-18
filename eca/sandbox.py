@@ -68,7 +68,9 @@ async def run(tools, command, timeout, runner):
     prefix = [executable, '--host', endpoint]
     info = json.loads(await runner([*prefix, 'info', '--format', '{{.OSType}}'], root, 10, 2000))
     if info.get('exit_code') != 0 or info.get('timed_out') or info.get('stdout', '').strip() != 'linux':
-        raise ValueError('A running Linux Docker engine is required; no host fallback')
+        raise ValueError('A running Linux Docker engine is required; no host fallback. '
+                         'On Windows, start Docker Desktop from the Start menu and wait for engine readiness, '
+                         'then retry. This tool does not start or reset Docker Desktop.')
     base = tools.settings.state_dir / 'sandbox'
     if base.resolve() != base or base.is_symlink():
         raise ValueError('Sandbox storage must not be an alias')
@@ -100,6 +102,9 @@ async def run(tools, command, timeout, runner):
             record['exit_code'] = result.get('exit_code')
             result['sandbox'] = {'backend': 'docker', 'container': name, 'writes': 'discarded', 'network': 'none'}
             return json.dumps(result, ensure_ascii=False)
+        except asyncio.CancelledError:
+            record['execution'] = 'cancelled'
+            raise
         finally:
             # Killing the Docker client does not stop its container. Always remove by unique name.
             async def remove():

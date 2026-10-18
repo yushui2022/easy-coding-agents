@@ -64,7 +64,7 @@ class BoundaryTests(unittest.IsolatedAsyncioTestCase):
             await run(self.tools, 'sleep 100', 2, runner)
         self.assertEqual(sum('run' in c.args[0] for c in runner.call_args_list), 1)
         self.assertEqual(self.tools.state['sandbox_runs'][-1]['cleanup'], 'removed')
-        self.assertEqual(self.tools.state['sandbox_runs'][-1]['execution'], 'unknown')
+        self.assertEqual(self.tools.state['sandbox_runs'][-1]['execution'], 'cancelled')
         self.assertIn('rm', runner.call_args_list[-1].args[0])
 
     async def test_cleanup_failure_cannot_report_success(self):

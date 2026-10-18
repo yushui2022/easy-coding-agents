@@ -34,7 +34,8 @@ def diagnose(root, **overrides):
             report['sandbox'] = settings.sandbox
             if settings.sandbox == 'docker':
                 check('sandbox_backend', 'warning' if shutil.which('docker') else 'error',
-                      'Docker CLI checked only; local Linux engine and preinstalled image are checked at execution. No host fallback.')
+                      'Docker CLI checked only; local Linux engine and preinstalled image are checked at execution. '
+                      'On Windows, start Docker Desktop from the Start menu before using the sandbox. No host fallback.')
             check("api_key", "ok" if settings.api_key else "error", "API key configured (not tested)." if settings.api_key else "API key missing. Set the configured api_key_env, ECA_API_KEY or the selected provider's key variable.")
             url = urlsplit(settings.base_url)
             # Display origin only; custom paths can themselves contain credentials.

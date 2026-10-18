@@ -48,6 +48,8 @@ class Store:
         return state
 
     def save(self, state):
+        from .recovery import checkpoint
+        state['checkpoint'] = checkpoint(state)
         with self.db:
             self.db.execute("INSERT OR REPLACE INTO sessions VALUES (?, ?, ?, ?)",
                             (state["id"], state["title"], time.time(), json.dumps(state, ensure_ascii=False)))
@@ -71,6 +73,7 @@ class Store:
     def load(self, identifier):
         state = self.peek(identifier)
         self.repair(state)
+        state['_resume_pending'] = True
         return state
 
     def begin(self, session_id, call_id, name, args):

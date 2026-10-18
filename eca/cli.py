@@ -27,6 +27,7 @@ from .usage import UsageLedger
 
 
 HELP = {
+    '/checkpoint': 'Show durable task checkpoint and last recovery inspection (no API call)',
     '/context': 'Show estimated context tokens and output/safety reservations (no API call)',
     '/map [QUERY]': 'Show local indexed symbols/imports without a model request',
     '/search QUERY': 'Search indexed source without a model request',
@@ -269,6 +270,9 @@ class App:
             self.status()
         elif command == '/sandbox':
             self.emit('notice', json.dumps({'sandbox_runs': self.state.get('sandbox_runs', [])}, ensure_ascii=False))
+        elif command == '/checkpoint':
+            self.emit('notice', json.dumps({'checkpoint': self.state.get('checkpoint'),
+                                          'last_recovery_inspection': self.state.get('resume_report')}, ensure_ascii=False))
         elif command == '/progress':
             from .workflow import suite_status
             self.emit('notice', json.dumps({'observations': self.state.get('progress', []),

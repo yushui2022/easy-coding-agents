@@ -36,6 +36,11 @@ class ContextBudget:
     def fits(self, messages: list[dict], tools: list[dict], fraction: float = 1.0) -> bool:
         return self.estimate(messages, tools) <= self.input_limit * fraction
 
+    def reduce_after_rejection(self, messages, tools):
+        # Make the effective budget at most half the rejected request. This is
+        # session-local conservatism, not discovery of the provider's true limit.
+        self._factor = max(self.factor * 2, self.input_limit * 2 / max(1, estimate_tokens(messages, tools)))
+
     def observe(self, messages: list[dict], tools: list[dict], usage: dict) -> None:
         factor = self.factor
         if not isinstance(usage, dict):

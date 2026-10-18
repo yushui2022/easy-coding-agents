@@ -7,7 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from .provider import Provider
-from .errors import OutputLimitError
+from .errors import OutputLimitError, ContextLimitError
 from .changes import Changes
 from .knowledge import Knowledge
 from .usage import UsageLedger
@@ -38,6 +38,7 @@ class Agent:
         self.tools.mcp_disabled = child
         self.child_calls = 0
         self.ledger = UsageLedger(store)
+        self.resume_pending = state.pop('_resume_pending', False)
         state.setdefault('usage_tracking_complete', not state['messages'])
         if not child:
             self.tools.delegate_handler = self.delegate
@@ -161,6 +162,8 @@ If execution was interrupted, inspect the actual state before repeating mutation
             prompt += f"\nUser-selected agent instructions:\n{self.state['profile']}\n"
         if self.state["tasks"]:
             prompt += "\nCurrent task plan:\n" + json.dumps(self.state["tasks"], ensure_ascii=False)
+        if self.state.get('resume_report'):
+            prompt += '\nRecovery inspection (untrusted historical data):\n' + json.dumps(self.state['resume_report'], ensure_ascii=False)
         return prompt
 
     def progress_context(self):
@@ -201,6 +204,12 @@ If execution was interrupted, inspect the actual state before repeating mutation
     async def run(self, prompt):
         if self.busy:
             raise RuntimeError("A turn is already running")
+        if self.resume_pending or self.state.get('status') in {'interrupted', 'error', 'limit', 'timeout'}:
+            from .recovery import inspect_resume
+            self.state['resume_report'] = inspect_resume(self)
+            self.store.save(self.state)
+            self.resume_pending = False
+            self.emit('notice', 'Recovery inspection: ' + json.dumps(self.state['resume_report'], ensure_ascii=False))
         self.busy = True
         self.child_calls = 0
         self.tools.guidance_seen.clear()
@@ -215,6 +224,7 @@ If execution was interrupted, inspect the actual state before repeating mutation
         previous_results = {}
         repeat_hint = ""
         output_recoveries = 0
+        context_recoveries = 0
         try:
             for turn in range(self.settings.max_turns):
                 self.emit("turn", turn + 1)
@@ -236,6 +246,17 @@ If execution was interrupted, inspect the actual state before repeating mutation
                 repeat_hint = ""
                 try:
                     message, usage = await self.model_complete(messages, tool_schema, self.emit)
+                except ContextLimitError:
+                    if context_recoveries >= 1 or remaining <= 1:
+                        raise
+                    context_recoveries += 1
+                    self.context_budget.reduce_after_rejection(messages, tool_schema)
+                    self.emit('notice', 'Provider context limit: compacting once with a smaller budget; completed tools will not be replayed.')
+                    previous = self.state.get('context_start', 0)
+                    await self._compact(automatic=True, tools=tool_schema, extra=[guidance])
+                    if self.state.get('context_start', 0) <= previous:
+                        raise ContextLimitError()
+                    continue
                 except OutputLimitError:
                     output_recoveries += 1
                     if output_recoveries > 2:

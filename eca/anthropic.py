@@ -87,6 +87,19 @@ class AnthropicProvider:
                 headers={"x-api-key": settings.api_key, "anthropic-version": "2023-06-01"},
                 json=messages_payload(messages, tools, settings)) as response:
             if response.status_code != 200:
+                if response.status_code in {400, 413}:
+                    from .errors import ContextLimitError, context_rejection
+                    raw = bytearray()
+                    async for chunk in response.aiter_bytes():
+                        raw.extend(chunk[:65537 - len(raw)])
+                        if len(raw) > 65536:
+                            break
+                    try:
+                        body = json.loads(raw) if len(raw) <= 65536 else None
+                    except (ValueError, UnicodeError):
+                        body = None
+                    if context_rejection(response.status_code, body):
+                        raise ContextLimitError()
                 # Provider bodies can echo request data; avoid persisting secrets.
                 if response.status_code in {408, 429, 500, 502, 503, 504, 529}:
                     raise TransientResponseError(f"Anthropic HTTP {response.status_code}")
