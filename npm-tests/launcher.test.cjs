@@ -72,3 +72,9 @@ test('ready runtime is reused without interpreter discovery or setup', () => {
     finally { if (old === undefined) delete process.env.ECA_PYTHON; else process.env.ECA_PYTHON=old; }
   } finally { cleanup(base); }
 });
+
+test('executable shebang uses Unix line endings', () => {
+  const bytes=fs.readFileSync(path.resolve('bin/ecs.cjs'));
+  assert.ok(bytes.toString().startsWith('#!/usr/bin/env node\n'));
+  assert.equal(bytes.includes(Buffer.from('\r\n')),false);
+});

@@ -6,7 +6,7 @@
 - Python 包新增 `ecs` 入口，保留 `eca`；启动器透传原有参数、工作目录与退出码。
 - 提供 `--setup`、无需初始化的 `--version`、摘要校验、初始化锁和 G 盘优先缓存。
 - npm 安装阶段不执行 postinstall。此版仍需 Node.js 20+ 和 Python 3.11+，未公开发布 registry。
-- Python 全量 222 passed, 2 skipped；Node 6 项通过，Windows 实际 tgz 安装与启动通过。
+- Python 全量 222 passed, 2 skipped；Node 7 项通过，Windows 实际 tgz 安装与启动通过。
 - [安装方式](docs/NPM_INSTALL.md) · [验证记录](docs/UPGRADE-v0.15.md)。
 
 ## 0.14.0 — 2026-10-17
