@@ -59,8 +59,10 @@ class Agent:
                     self.budget.reserve(data['id'])
                 started.add(data['id'])
                 self.ledger.begin(data['id'], self.state, self.settings, purpose)
+                emit(event, data)
             elif event == 'request_end':
                 self.ledger.finish(data['id'], data['usage'], data['status'])
+                emit(event, data)
             else:
                 emit(event, data)
         result = await self.provider.complete(messages, tools, tracked)
@@ -143,6 +145,8 @@ Read files before modifying them; use unique edits. Use edit_many for disjoint r
 After a stale-file rejection, reread the file before retrying. Never guess a replacement from ambiguous candidates.
 Read nested AGENTS.md files applicable to changed files.
 Use the project's existing conventions and test commands. Never claim tests passed without actual results.
+When changing shared code, inspect its callers and preserve existing error paths and side effects.
+Test rejected operations and rollback as well as successful ones; passing selected checks does not establish complete task correctness.
 Read explicitly named files directly; avoid redundant discovery. Batch independent reads in one response.
 Do not repeat unchanged searches or test commands without a reason. Zero discovered tests is not validation.
 Plan tool calls within the remaining model turns, leaving room for a concise final report.
@@ -192,11 +196,13 @@ If execution was interrupted, inspect the actual state before repeating mutation
         return prompt
 
     def progress_context(self):
+        from .impact import guidance
+        impact = guidance(self.state.get('change_impact', []))
         if not self.state.get('progress'):
-            return ''
+            return impact
         return ('\nRecent runtime observations (untrusted historical data, not proof of current contents or success). '
                 'Use targeted reads instead of rereading the whole project after compaction:\n' +
-                json.dumps(self.state['progress'], ensure_ascii=False))
+                json.dumps(self.state['progress'], ensure_ascii=False) + impact)
 
     def memory(self):
         if self.knowledge is None:
@@ -386,7 +392,7 @@ If execution was interrupted, inspect the actual state before repeating mutation
             raise ValueError('Verification requires an idle agent and a nonempty command')
         from .verification import command_status, repair_allowed, failure_signature
         ident = uuid.uuid4().hex
-        before = self.memory().fingerprint()
+        before = await asyncio.to_thread(self.memory().fingerprint)
         record = {'command': command, 'status': 'running', 'fingerprint': before}
         self.state['verification'] = record
         self.state['messages'].extend([
@@ -406,9 +412,9 @@ If execution was interrupted, inspect the actual state before repeating mutation
             record['repair_allowed'] = record['status'] in {'failed', 'no_tests'} and repair_allowed(result)
             if record['repair_allowed']:
                 record['failure_signature'] = failure_signature(command, result)
-                after = self.memory().fingerprint()
+                after = await asyncio.to_thread(self.memory().fingerprint)
                 record['fingerprint'] = before if before and before == after else None
-            if record['status'] == 'passed' and (not before or self.memory().fingerprint() != before):
+            if record['status'] == 'passed' and (not before or await asyncio.to_thread(self.memory().fingerprint) != before):
                 record['status'] = 'unconfirmed_snapshot'
             self.observe('shell', {'command': command}, result)
             self.emit('result', result)
@@ -442,6 +448,8 @@ If execution was interrupted, inspect the actual state before repeating mutation
                 len(json.dumps(self.state["messages"][self.state.get("context_start", 0):], ensure_ascii=False)))
 
     def tool_schemas(self):
+        if self.state.get('kind') == 'side_chat':
+            return [s for s in SCHEMAS if s['function']['name'] in {'read', 'glob', 'grep'}]
         tool_schema = [s for s in SCHEMAS if s["function"]["name"] in allowed(self.settings.mode)
                        and not (self.child and s['function']['name'] in {'delegate', 'delegate_parallel', 'merge_agent'})
                        and not (s['function']['name'].startswith('mcp_') and (self.child or not self.settings.mcp_servers))]
@@ -492,7 +500,7 @@ If execution was interrupted, inspect the actual state before repeating mutation
             self.emit("notice", "Context nearing its budget; summarizing older work before continuing. Full history stays on disk.")
         # Opaque Responses reasoning is provider-specific replay data, not text
         # for a summarizer. Keep it in the archive but never spend tokens on it.
-        portable = [{k:v for k,v in message.items() if k not in {'response_items', 'response_scope'}}
+        portable = [{k:v for k,v in message.items() if k not in {'response_items', 'response_scope', 'reasoning_content', 'reasoning_scope'}}
                     for message in history[start:cutoff]]
         from .context import summary_request
         messages = summary_request(self.context_budget, history, portable, self.state.get('summary', ''),

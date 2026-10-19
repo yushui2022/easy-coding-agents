@@ -1,0 +1,73 @@
+{
+  "name": "eca-desktop",
+  "productName": "ECA Desktop",
+  "version": "0.27.1",
+  "private": true,
+  "description": "Easy Coding Agent desktop workspace",
+  "author": "ECA contributors",
+  "license": "UNLICENSED",
+  "main": "dist/main/index.cjs",
+  "scripts": {
+    "build": "tsc --noEmit && node scripts/build.mjs",
+    "dev": "npm run build && electron .",
+    "test": "node --test tests/*.test.cjs",
+    "test:e2e": "node tests/e2e.cjs",
+    "package": "npm run build && electron-builder --win nsis --x64"
+  },
+  "build": {
+    "appId": "dev.easycodingagent.desktop",
+    "productName": "ECA Desktop",
+    "asar": true,
+    "directories": {
+      "output": "../output/release/desktop",
+      "buildResources": "resources"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json",
+      "!node_modules/node-pty/prebuilds/darwin-*/**/*",
+      "!node_modules/node-pty/prebuilds/win32-arm64/**/*",
+      "!node_modules/node-pty/third_party/**/win10-arm64/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "runtime/eca-backend",
+        "to": "backend"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "signExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "artifactName": "ECA-Desktop-${version}-${arch}-Setup.${ext}",
+    "asarUnpack": [
+      "node_modules/node-pty/**/*"
+    ],
+    "npmRebuild": false
+  },
+  "devDependencies": {
+    "@phosphor-icons/react": "2.1.10",
+    "@playwright/test": "1.64.1",
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "electron": "44.9.0",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-markdown": "10.1.0",
+    "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/xterm": "6.0.0",
+    "node-pty": "1.1.0"
+  }
+}

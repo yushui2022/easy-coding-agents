@@ -39,6 +39,7 @@ class Settings:
     pricing: dict = field(default_factory=dict)
     lsp_servers: dict = field(default_factory=dict)
     reasoning_effort: str = ""
+    thinking_mode: str = "default"
     model_profiles: dict = field(default_factory=dict, repr=False)
     model_profile: str = ""
     worker_profiles: list = field(default_factory=list)
@@ -80,7 +81,7 @@ class Settings:
                       model=env.get("ECA_MODEL") or env.get("MODEL_NAME") or cfg.get("model", "" if native else cls.model),
                       base_url=env.get("ECA_BASE_URL") or env.get("ANTHROPIC_BASE_URL" if native else "OPENAI_BASE_URL") or cfg.get("base_url", default_url))
         values.update(mcp_servers=data.get("mcp_servers", {}), pricing=data.get("pricing", {}), lsp_servers=data.get("lsp_servers", {}), model_profiles=data.get("model_profiles", {}), web=data.get("web", {}))
-        for name in ("sandbox", "sandbox_image", "reasoning_effort", "mode", "permission", "max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "network_retries", "auto_compact", "project_memory", "stream_usage", "subagent_max_turns", "subagent_max_calls", "subagent_timeout", "subagent_concurrency", "worker_profiles"):
+        for name in ("sandbox", "sandbox_image", "reasoning_effort", "thinking_mode", "mode", "permission", "max_turns", "context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "network_retries", "auto_compact", "project_memory", "stream_usage", "subagent_max_turns", "subagent_max_calls", "subagent_timeout", "subagent_concurrency", "worker_profiles"):
             if name in cfg:
                 values[name] = cfg[name]
         for name in ('context_window_tokens', 'context_reserve_tokens', 'shared_request_limit', 'output_recovery_limit'):
@@ -150,6 +151,8 @@ class Settings:
             raise ValueError("project_memory must be true or false")
         from .lsp import validate_servers as validate_lsp
         validate_lsp(self.lsp_servers)
+        if self.thinking_mode not in {'default', 'fast', 'balanced', 'deep'}:
+            raise ValueError('Invalid thinking_mode')
         if self.reasoning_effort not in {"", "none", "minimal", "low", "medium", "high", "xhigh"}:
             raise ValueError("Invalid reasoning_effort")
         if self.api_format not in {"openai", "anthropic", "responses"}:

@@ -22,7 +22,7 @@ from eca.config import Settings
 from eca.store import Store
 from eca.workflow import verified_run, suite_status
 
-SUITE_VERSION = 4
+SUITE_VERSION = 6
 TEST_COMMAND = 'python -B -m unittest discover -v'
 GUIDANCE = ('Use Python standard library only. No dependency installs or network access. '
             f'Only approved shell command: {TEST_COMMAND}. '

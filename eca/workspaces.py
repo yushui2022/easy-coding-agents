@@ -13,7 +13,7 @@ def source_files(tools):
     from .tools import SKIP
     try:
         result = subprocess.run(['git', '-c', 'core.fsmonitor=false', 'ls-files', '--cached', '--others', '--exclude-standard', '-z'],
-            cwd=tools.settings.root, capture_output=True, timeout=10,
+            cwd=tools.settings.root, stdin=subprocess.DEVNULL, capture_output=True, timeout=10,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
     except (OSError, subprocess.TimeoutExpired):
         result = None

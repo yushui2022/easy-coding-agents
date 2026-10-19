@@ -51,7 +51,9 @@ def diagnose(root, **overrides):
     elif root.is_dir():
         try:
             def run(*args):
-                return subprocess.run([git, *args], cwd=root, capture_output=True, timeout=5)
+                return subprocess.run([git, *args], cwd=root, stdin=subprocess.DEVNULL,
+                                      capture_output=True, timeout=5,
+                                      creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
             inside = run("rev-parse", "--is-inside-work-tree")
             if inside.returncode != 0 or inside.stdout.strip() != b"true":
                 check("git", "warning", "Directory is not a Git worktree; file-tool snapshots still work.")

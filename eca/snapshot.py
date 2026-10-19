@@ -61,11 +61,15 @@ def fingerprint(root, files, resolve, skip):
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             raise ValueError('Snapshot time budget exhausted')
-        result = subprocess.run(['git', '-c', 'core.fsmonitor=false', 'ls-files', '-co',
-                                 '--exclude-standard', '-z'], cwd=root,
-                                capture_output=True, timeout=min(5, remaining))
+        try:
+            result = subprocess.run(['git', '-c', 'core.fsmonitor=false', 'ls-files', '-co',
+                                     '--exclude-standard', '-z'], cwd=root,
+                                    stdin=subprocess.DEVNULL, capture_output=True, timeout=min(5, remaining),
+                                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+        except FileNotFoundError:
+            result = None  # Git is optional for ordinary project folders.
         paths = set()
-        if result.returncode == 0:
+        if result is not None and result.returncode == 0:
             for raw in result.stdout.split(b'\0'):
                 if not raw:
                     continue

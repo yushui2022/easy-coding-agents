@@ -98,9 +98,10 @@ class UsageLedger:
             self.db.execute("UPDATE usage_requests SET status=?,usage=?,tokens=?,cost=? WHERE id=?",
                             (status, json.dumps(usage), json.dumps(tokens), cost, ident))
 
-    def summary(self, state):
-        rows = self.db.execute("SELECT status,rates,tokens,cost,purpose,session_id FROM usage_requests WHERE root_id=?",
-                               (state.get('billing_root', state['id']),)).fetchall()
+    def summary(self, state, session_only=False):
+        column = 'session_id' if session_only else 'root_id'
+        rows = self.db.execute(f"SELECT status,rates,tokens,cost,purpose,session_id FROM usage_requests WHERE {column}=?",
+                               (state['id'] if session_only else state.get('billing_root', state['id']),)).fetchall()
         totals, costs, unknown_usage, unknown_cost = {}, {}, 0, 0
         for status, rates, tokens, cost, _, _ in rows:
             parsed = json.loads(tokens)
@@ -114,7 +115,7 @@ class UsageLedger:
             if cost is not None:
                 currency = json.loads(rates)['currency']
                 costs[currency] = costs.get(currency, Decimal(0)) + Decimal(cost)
-        return dict(scope='root session and all descendants', requests=len(rows),
+        return dict(scope='this session' if session_only else 'root session and all descendants', requests=len(rows),
                     reported_tokens=totals, priced_subtotals={k:str(v) for k,v in costs.items()},
                     incomplete_usage_requests=unknown_usage, incomplete_cost_requests=unknown_cost,
                     historical_usage_untracked=not state.get('usage_tracking_complete', False),

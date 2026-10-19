@@ -22,6 +22,15 @@ class SnapshotTests(unittest.TestCase):
     def fingerprint(self):
         return snapshot.fingerprint(self.root, self.tools.files, self.tools.path, SKIP)
 
+    def test_missing_git_uses_complete_filesystem_inventory(self):
+        path = self.root/'code.txt'
+        path.write_text('before')
+        with patch('eca.snapshot.subprocess.run', side_effect=FileNotFoundError):
+            before = self.fingerprint()
+            self.assertIsNotNone(before)
+            path.write_text('after')
+            self.assertNotEqual(before, self.fingerprint())
+
     def test_large_file_and_total_bytes_are_fully_hashed(self):
         path = self.root/'large.bin'
         with path.open('wb') as stream:

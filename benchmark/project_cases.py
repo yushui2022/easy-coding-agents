@@ -118,7 +118,38 @@ old=sqlite3.connect(legacy)
 try:
     assert old.execute('PRAGMA user_version').fetchone()[0]==2
     assert old.execute('SELECT stock,reserved FROM products').fetchall()==[(7,2)]
-finally: old.close()''',
+finally: old.close()
+# Migration must preserve transaction behavior of the unchanged purchase API.
+buy(db, ident='duplicate-order')
+before = stock(db, 'book')
+try: buy(db, ident='duplicate-order')
+except sqlite3.IntegrityError: pass
+else: raise AssertionError('duplicate order unexpectedly accepted')
+assert stock(db, 'book') == before, 'rejected duplicate order consumed stock'
+assert db.execute("SELECT COUNT(*) FROM orders WHERE id='duplicate-order'").fetchone()[0] == 1
+# Inject a database failure AFTER schema work, not before the first change.
+# A context manager alone does not begin a transaction for SQLite DDL.
+from unittest.mock import patch
+interrupted_path = str(Path(folder)/'interrupted.sqlite')
+real_connect = sqlite3.connect
+raw = real_connect(interrupted_path)
+raw.executescript("CREATE TABLE products (sku TEXT PRIMARY KEY, stock INTEGER NOT NULL); CREATE TABLE orders (id TEXT PRIMARY KEY, sku TEXT, qty INTEGER, status TEXT); INSERT INTO products VALUES ('saved',9);")
+raw.close()
+def interrupted_connect(*args, **kwargs):
+    conn = real_connect(*args, **kwargs)
+    conn.set_authorizer(lambda action, first, second, *_:
+        sqlite3.SQLITE_DENY if action == sqlite3.SQLITE_PRAGMA and first.lower() == 'user_version' and second is not None else sqlite3.SQLITE_OK)
+    return conn
+with patch('sqlite3.connect', interrupted_connect):
+    try: connect(interrupted_path)
+    except sqlite3.DatabaseError: pass
+    else: raise AssertionError('migration failure was swallowed')
+raw = real_connect(interrupted_path)
+try:
+    assert [r[1] for r in raw.execute('PRAGMA table_info(products)')] == ['sku','stock'], 'failed migration left partial schema changes'
+    assert raw.execute('PRAGMA user_version').fetchone()[0] == 0
+    assert raw.execute('SELECT * FROM products').fetchall() == [('saved',9)]
+finally: raw.close()''',
     'shop_idempotency': '''assert buy(db)=={'id':'a'}
 assert buy(db)=={'id':'a'} and stock(db,'book')==8
 db.close(); db=connect(path)

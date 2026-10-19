@@ -46,6 +46,13 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
             process.assert_awaited_once()
         self.assertEqual(len(self.provider.contexts), 1)
 
+    async def test_new_unverified_task_does_not_inherit_previous_pass(self):
+        with patch('eca.tools.run_process', AsyncMock(return_value=OK)):
+            self.assertTrue(await verified_run(self.agent, 'work', ['pytest']))
+        self.assertTrue(await verified_run(self.agent, 'new work', []))
+        self.assertEqual(suite_status(self.agent)['status'], 'not_run')
+        self.assertEqual(self.agent.verification_status()['status'], 'not_run')
+
     async def test_repair_restarts_all_checks_and_preserves_rounds(self):
         with patch('eca.tools.run_process', AsyncMock(side_effect=[OK, FAIL, OK, OK])) as process:
             self.assertTrue(await verified_run(self.agent, 'preserve feature', ['pytest', 'build'], 1))

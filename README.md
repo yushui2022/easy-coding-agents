@@ -2,12 +2,14 @@
   <img src="docs/assets/eca-logo-v1.png" width="144" height="144" alt="Easy Coding Agent：融入终端提示符的橙色几何标志">
 </p>
 
-<h1 align="center">Easy Coding Agent</h1>
+<h1 align="center">ECA — Easy Coding Agent</h1>
+
+**ECA Desktop 0.27.1 Windows 预览版**：桌面工程位于 `desktop/`，提供项目与会话导航、右侧独立聊天、网页预览、PowerShell 交互终端、修改审查与验证；长会话使用预览与增量更新。与 CLI 共用 Python 核心和项目数据。[安装、开发与验收说明](docs/desktop/README.md)。npm 启动器同时提供 `eca` 和兼容命令 `ecs`。
 
 主 Agent 默认不限响应轮数和输出截断恢复次数，可用 Ctrl+C 中断。旧配置中的显式上限仍有效，可运行 `ecs --max-turns 0 --output-recovery-limit 0` 取消这两项限制。模型单次输出上限、子 Agent 限额和共享预算的区别见 [输出与持续执行配置](docs/OUTPUT_LIMITS.md)。
 
-<p align="center"><strong>你的项目，你的模型，你的终端。</strong></p>
-<p align="center">在终端里理解代码、执行修改，并检查每一步留下的结果。</p>
+<p align="center"><strong>你的项目，你的模型。</strong></p>
+<p align="center">通过终端或桌面理解代码、执行修改，并检查每一步留下的结果。</p>
 
 <p align="center">
   <a href="#快速开始">快速开始</a> ·
@@ -16,11 +18,11 @@
   <a href="docs/UPGRADE-v0.18.md">验证记录</a>
 </p>
 
-<p align="center"><code>Python 3.11+</code> · <code>v0.20.0</code> · <code>开发中</code></p>
+<p align="center"><code>CLI + Windows Desktop</code> · <code>v0.27.1</code> · <code>预览版</code></p>
 
 ---
 
-Easy Coding Agent（ECA）是一个可自行配置模型的 Python CLI 编程助手。它可以读取与搜索项目、编辑文件、运行命令，并把完整会话和文件修改记录保存在项目本地。
+ECA（Easy Coding Agent）是一个可自行配置模型的编程助手，提供 CLI 和 Windows 桌面入口，共用 Python 核心。它可以读取与搜索项目、编辑文件、运行命令，并把完整会话和文件修改记录保存在项目本地。桌面安装包自带运行时；CLI 运行需要 Python 3.11+。
 
 它重视三件事：**改动可检查、工作可继续、记忆有来源。** 你可以先看差异再允许写入，中断后恢复会话，也可以检查或撤销文件工具产生的修改。
 
@@ -74,7 +76,7 @@ Easy Coding Agent（ECA）是一个可自行配置模型的 Python CLI 编程助
 已有本地 npm 安装包时（需要 Node.js 20+ 和 Python 3.11+）：
 
 ```sh
-npm install -g ./easy-coding-agent-cli-0.20.0.tgz
+npm install -g ./easy-coding-agent-cli-0.27.1.tgz
 ecs
 ```
 

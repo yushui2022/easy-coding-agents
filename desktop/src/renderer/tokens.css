@@ -1,0 +1,69 @@
+/* One visual contract for the app, native dialogs, and workspace panels. */
+:root {
+  color-scheme: light dark;
+  --surface: #ffffff;
+  --sidebar: #f4f5f3;
+  --panel: #fafbf9;
+  --text: #242923;
+  --secondary: #565f59;
+  --muted: #6b746d;
+  --border: #e5e8e2;
+  --control-border: #d4d9d1;
+  --hover: #eaede7;
+  --selected: #ffffff;
+  --accent: #b94b2c;
+  --on-accent: #ffffff;
+  --accent-soft: #fbefe9;
+  --success: #26734b;
+  --success-soft: #edf6ef;
+  --danger: #b13643;
+  --danger-soft: #fcf0f0;
+  --code: #f2f4f0;
+  --shadow-control: 0 1px 3px #2633220b;
+  --shadow-composer: 0 3px 16px #26332208, 0 1px 3px #26332206;
+  --shadow-dialog: 0 24px 80px #18231d30;
+  --radius-control: 7px;
+  --radius-panel: 12px;
+  --control-height: 34px;
+  --header-height: 56px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --nav-width: 216px;
+  --detail-width: 360px;
+  --font-ui: "Segoe UI Variable", "Microsoft YaHei UI", "Segoe UI", sans-serif;
+  --font-reading: "Segoe UI Variable", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --font-code: "Cascadia Code", Consolas, "Microsoft YaHei UI", monospace;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #1d201e;
+    --sidebar: #181b19;
+    --panel: #1a1e1b;
+    --text: #e9ede7;
+    --secondary: #b5bfb6;
+    --muted: #9ba69c;
+    --border: #303730;
+    --control-border: #444d44;
+    --hover: #2b322b;
+    --selected: #2d352d;
+    --accent: #f29d7c;
+    --on-accent: #301b12;
+    --accent-soft: #382a23;
+    --success: #8fd3a9;
+    --success-soft: #22392b;
+    --danger: #f6a0a8;
+    --danger-soft: #352528;
+    --code: #171b18;
+    --shadow-control: 0 1px 3px #0002;
+    --shadow-composer: 0 3px 16px #0002;
+    --shadow-dialog: 0 24px 80px #0006;
+  }
+}

@@ -1,0 +1,305 @@
+@charset "UTF-8";
+* {box-sizing: border-box;}
+body {margin: 0; font-family: var(--font-ui);}
+.eca-app {font-family: var(--font-ui); -webkit-font-smoothing: antialiased;}
+.eca-app :where(button, input, select, textarea) {font: inherit;}
+.eca-app button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: var(--control-height); padding: 6px 11px; border: 1px solid var(--control-border);
+  border-radius: var(--radius-control); color: var(--text); background: var(--surface);
+  cursor: pointer; transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+.eca-app button:hover:not(:disabled) {background: var(--hover);}
+.eca-app button:active:not(:disabled) {filter: brightness(.96);}
+.eca-app button:disabled {opacity: .45; cursor: default;}
+.eca-app :where(button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 3px;
+}
+.eca-app :where(input, select, textarea) {
+  color: var(--text); background: var(--surface); border: 1px solid var(--control-border);
+  border-radius: var(--radius-control); padding: 8px 10px; max-width: 100%;
+}
+.eca-app :where(input, textarea)::placeholder {color: var(--muted); opacity: 1;}
+.eca-app textarea {resize: vertical;}
+.eca-app button.primary, .eca-app button.send-button {
+  background: var(--accent); border-color: var(--accent); color: var(--on-accent);
+}
+.eca-app button.primary:hover:not(:disabled), .eca-app button.send-button:hover:not(:disabled) {
+  background: var(--accent); filter: brightness(1.09);
+}
+.eca-app .icon-button {padding: 6px; min-width: 30px; min-height: 30px; border: 0; background: transparent;}
+.eca-app svg {flex-shrink: 0;}
+.eca-app p {line-height: 1.65;}
+.eca-app summary {cursor: pointer;}
+.eca-app pre {tab-size: 2;}
+.eca-app :where(.transcript, .session-list, .inspector-body, .dialog-body) {
+  scrollbar-width: thin; scrollbar-color: var(--control-border) transparent;
+}
+.workspace {display: grid; grid-template-columns: var(--nav-width) minmax(0, 1fr); height: 100dvh; overflow: hidden;}
+.workspace.with-inspector {grid-template-columns: var(--nav-width) minmax(0, 1fr) var(--detail-width);}
+.workspace.nav-collapsed {--nav-width: 64px;}
+.eca-app .sidebar {
+  display: flex; flex-direction: column; min-height: 0; padding: 0 12px;
+  background: var(--sidebar); border-right: 1px solid var(--border);
+}
+.eca-app .brand {height: var(--header-height); display: flex; align-items: center; gap: 6px; padding: 0 8px;}
+.eca-app .brand img {width: 25px; height: 25px; object-fit: contain; margin-right: 3px;}
+.eca-app .brand strong {font-size: 17px; letter-spacing: -.5px;}
+.eca-app .brand > span {color: var(--secondary); font-size: 12px;}
+.eca-app .brand .preview {font-size: 10px; margin-left: auto; color: var(--muted); padding: 2px 4px; border-radius: 4px; background: var(--hover);}
+.eca-app .open-project {width: 100%; justify-content: flex-start; margin: 6px 0 0; min-height: 36px; background: var(--surface); border-color: var(--border); box-shadow: var(--shadow-control);}
+.eca-app .open-project > svg:last-child {margin-left: auto; color: var(--muted);}
+.eca-app .section-heading {
+  display: flex; justify-content: space-between; align-items: center;
+  margin: 24px 10px 8px; color: var(--muted); font-size: 11px; font-weight: 500; letter-spacing: .04em;
+}
+.eca-app .nav-empty {font-size: 12px; color: var(--muted); margin: 4px 8px; line-height: 1.9;}
+.eca-app .project-current {display: flex; align-items: center; gap: 9px; min-height: 36px; padding: 8px 10px; border-radius: var(--radius-control); background: var(--hover); font-weight: 600;}
+.eca-app .project-current > svg {color: var(--accent);}
+.eca-app :where(.project-current, .recent, .session-list button) > span:last-child {overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
+.eca-app .project-dot {height: 6px; width: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0;}
+.eca-app .recent {border: 0; background: transparent; justify-content: flex-start; color: var(--secondary); width: 100%; padding: 8px 10px;}
+.eca-app .session-heading {margin-top: 18px; margin-bottom: 5px;}
+.eca-app .session-list {overflow: auto; min-height: 50px; flex: 1;}
+.eca-app .session-list button {border: 0; background: transparent; width: 100%; text-align: left; justify-content: flex-start; margin: 3px 0; min-height: 36px; color: var(--secondary);}
+.eca-app .session-list button.selected {background: var(--selected); color: var(--text); box-shadow: var(--shadow-control);}
+.eca-app .session-list button.selected > svg {color: var(--accent);}
+.eca-app .sidebar-bottom {border-top: 1px solid var(--border); margin-top: 16px; padding: 10px 0 12px;}
+.eca-app .settings-button {border: 0; background: transparent; justify-content: flex-start; width: 100%;}
+.eca-app .settings-button .connection-dot {margin-left: auto;}
+.eca-app .sidebar footer {display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; padding: 9px 10px 0;}
+.eca-app .conversation {display: flex; flex-direction: column; min-width: 0; min-height: 0;}
+.eca-app .conversation-header {height: var(--header-height); flex-shrink: 0; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; padding: 0 22px;}
+.eca-app .workspace-title {display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; color: var(--secondary);}
+.eca-app .workspace-title > span {font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
+.eca-app .workspace-title strong {font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
+.eca-app .header-actions {display: flex; align-items: center; gap: 8px; flex-shrink: 0;}
+.eca-app .status {display: flex; gap: 7px; align-items: center; font-size: 11px; color: var(--secondary); white-space: nowrap; padding: 5px 8px; border-radius: 20px; background: var(--panel);}
+.eca-app :where(.status-dot, .connection-dot) {display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink: 0;}
+.eca-app .connection-dot {background: var(--success);}
+.eca-app .status-dot.active {background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);}
+.eca-app .work-area {position: relative; display: flex; flex: 1; flex-direction: column; min-height: 0;}
+.eca-app .transcript {flex: 1; overflow: auto; padding: 28px var(--space-8) var(--space-3); min-height: 0; overflow-anchor: none;}
+.eca-app .work-area.is-empty {overflow-y: auto; padding-top: clamp(36px, 12vh, 112px); padding-bottom: 24px;}
+.eca-app .is-empty .transcript {flex: 0 0 auto; overflow: visible; padding-top: 0; padding-bottom: 0;}
+.eca-app .welcome {max-width: 640px; margin: 0 auto 22px;}
+.eca-app .welcome h1 {font-size: 24px; letter-spacing: -.4px; font-weight: 600; line-height: 1.5; margin: 0 0 8px;}
+.eca-app .welcome p {font-size: 13px; color: var(--secondary); margin: 0;}
+.eca-app .composer-wrap {flex-shrink: 0; width: 100%; max-width: 864px; padding: var(--space-3) var(--space-8) var(--space-4); margin: 0 auto;}
+.eca-app .is-empty .composer-wrap {max-width: 704px; padding-top: 0;}
+.eca-app .composer {background: var(--surface); border: 1px solid var(--control-border); border-radius: 14px; box-shadow: var(--shadow-composer); transition: border-color 120ms ease, box-shadow 120ms ease;}
+.eca-app .composer:focus-within {border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft);}
+.eca-app .composer textarea {display: block; width: 100%; border: 0; background: transparent; border-radius: 14px 14px 0 0; min-height: 72px; max-height: min(180px, 25vh); padding: 16px 18px; font: 14px/1.75 var(--font-reading); resize: vertical;}
+.eca-app .composer textarea:focus-visible {outline: none;}
+.eca-app .is-empty .composer textarea {min-height: 96px;}
+.eca-app .composer-toolbar {display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; padding: 8px 10px; background: var(--panel); border-top: 1px solid var(--border); border-radius: 0 0 13px 13px;}
+.eca-app .model-chip {border: 0; color: var(--secondary); background: transparent; min-height: 30px; max-width: 100%; font-size: 12px; padding: 5px 7px;}
+.eca-app .model-chip > span:nth-child(2) {overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
+.eca-app .send-button {min-height: 32px; min-width: 32px; border-radius: 9px; padding: 6px 8px; font-size: 12px; white-space: nowrap;}
+.eca-app .send-button span {padding: 0 2px;}
+.eca-app .stop-button {min-height: 31px; color: var(--danger); border-color: var(--control-border); font-size: 12px;}
+.eca-app .composer-meta {position: relative; margin-top: 5px; color: var(--secondary); font-size: 11px; container-type: inline-size;}
+.eca-app .checks summary {display: flex; align-items: center; gap: 6px; width: fit-content; min-height: 28px; padding: 3px 7px; border-radius: 5px; list-style: none; color: var(--secondary); cursor: pointer; transition: background 120ms ease;}
+.eca-app .checks summary::-webkit-details-marker {display: none;}
+.eca-app .checks summary:hover,.eca-app .checks[open] summary {background: var(--hover); color: var(--text);}
+.eca-app .check-count {font-variant-numeric: tabular-nums; padding: 0 5px; border-radius: 3px; background: var(--code); color: var(--secondary); font-size: 10px;}
+.eca-app .checks-caret {color: var(--muted); transition: transform 120ms ease;}
+.eca-app .checks[open] .checks-caret {transform: rotate(180deg);}
+.eca-app .check-settings {margin-top: 6px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel);}
+.eca-app .check-settings-heading {display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 5px 12px; font-size: 11px;}
+.eca-app .check-settings-heading label {font-weight: 500; color: var(--text);}
+.eca-app .check-settings-heading span {color: var(--muted);}
+.eca-app .checks textarea {display: block; width: 100%; min-height: 62px; margin-top: 8px; max-height: 120px; font: 12px/1.6 var(--font-code);}
+.eca-app .repair-option {display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 10px; color: var(--secondary); font-size: 11px;}
+.eca-app .repair-option select {padding: 4px 7px; max-width: 100%; font-size: 11px;}
+.eca-app .check-settings .fine-print {margin: 9px 0 0; font-size: 10px; line-height: 1.6;}
+.eca-app .impact-review {margin-top: 18px; font-size: 12px; overflow-wrap: anywhere;}
+.eca-app .impact-review summary {cursor: pointer; color: var(--secondary);}
+.eca-app .impact-review strong {display: block; margin-top: 12px; font-weight: 500;}
+.eca-app .impact-review p {color: var(--secondary); line-height: 1.6;}
+.eca-app .keyboard-hint {position: absolute; right: 5px; top: 0; display: flex; align-items: center; gap: 12px; height: 28px; color: var(--muted); font-size: 10px; pointer-events: none;}
+.eca-app .keyboard-hint>span {display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;}
+.eca-app .keyboard-hint kbd {font: 10px/17px var(--font-ui); color: var(--muted);}
+@container (max-width: 360px) {.eca-app .keyboard-hint>span:first-child {display: none;}}
+.eca-app .suggestions {display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; margin-top: 24px;}
+.eca-app .suggestions-label {font-size: 11px; color: var(--muted); margin-right: 4px;}
+.eca-app .suggestions button {min-height: 30px; font-size: 12px; color: var(--secondary); background: transparent; border: 0; border-radius: 6px; padding: 5px 6px;}
+.eca-app .suggestions button:hover:not(:disabled) {color: var(--text);}
+.eca-app .composer-notice {display: flex; align-items: center; gap: 6px; color: var(--success); font-size: 12px; margin-top: 12px;}
+.eca-app .error-banner {background: var(--accent-soft); border-bottom: 1px solid var(--border); color: var(--danger); padding: 10px 20px; display: flex; align-items: center; gap: 10px; max-height: 170px; overflow: auto;}
+.eca-app .error-banner span {flex: 1; overflow-wrap: anywhere; line-height: 1.6;}
+.eca-app .message {max-width: 800px; margin: 0 auto 28px; font: 14px/1.85 var(--font-reading); overflow-wrap: anywhere;}
+.eca-app .message-label {display: flex; align-items: center; font: 600 12px/1.5 var(--font-ui); margin-bottom: 12px; color: var(--accent);}
+.eca-app .message.assistant .message-label::before {content: ""; width: 4px; height: 13px; border-radius: 2px; background: var(--accent); margin-right: 7px;}
+.eca-app .message-label span {color: var(--muted); margin-left: 8px; font-weight: 400;}
+.eca-app .message.user {padding: 14px 18px; margin-top: 4px; margin-bottom: 28px; border-radius: var(--radius-panel); background: var(--panel); border: 1px solid var(--border);}
+.eca-app .message.user :last-child {margin-bottom: 0;}
+.eca-app .message.user .message-label {color: var(--muted); margin-bottom: 6px; font-weight: 500;}
+.eca-app .message :where(p, ul, ol) {margin: 8px 0 12px; line-height: 1.8;}
+.eca-app .message :where(h1, h2, h3) {font-size: 18px; font-weight: 600; line-height: 1.5;}
+.eca-app .message code {font: 12px/1.7 var(--font-code); background: var(--code); border-radius: 3px; padding: 2px 5px;}
+.eca-app .message pre {background: var(--code); border: 1px solid var(--border); border-radius: 6px; padding: 14px; overflow: auto;}
+.eca-app .message pre code {padding: 0;}
+.eca-app .message table {border-collapse: collapse; display: block; max-width: 100%; overflow: auto;}
+.eca-app .message :where(th, td) {border: 1px solid var(--border); padding: 6px 10px; text-align: left;}
+.eca-app .text-link {display: inline; min-height: 0; border: 0; background: transparent; padding: 0; border-radius: 0; color: var(--accent); text-align: inherit; font-size: inherit; text-decoration: underline;}
+.eca-app .tool-record {max-width: 860px; margin: 6px auto; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--secondary); font-size: 12px;}
+.eca-app .tool-record > summary {display: flex; align-items: center; gap: 7px; padding: 9px 10px; list-style: none;}
+.eca-app .tool-record[open] > summary > svg:first-child {transform: rotate(90deg);}
+.eca-app .tool-record pre {margin: 0; padding: 12px; max-height: 300px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.7 var(--font-code); border: 0; border-top: 1px solid var(--border);}
+.eca-app .load-older {display: block; margin: 0 auto 20px; font-size: 12px;}
+.eca-app .approval {max-width: 900px; max-height: 38vh; overflow: auto; border: 1px solid var(--accent); border-radius: 8px; background: var(--panel); padding: 14px 16px; margin: 0 auto 12px;}
+.eca-app .eyebrow {font-size: 12px; font-weight: 600; color: var(--accent);}
+.eca-app .approval h3 {font-size: 13px; font-weight: 600; line-height: 1.6; overflow-wrap: anywhere; margin: 7px 0;}
+.eca-app .approval pre {font: 12px/1.7 var(--font-code); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow: auto;}
+.eca-app .approval form {display: flex; gap: 10px;}
+.eca-app .approval form input {flex: 1; min-width: 0;}
+.eca-app .actions {display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;}
+.eca-app .inspector {background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0;}
+.eca-app .inspector > header {display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; height: 60px; padding: 0 16px; border-bottom: 1px solid var(--border);}
+.eca-app .inspector header strong {font-size: 13px; font-weight: 600;}
+.eca-app .inspector header > div {display: flex; gap: 2px;}
+.eca-app .tabs {display: flex; gap: var(--space-1); margin: var(--space-4) 18px var(--space-1); padding: 3px; border-radius: 8px; background: var(--hover);}
+.eca-app .tabs button {flex: 1; min-width: 0; min-height: 30px; border: 0; border-radius: 6px; background: transparent; padding: 5px 8px; color: var(--secondary); font-size: 12px;}
+.eca-app .tabs button.active {background: var(--selected); color: var(--text); font-weight: 600; box-shadow: var(--shadow-control);}
+.eca-app .count {font-size: 11px; border-radius: 4px; padding: 0 5px; background: var(--hover);}
+.eca-app .inspector-body {flex: 1; padding: 20px 16px; overflow: auto;}
+.eca-app .panel-label {display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 12px;}
+.eca-app .panel-label > span {color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums;}
+.eca-app .empty-state {display: flex; flex-direction: column; align-items: center; text-align: center; padding: 36px 18px 40px; color: var(--secondary);}
+.eca-app .empty-state-icon {display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 16px; border: 1px solid var(--border); border-radius: 14px; color: var(--muted); background: var(--surface); box-shadow: var(--shadow-control);}
+.eca-app .empty-state > strong {font-size: 13px; font-weight: 500; color: var(--text);}
+.eca-app .empty-state-description {max-width: 280px; margin-top: 8px; font-size: 12px; line-height: 1.8; color: var(--muted);}
+.eca-app .empty-state-description p {margin: 0 0 6px;}
+.eca-app .change {border-bottom: 1px solid var(--border); padding: 9px 0; margin-bottom: 4px;}
+.eca-app .change-title {border: 0; background: transparent; padding: 0; min-height: 26px; width: 100%; justify-content: flex-start; font-size: 12px;}
+.eca-app .change-title span {overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
+.eca-app .change-bottom {display: flex; align-items: center; gap: 5px; color: var(--secondary); font-size: 12px; margin-top: 4px;}
+.eca-app .change-bottom span {flex: 1;}
+.eca-app .change-bottom button {min-height: 28px; padding: 5px; border: 0; background: transparent;}
+.eca-app .verification-label {margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);}
+.eca-app .verification > span {display: inline-flex; padding: 4px 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); font-size: 11px; color: var(--secondary);}
+.eca-app .verification > .passed {color: var(--success); background: var(--success-soft); border-color: transparent;}
+.eca-app .verification p {color: var(--secondary); font-size: 12px; overflow-wrap: anywhere;}
+.eca-app .verification details {font-size: 12px; margin-top: 12px;}
+.eca-app :where(.verification, .activity) pre {font: 12px/1.7 var(--font-code); white-space: pre-wrap; overflow-wrap: anywhere;}
+.eca-app .fine-print {font-size: 12px; line-height: 1.7; color: var(--muted); overflow-wrap: anywhere;}
+.eca-app .task-row {display: flex; gap: 8px; font-size: 13px; margin: 12px 0; overflow-wrap: anywhere;}
+.eca-app .task-row small {color: var(--muted); font-size: 11px; margin-left: auto; flex-shrink: 0;}
+.eca-app .activity {font-size: 12px; border-bottom: 1px solid var(--border); padding: 11px 0; overflow-wrap: anywhere;}
+.eca-app .metric {padding: 16px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: baseline; gap: 14px;}
+.eca-app .metric span {font-size: 12px; color: var(--secondary);}
+.eca-app .metric strong {font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; text-align: right;}
+.eca-app .diagnose {align-self: flex-start; margin: 12px 18px 16px; background: transparent; color: var(--secondary); border: 0; font-size: 12px;}
+.eca-app .muted {color: var(--secondary); font-size: 13px;}
+.eca-app .eca-dialog {
+  width: min(560px, calc(100vw - 48px)); max-height: calc(100dvh - 48px);
+  padding: 0; border: 1px solid var(--control-border); border-radius: 16px;
+  background: var(--surface); color: var(--text); box-shadow: var(--shadow-dialog); overflow: hidden;
+}
+.eca-app .eca-dialog::backdrop {background: #18231d66;}
+.eca-app .eca-dialog[open] {display: flex; flex-direction: column;}
+.eca-app .eca-dialog > header {display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 20px 24px; border-bottom: 1px solid var(--border); flex-shrink: 0;}
+.eca-app .eca-dialog h2 {font-size: 18px; font-weight: 600; margin: 0; overflow-wrap: anywhere; min-width: 0;}
+.eca-app .dialog-body {padding: 24px; overflow: auto;}
+.eca-app .dialog-intro {font-size: 13px; color: var(--secondary); margin: 0 0 16px;}
+.eca-app .config-summary {display: flex; align-items: center; flex-wrap: wrap; gap: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); padding: 10px 12px; font-size: 12px; margin-bottom: 18px; color: var(--secondary);}
+.eca-app .config-summary strong {margin-left: auto; color: var(--text); font-weight: 500; overflow-wrap: anywhere;}
+.eca-app .form-row {display: grid; grid-template-columns: 1fr 1.1fr; gap: 14px;}
+.eca-app .field {margin-bottom: 16px; min-width: 0;}
+.eca-app .field label {display: block; font-size: 12px; font-weight: 600; margin-bottom: 7px;}
+.eca-app .field label span {color: var(--muted); font-size: 11px; font-weight: 400; margin-left: 8px;}
+.eca-app .field :where(input, select) {width: 100%; height: 36px;}
+.eca-app .checkbox {display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--secondary);}
+.eca-app .checkbox input {accent-color: var(--accent); margin: 0;}
+.eca-app .config-actions {align-items: center; flex-wrap: wrap;}
+.eca-app .config-actions button {font-size: 12px;}
+.eca-app .unsaved {font-size: 12px; color: var(--accent); margin-right: auto;}
+.eca-app .config-status {background: var(--panel); padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere;}
+.eca-app .model-selection {border-top: 1px solid var(--border); margin-top: 20px; padding-top: 5px;}
+.eca-app .model-selection p {font-size: 12px; overflow-wrap: anywhere;}
+.eca-app .model-selection p span {display: block; color: var(--secondary); margin-top: 4px;}
+.eca-app .model-selection > div {display: flex; flex-wrap: wrap; gap: 8px;}
+.eca-app .model-selection button {font-size: 12px; flex: 1;}
+.eca-app .data-location {font-size: 11px; color: var(--muted); margin: 20px 0 0; overflow-wrap: anywhere;}
+.eca-app .eca-dialog.wide {width: min(960px, calc(100vw - 48px));}
+.eca-app .diff {font: 13px/1.8 var(--font-code); padding: 14px; margin: 0; background: var(--code); overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;}
+.eca-app .diff .added {color: var(--success);}
+.eca-app .diff .removed {color: var(--danger);}
+.eca-app .diagnostic {padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 13px;}
+.eca-app .diagnostic p {color: var(--secondary);}
+.eca-app .inspector-sheet {border: 0; background: var(--surface); min-height: 320px;}
+.eca-app .inspector-sheet .inspector-body {overflow: visible;}
+@media (max-width: 1179px) {
+  .workspace {--nav-width: 192px;}
+  .eca-app .conversation-header {padding: 0 20px;}
+  .eca-app .transcript {padding-left: 24px; padding-right: 24px;}
+  .eca-app .composer-wrap {padding-left: 24px; padding-right: 24px;}
+}
+@media (max-width: 850px) {
+  .workspace {--nav-width: 176px;}
+  .eca-app .brand .preview {display: none;}
+  .eca-app .sidebar {padding: 0 10px;}
+  .eca-app .transcript {padding-left: 20px; padding-right: 20px;}
+  .eca-app .composer-wrap {padding-left: 20px; padding-right: 20px;}
+}
+@media (max-height: 680px) {
+  .eca-app .work-area.is-empty {padding-top: 26px; padding-bottom: 10px;}
+  .eca-app .welcome h1 {font-size: 22px;}
+  .eca-app .suggestions {margin-top: 18px;}
+  .eca-app .dialog-body {padding-top: 16px;}
+}
+@media (prefers-reduced-motion: reduce) {
+  .eca-app * {transition: none !important; scroll-behavior: auto !important;}
+}
+/* Saved model connections and the task-level picker share the existing dialog tokens. */
+.eca-app .connection-layout {display:grid;grid-template-columns:190px minmax(0,1fr);gap:24px;}
+.eca-app .connection-sidebar {border-right:1px solid var(--border);padding-right:16px;min-width:0;}
+.eca-app .add-connection {width:100%;margin-bottom:14px;}
+.eca-app .connection-sidebar nav {display:flex;flex-direction:column;gap:6px;}
+.eca-app .connection-sidebar nav button {display:block;text-align:left;width:100%;border-color:transparent;background:transparent;padding:10px;overflow:hidden;}
+.eca-app .connection-sidebar nav button.selected {background:var(--hover);}
+.eca-app .connection-sidebar nav :where(strong,span,small) {display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.eca-app .connection-sidebar nav strong {font-size:13px;font-weight:600;}
+.eca-app .connection-sidebar nav span {font-size:12px;color:var(--secondary);margin-top:5px;}
+.eca-app .connection-sidebar nav small {font-size:11px;color:var(--accent);margin-top:6px;}
+.eca-app .connection-editor {min-width:0;}
+.eca-app .connection-editor fieldset {border:0;padding:0;margin:0;min-width:0;}
+.eca-app .credential-options {display:flex;flex-wrap:wrap;gap:10px 20px;margin-bottom:18px;}
+.eca-app .model-field > div {display:flex;gap:8px;}
+.eca-app .model-field input, .eca-app .model-field select {min-width:0;flex:1;}
+.eca-app .catalogue-status {min-height:20px;overflow-wrap:anywhere;}
+.eca-app .manual-model {margin:8px 0 18px;}
+.eca-app .manual-model summary {cursor:pointer;color:var(--muted);font-size:12px;}
+.eca-app .manual-model .field {margin-top:12px;}
+.eca-app .model-field button {white-space:nowrap;font-size:12px;}
+.eca-app .connection-actions {display:flex;flex-wrap:wrap;gap:8px;border-top:1px solid var(--border);padding-top:14px;}
+.eca-app .connection-actions button {font-size:12px;}
+.eca-app .current-model-note {border-top:1px solid var(--border);padding-top:16px;color:var(--secondary);font-size:12px;}
+.eca-app .model-search {width:100%;margin-bottom:12px;}
+.eca-app .model-options {display:flex;flex-direction:column;gap:4px;}
+.eca-app .model-option {text-align:left;width:100%;justify-content:space-between;padding:12px;border-color:transparent;}
+.eca-app .model-option[aria-pressed=true] {background:var(--accent-soft);border-color:var(--accent);}
+.eca-app .model-option div {min-width:0;}
+.eca-app .model-option strong {display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;}
+.eca-app .model-option span {display:block;color:var(--secondary);font-size:12px;margin-top:4px;overflow-wrap:anywhere;}
+.eca-app .model-option small {color:var(--accent);font-size:11px;font-weight:400;}
+.eca-app .project-model-option {margin-top:10px;border-top-color:var(--border);}
+.eca-app .manage-models {width:100%;margin-top:16px;}
+@media(max-width:850px) {
+  .eca-app .connection-layout {grid-template-columns:150px minmax(0,1fr);gap:16px;}
+  .eca-app .connection-sidebar {padding-right:10px;}
+  .eca-app .connection-editor .form-row {grid-template-columns:1fr;gap:0;}
+  .eca-app .model-field > div {flex-wrap:wrap;}
+}
+/* Live work is visible even while the model is only producing reasoning or arguments. */
+.run-activity{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:8px 2px;background:var(--surface);font-size:12px}
+.run-activity>div{display:grid;gap:5px;flex:1}.run-activity strong{font-weight:500}.run-activity small,.run-activity time{color:var(--muted)}.run-activity time{font-variant-numeric:tabular-nums}
+.eca-app .composer-options {display:flex;align-items:center;min-width:0;flex:1 1 160px;max-width:320px;}
+.eca-app .composer-actions {display:flex;align-items:center;gap:10px;flex-shrink:0;margin-left:auto;}
+.eca-app .permission-control {display:flex;align-items:center;gap:1px;color:var(--secondary);border-radius:6px;padding-left:6px;}
+.eca-app .permission-control.full-access {color:var(--accent);background:var(--accent-soft);}
+.eca-app .thinking-badge {flex-shrink:0;font-size:10px;color:var(--muted);padding:2px 5px;border-radius:4px;background:var(--surface);border:1px solid var(--border);}
+.eca-app .permission-picker {max-width:120px;font:12px/1.4 var(--font-ui);padding:5px 6px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--secondary);}
+.eca-app .permission-picker:hover:not(:disabled) {background:var(--hover);}
+.eca-app .permission-picker.full-access {color:var(--accent);background:var(--accent-soft);}

@@ -1,4 +1,4 @@
-# npm 安装与 ecs 命令
+# npm 安装与 eca / ecs 命令
 
 当前提供本地 `.tgz` 安装包，尚未发布到 npm registry。安装和使用本地包无需 npm 账号；公开发布需要发布者账号。包名暂定 `easy-coding-agent-cli`，`private: true` 防止误发布；确认账号、可用包名和许可证后再发布。
 
@@ -9,7 +9,7 @@
 下载或构建本项目的安装包后：
 
 ```sh
-npm install -g ./easy-coding-agent-cli-0.20.0.tgz
+npm install -g ./easy-coding-agent-cli-0.24.0.tgz
 ecs --version
 ecs --setup
 cd your-project
@@ -20,14 +20,14 @@ ecs
 
 `--setup` 是可选的提前初始化。直接输入 `ecs` 也会在首次运行时自动建立独立虚拟环境，从包内 wheel 安装 ECA，并联网安装 Python 依赖。后续启动复用环境，无需手动激活 venv，也无需运行 Python 脚本。npm 安装阶段不运行 postinstall，不自动下载 Python 或模型。
 
-Windows PowerShell 通常也可以输入大写 `ECS`；跨平台统一使用小写 `ecs`。若 PowerShell 的脚本执行策略拦截 npm 生成的 shim，可使用 `ecs.cmd`，无需降低系统执行策略。旧 `eca` 命令继续支持 Python 安装方式，Python 包同时注册 `ecs` 别名。
+Windows PowerShell 通常也可以输入大写 `ECS`；跨平台统一使用小写 `ecs`。若 PowerShell 的脚本执行策略拦截 npm 生成的 shim，可使用 `ecs.cmd`，无需降低系统执行策略。npm 和 Python 安装方式均提供 `eca` 主命令与 `ecs` 兼容别名。
 
 ## Windows：存储放到 G 盘
 
 npm 默认全局目录可能在 C 盘。可显式安装到 G 盘：
 
 ```powershell
-npm install -g --prefix G:\DevTools\npm .\easy-coding-agent-cli-0.20.0.tgz --cache G:\DevCache\npm
+npm install -g --prefix G:\DevTools\npm .\easy-coding-agent-cli-0.24.0.tgz --cache G:\DevCache\npm
 G:\DevTools\npm\ecs.cmd --setup
 ```
 

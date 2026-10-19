@@ -24,6 +24,7 @@ from .store import Store
 from .tools import atomic_write, run_process
 from .doctor import diagnose
 from .usage import UsageLedger
+from .runtime import Runtime
 
 
 HELP = {
@@ -134,6 +135,7 @@ class App:
         self.store.save(self.state)
         self.prompt = None
         self.agent = self.make_agent()
+        self.runtime = Runtime(self.agent)
         self.streaming = False
 
     def make_agent(self):
@@ -207,8 +209,8 @@ class App:
             raise asyncio.CancelledError
 
     async def run_task(self, text):
-        from .workflow import verified_run
-        task = asyncio.create_task(verified_run(self.agent, text, self.args.verify_command, self.args.repair_attempts, self.args.worker_first))
+        self.runtime.agent = self.agent
+        task = self.runtime.start(text, self.args.verify_command, self.args.repair_attempts, self.args.worker_first)
         loop = asyncio.get_running_loop()
         previous = signal.getsignal(signal.SIGINT)
         def interrupt(*_):
@@ -277,20 +279,9 @@ class App:
             self.store.save(self.state)
             self.emit('notice', result)
         elif command in {"/new", "/resume"}:
-            state = self.store.create(self.settings.mode) if command == "/new" else self.store.load(arg or "latest")
-            selected = self.settings.select_profile(state['model_profile']) if state.get('model_profile') else self.settings
-            if state.get('sandbox') == 'docker':
-                selected.sandbox = 'docker'
-                selected.sandbox_image = state.get('sandbox_image', selected.sandbox_image)
-            await self.agent.close()
-            self.settings = selected
-            self.state = state
-            self.state.update(sandbox=selected.sandbox, sandbox_image=selected.sandbox_image)
-            self.settings.mode = state["mode"]
-            if self.settings.model_profile:
-                self.state["model_profile"] = self.settings.model_profile
-            self.store.save(self.state)
-            self.agent = self.make_agent()
+            self.runtime.agent = self.agent
+            self.agent = await self.runtime.switch(None if command == '/new' else arg or 'latest')
+            self.settings, self.state = self.agent.settings, self.agent.state
             self.status()
         elif command == '/related':
             self.emit('notice', await self.agent.tools.execute('code_relations', {'query': arg}))
@@ -520,8 +511,8 @@ class App:
         return 0
 
     async def close(self):
-        await self.agent.close()
-        self.store.close()
+        self.runtime.agent = self.agent
+        await self.runtime.close()
 
 
 async def async_main(args):

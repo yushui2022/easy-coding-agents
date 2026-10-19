@@ -124,6 +124,8 @@ class UpgradeTests(unittest.IsolatedAsyncioTestCase):
         # App uses this test's already locked Store; no second project writer.
         app = App.__new__(App)
         app.agent, app.state, app.settings = self.agent, self.agent.state, self.settings
+        from eca.runtime import Runtime
+        app.runtime = Runtime(self.agent)
         app.args = parser().parse_args(['-p', 'work', '--allow-shell', '--verify-command', 'pytest'])
         app.streaming = False
         app.emit = lambda *_: None

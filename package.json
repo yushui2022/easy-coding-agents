@@ -1,12 +1,12 @@
 {
   "name": "easy-coding-agent-cli",
-  "version": "0.20.0",
+  "version": "0.27.1",
   "private": true,
   "description": "Easy Coding Agent terminal launcher (ecs)",
   "license": "UNLICENSED",
   "repository": { "type": "git", "url": "https://github.com/yushui2022/easy-coding-agents.git" },
   "engines": { "node": ">=20" },
-  "bin": { "ecs": "bin/ecs.cjs" },
+  "bin": { "eca": "bin/ecs.cjs", "ecs": "bin/ecs.cjs" },
   "files": ["bin/ecs.cjs", "vendor/*.whl", "vendor/runtime.json", "docs/NPM_INSTALL.md"],
   "scripts": {
     "prepack": "node scripts/build-npm.cjs",

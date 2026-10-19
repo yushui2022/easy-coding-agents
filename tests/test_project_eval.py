@@ -81,6 +81,20 @@ def connect(path):
             (root / 'shop/orders.py').write_text(code, encoding='utf-8')
             checks, output = verify(name, root, originals)
             self.assertTrue(all(checks.values()), (name, checks, output))
+            if name == 'shop_migration':
+                # A successful migration can silently break the transaction
+                # behavior of callers that use `with db:` for rollback.
+                (root / 'shop/db.py').write_text(db_code.replace(
+                    'sqlite3.connect(path)', 'sqlite3.connect(path, isolation_level=None)'), encoding='utf-8')
+                checks, output = verify(name, root, originals)
+                self.assertFalse(checks['external_assertions'])
+                self.assertIn('rejected duplicate order consumed stock', output)
+                (root / 'shop/db.py').write_text(db_code.replace(
+                    "            db.execute('BEGIN')\n", ''), encoding='utf-8')
+                checks, output = verify(name, root, originals)
+                self.assertFalse(checks['external_assertions'])
+                self.assertIn('failed migration left partial schema changes', output)
+                (root / 'shop/db.py').write_text(db_code, encoding='utf-8')
             # Weakened public tests cannot hide acceptance failures.
             (root / 'test_shop.py').write_text('', encoding='utf-8')
             checks, _ = verify(name, root, originals)

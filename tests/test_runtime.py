@@ -67,6 +67,21 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("exactly once", result)
         self.assertEqual(path.read_text(), "a = 1\nb = 1\n")
 
+    async def test_read_explains_image_and_binary_limit_without_acknowledging_edit(self):
+        for name, raw, expected in [
+            ('screenshot.PNG', b'\x89PNG\r\n\x1a\n', 'Image input is not supported'),
+            ('unknown.bin', b'\xff\xfe\x00', 'UTF-8 text only'),
+            ('binary.dat', b'abc\x00def', 'Binary files are not supported'),
+        ]:
+            with self.subTest(name=name):
+                (self.root / name).write_bytes(raw)
+                message = await self.tools.execute('read', {'path': name})
+                self.assertTrue(message.startswith('Error:'))
+                self.assertIn(expected, message)
+                self.assertEqual((self.root / name).read_bytes(), raw)
+        (self.root / '正常.txt').write_text('第一行\n第二行', encoding='utf-8-sig')
+        self.assertIn('2: 第二行', await self.tools.read('正常.txt', offset=2, limit=1))
+
     async def test_permission_denied_does_not_write(self):
         self.tools.approve = no
         result = await self.tools.execute("write", {"path": "new.txt", "content": "no"})
@@ -188,15 +203,18 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.state["status"], "blocked")
 
     async def test_context_trimming_preserves_full_turns(self):
-        self.settings.context_chars = 2400
         self.state["messages"] = [{"role": "user", "content": "old" + "x" * 1000}, call("read", {"path": "a"}),
                                  {"role": "tool", "tool_call_id": "call1", "content": "y" * 1000},
                                  {"role": "user", "content": "new"}]
         agent = Agent(self.settings, self.store, self.state, yes, yes, lambda *_: None, FakeProvider([]))
+        # Keep room for the mandatory prompt and current short turn, but not
+        # the old tool turn. Prompt wording and temporary path length vary.
+        self.settings.context_chars = len(agent.system_prompt()) + 500
         context = agent.context()
         self.assertEqual(context[-1]["content"], "new")
         self.assertFalse(any(m["role"] == "tool" for m in context))
         self.assertEqual(len(self.state["messages"]), 4)
+        self.assertLessEqual(len(json.dumps(context, ensure_ascii=False)), self.settings.context_chars)
 
     async def test_compact_retains_archive(self):
         self.state["messages"] = [{"role": "user", "content": "old"}, {"role": "assistant", "content": "answer"}]

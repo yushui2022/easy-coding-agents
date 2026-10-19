@@ -1,5 +1,6 @@
 """User-selected checks and explicitly bounded repair, never implicit replay."""
 import json
+import asyncio
 import uuid
 
 
@@ -13,13 +14,17 @@ def suite_status(agent):
     return record
 
 
-async def verified_run(agent, prompt, commands, repair_attempts=0, worker_first=None):
-    if not 0 <= repair_attempts <= 3 or (repair_attempts and not commands):
+def validate_checks(agent, commands, repair_attempts):
+    if type(repair_attempts) is not int or not 0 <= repair_attempts <= 3 or (repair_attempts and not commands):
         raise ValueError('Repair requires checks and a budget of 0..3')
-    if len(commands) > 10 or any(not isinstance(c, str) or not c.strip() for c in commands):
+    if not isinstance(commands, (list, tuple)) or len(commands) > 10 or any(not isinstance(c, str) or not c.strip() for c in commands):
         raise ValueError('Supply at most 10 nonempty verification commands')
     if repair_attempts and (agent.settings.mode != 'code' or agent.state.get('isolated')):
         raise ValueError('Automatic repair requires non-isolated code mode')
+
+
+async def verified_run(agent, prompt, commands, repair_attempts=0, worker_first=None):
+    validate_checks(agent, commands, repair_attempts)
     if worker_first is not None:
         from .models import worker_settings
         if not commands or agent.settings.mode != 'code' or agent.state.get('isolated') or agent.child:
@@ -27,12 +32,16 @@ async def verified_run(agent, prompt, commands, repair_attempts=0, worker_first=
         if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 12000 or agent.busy:
             raise ValueError('Worker-first requires an idle agent and a task of 1..12000 characters')
         worker_settings(agent.settings, worker_first)  # Validate before any model or command dispatch.
-    suite = {'status': 'running', 'commands': list(commands), 'rounds': [], 'repair_budget': repair_attempts}
+    suite = {'status': 'running' if commands else 'not_run', 'commands': list(commands), 'rounds': [], 'repair_budget': repair_attempts}
     failures_seen = set()
     previously_passed = set()
-    if commands:
+    def publish():
         agent.state['verification_suite'] = suite
         agent.store.save(agent.state)
+        agent.emit('verification_progress', json.loads(json.dumps(suite)))
+    # Each task gets its own evidence; do not display a previous task's success.
+    agent.state['verification'] = {'status': 'not_run'}
+    publish()
     try:
         if worker_first is None:
             await agent.run(prompt)
@@ -45,10 +54,10 @@ async def verified_run(agent, prompt, commands, repair_attempts=0, worker_first=
                 suite['status'] = 'task_incomplete'
                 return False
             suite['status'] = 'running'
-            before = agent.memory().fingerprint()
+            before = await asyncio.to_thread(agent.memory().fingerprint)
             row = {'attempt': attempt, 'checks': [], 'status': 'running'}
             suite['rounds'].append(row)
-            agent.store.save(agent.state)
+            publish()
             repairable = False
             for command in commands:
                 passed = await agent.verify(command)
@@ -57,7 +66,7 @@ async def verified_run(agent, prompt, commands, repair_attempts=0, worker_first=
                 if passed:
                     previously_passed.add(command)
                 row['checks'].append(check)
-                agent.store.save(agent.state)
+                publish()
                 if passed and (not before or check.get('fingerprint') != before):
                     row['status'] = suite['status'] = 'unconfirmed_snapshot'
                     return False
@@ -65,7 +74,7 @@ async def verified_run(agent, prompt, commands, repair_attempts=0, worker_first=
                     repairable = check.get('repair_allowed', False)
                     break
             else:
-                if before and agent.memory().fingerprint() == before:
+                if before and await asyncio.to_thread(agent.memory().fingerprint) == before:
                     row['status'] = suite['status'] = 'passed'
                     suite['fingerprint'] = before
                     return True
@@ -85,7 +94,7 @@ async def verified_run(agent, prompt, commands, repair_attempts=0, worker_first=
                 suite['stop_reason'] = 'repair_budget_exhausted' if repairable else 'unsafe_to_retry'
                 return False
             suite['status'] = 'repairing'
-            agent.store.save(agent.state)
+            publish()
             if worker_first is not None:
                 suite['handoff'] = {'model': agent.settings.model, 'attempt': attempt + 1, 'reason': 'repairable_check_failure'}
                 agent.store.save(agent.state)

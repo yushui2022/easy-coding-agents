@@ -38,7 +38,7 @@ SCHEMAS = [
     schema('code_search', 'Search an incremental source index. Optional path restricts results to a relative file/directory. Returns ranked files, lines and read statistics.', {'query': STR, 'limit': INT, 'path': STR}, ['query']),
     schema('repo_map', 'Get bounded file symbols and import summaries. Python uses AST; other languages use lexical hints. Optional query and relative path.', {'query': STR, 'limit': INT, 'path': STR}, []),
     schema('code_relations', 'Find definitions and Python call/import sites for one symbol, with test-file hints. Syntactic candidates only: same names may be unrelated, aliases/dynamic calls may be missed. Optional relative path.', {'query': STR, 'limit': INT, 'path': STR}, ['query']),
-    schema("read", "Read a UTF-8 text file with 1-based lines. Read before editing.", {"path": STR, "offset": INT, "limit": INT}, ["path"]),
+    schema("read", "Read a UTF-8 text file with 1-based lines. Read before editing. Images and binary files are not supported; this tool cannot inspect screenshots.", {"path": STR, "offset": INT, "limit": INT}, ["path"]),
     schema("glob", "Find workspace files; ignores build/cache/secret directories.", {"pattern": STR}, ["pattern"]),
     schema("grep", "Search literal text in workspace files; optional filename glob.", {"query": STR, "include": STR}, ["query"]),
     schema("write", "Create or overwrite a UTF-8 file with diff approval; prefer edit for existing files.", {"path": STR, "content": STR}, ["path", "content"]),
@@ -211,6 +211,8 @@ class Tools:
                     yield path
 
     async def execute(self, name, args):
+        if self.state.get('kind') == 'side_chat' and name not in {'read', 'glob', 'grep'}:
+            return 'Denied: side chats may only read and search project files.'
         if name in {'lsp_rename', 'lsp_apply'} and (self.settings.sandbox == 'docker' or self.state.get('isolated')):
             return 'Denied: host LSP refactoring is disabled in isolated execution.'
         if name.startswith('process_') and (self.settings.sandbox == 'docker' or self.state.get('isolated') or getattr(self, 'mcp_disabled', False)):
@@ -294,10 +296,18 @@ class Tools:
         target = self.path(path)
         if offset < 1 or not 1 <= limit <= 2000:
             raise ValueError("offset >= 1; limit must be 1..2000")
-        if target.stat().st_size > 2_000_000:
+        size = target.stat().st_size
+        if target.suffix.lower() in {'.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.ico', '.avif', '.tiff', '.heic'}:
+            raise ValueError("Image input is not supported by read; it only reads UTF-8 text. "
+                             "Retrying or converting the image to text/base64 will not provide visual evidence. "
+                             "Report that visual inspection is unavailable unless a separate image-capable tool is available.")
+        if size > 2_000_000:
             raise ValueError("File exceeds 2 MB read limit")
         raw = target.read_bytes()
-        text = raw.decode("utf-8-sig")
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            raise ValueError("read supports UTF-8 text only; this file is binary or uses another encoding.") from None
         if "\x00" in text:
             raise ValueError("Binary files are not supported")
         self.remember_file(target, raw)
@@ -428,8 +438,15 @@ class Tools:
         if ident is not None:
             self.changes.mark(ident, "applied")
         self.remember_file(path, content.encode('utf-8') if content is not None else None)
+        from .impact import inspect_change, remember, guidance
+        impact = inspect_change(relative, old if before is not None else None, content)
+        hint = ''
+        if impact:
+            remember(self.state, impact)
+            self.emit('change_impact', impact)
+            hint = guidance([impact])
         review = f" Change #{ident}; review with /changes {ident}, undo with /undo {ident}." if ident is not None else ""
-        return f"{'Deleted' if content is None else 'Saved'} {relative}.{review} This is not a test result; run appropriate checks."
+        return f"{'Deleted' if content is None else 'Saved'} {relative}.{review} This is not a test result; run appropriate checks." + hint
 
     async def delete(self, path):
         # Reject aliases rather than deleting their resolved target.

@@ -21,6 +21,7 @@ command_timeout = 120
 request_timeout = 120
 output_limit = 24000
 stream_usage = true # request usage in OpenAI-compatible streams; false for incompatible servers
+thinking_mode = "default" # DeepSeek Chat: fast (disabled), balanced (low), deep (high); others use default
 subagent_max_turns = 6 # per child; also bounded by parent max_turns
 subagent_concurrency = 2 # simultaneous children, 1..8; excess tasks wait
 subagent_max_calls = 3 # per parent run; no recursive delegation

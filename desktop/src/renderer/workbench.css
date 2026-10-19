@@ -1,0 +1,65 @@
+/* Workbench controls and progressive detail disclosure. Existing layout owns its surfaces. */
+.eca-app .session-search {display:flex;align-items:center;gap:6px;margin:0 0 8px;padding:0 10px;border:1px solid transparent;border-radius:7px;background:var(--hover);color:var(--muted);}
+.eca-app .session-search:focus-within {border-color:var(--control-border);background:var(--surface);}
+.eca-app .session-search input {min-width:0;width:100%;height:30px;border:0;background:transparent;padding:4px 0;font-size:12px;}
+.eca-app .session-search .icon-button {min-width:22px;min-height:24px;padding:2px;}
+.nav-collapsed .sidebar {padding:0 8px;}
+.nav-collapsed .brand {padding:0;justify-content:center;}
+.nav-collapsed .brand :not(img),.nav-collapsed .sidebar > :is(.section-heading,.project-current,.recent,.nav-empty,.session-search,.session-list),.nav-collapsed .sidebar-bottom :is(span,footer) {display:none;}
+.nav-collapsed .open-project {font-size:0;gap:0;padding:8px;}
+.nav-collapsed .open-project > svg:last-child {display:none;}
+.nav-collapsed .sidebar-bottom {margin-top:auto;}
+.nav-collapsed .settings-button {justify-content:center;}
+.eca-app .tool-name {flex-shrink:0;font-weight:500;color:var(--text);}
+.eca-app .tool-target {min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-code);}
+.eca-app .tool-outcome {display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-size:11px;}
+.eca-app .failed {color:var(--danger);}
+.eca-app .tool-detail {border-top:1px solid var(--border);padding:12px;}
+.eca-app .tool-detail .panel-label {margin:8px 0;}
+.eca-app .tool-detail pre {border:0;padding:8px;background:var(--code);}
+.eca-app .log-more {font-size:12px;margin:8px 0;}
+.eca-app .lazy-detail pre {font:12px/1.7 var(--font-code);white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto;}
+.eca-app .runtime-note {max-width:800px;margin:8px auto 16px;color:var(--secondary);font-size:12px;border-bottom:1px solid var(--border);padding-bottom:10px;}
+.eca-app .runtime-note summary {display:flex;align-items:center;gap:8px;}
+.eca-app .runtime-note pre {padding:12px;background:var(--code);}
+.eca-app .stream-text {white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;}
+.eca-app .scroll-return {display:flex;justify-content:center;margin-bottom:8px;}
+.eca-app .jump-latest {font-size:12px;border-radius:18px;}
+.eca-app .check-round {margin:18px 0;border-top:1px solid var(--border);padding-top:12px;}
+.eca-app .check-round-title {font-size:12px;font-weight:600;color:var(--text);}
+.eca-app .check-record > summary {display:flex;gap:8px;align-items:baseline;line-height:1.7;}
+.eca-app .check-record > summary span {flex-shrink:0;}
+.eca-app .check-record code {font:11px/1.7 var(--font-code);overflow-wrap:anywhere;}
+.eca-app .approval .actions {position:sticky;bottom:-14px;margin:8px -16px -14px;padding:10px 16px;background:var(--panel);border-top:1px solid var(--border);}
+.eca-app .approval-detail pre {margin:8px 0;max-height:120px;}
+.eca-app .history-gap {font-size:12px;color:var(--secondary);padding:10px 0;border-block:1px solid var(--border);margin-bottom:18px;}
+.eca-app .execution-group {max-width:800px;margin:0 auto 24px;font-size:12px;}
+.eca-app .execution-heading {display:flex;align-items:center;gap:8px;min-height:34px;margin-bottom:6px;color:var(--secondary);}
+.eca-app .execution-heading strong {font-weight:500;color:var(--text);}
+.eca-app .execution-count {color:var(--muted);font-variant-numeric:tabular-nums;}
+.eca-app .execution-totals {margin-left:auto;display:flex;flex-wrap:wrap;gap:10px;font-size:11px;font-variant-numeric:tabular-nums;}
+.eca-app .execution-totals .count-error {color:var(--danger);}
+.eca-app .execution-steps {border-left:1px solid var(--border);margin-left:7px;padding-left:12px;}
+.eca-app .execution-group .tool-record {margin:0;border:0;background:transparent;border-radius:5px;}
+.eca-app .execution-group .tool-record > summary {min-height:36px;padding:7px 8px;gap:8px;}
+.eca-app .execution-group .tool-record > summary:hover {background:var(--panel);}
+.eca-app .execution-group .tool-record[open] {background:var(--panel);margin-block:3px 8px;}
+.eca-app .execution-group .tool-record > summary > svg {flex-shrink:0;}
+.eca-app .execution-group .tool-target {font-size:12px;}
+.eca-app .execution-group .tool-detail {margin-inline:8px;border-top:1px solid var(--border);padding:4px 8px 12px;}
+.eca-app .execution-group .tool-error-hint {display:block;font:11px/1.7 system-ui,sans-serif;color:var(--danger);overflow:hidden;text-overflow:ellipsis;}
+.eca-app .outcome-error .tool-outcome {color:var(--danger);}
+.eca-app .execution-group .outcome-error {background:var(--danger-soft); margin-block:3px;}
+.eca-app .outcome-pending .tool-outcome {color:var(--accent);}
+.eca-app .execution-fold,.eca-app .execution-toggle {display:flex;align-items:center;gap:8px;background:transparent;border:0;box-shadow:none;font-size:11px;color:var(--secondary);min-height:30px;padding:5px 8px;}
+.eca-app .execution-toggle {margin-left:20px;}
+.eca-app .execution-fold:hover,.eca-app .execution-toggle:hover {color:var(--text);background:var(--panel);}
+.eca-app .messages {container-type:inline-size;}
+@container (max-width:560px) {
+  .eca-app .execution-heading {flex-wrap:wrap;}
+  .eca-app .execution-totals {gap:7px;}
+  .eca-app .execution-group .tool-record > summary {display:grid;grid-template-columns:12px 15px auto minmax(0,1fr);gap:6px;}
+  .eca-app .execution-group .tool-target {grid-column:3/5;grid-row:2;}
+  .eca-app .execution-group .tool-outcome {grid-column:4;grid-row:1;justify-self:end;}
+}
+@media(prefers-reduced-motion:reduce) {.eca-app * {scroll-behavior:auto;}}

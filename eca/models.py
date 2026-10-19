@@ -4,7 +4,7 @@ import os
 import re
 from dotenv import dotenv_values
 
-FIELDS = {'model', 'base_url', 'api_format', 'api_key_env', 'reasoning_effort',
+FIELDS = {'model', 'base_url', 'api_format', 'api_key_env', 'reasoning_effort', 'thinking_mode',
           'max_output_tokens', 'context_chars', 'stream_usage', 'context_window_tokens', 'context_reserve_tokens'}
 
 
@@ -33,7 +33,7 @@ def select(settings, name):
     result = replace(settings, **{k:v for k,v in cfg.items() if k != 'api_key_env'},
                      api_key=env.get(cfg['api_key_env'], ''), model_profile=name)
     # Reset model-specific optional knobs instead of inheriting another endpoint's values.
-    for name, default in [('reasoning_effort', ''), ('stream_usage', True),
+    for name, default in [('reasoning_effort', ''), ('thinking_mode', 'default'), ('stream_usage', True),
                           ('max_output_tokens', 8192), ('context_chars', 100_000),
                           ('context_window_tokens', 32768), ('context_reserve_tokens', 1024)]:
         if name not in cfg:
