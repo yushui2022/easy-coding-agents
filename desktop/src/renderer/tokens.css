@@ -2,6 +2,10 @@
 :root {
   color-scheme: light dark;
   --surface: #ffffff;
+  --canvas: #fafaf9;
+  --context-surface: #eeefed;
+  --action: #2c302d;
+  --on-action: #ffffff;
   --sidebar: #f4f5f3;
   --panel: #fafbf9;
   --text: #242923;
@@ -20,7 +24,7 @@
   --danger-soft: #fcf0f0;
   --code: #f2f4f0;
   --shadow-control: 0 1px 3px #2633220b;
-  --shadow-composer: 0 3px 16px #26332208, 0 1px 3px #26332206;
+  --shadow-composer: 0 6px 28px #2633220b, 0 1px 5px #26332208;
   --shadow-dialog: 0 24px 80px #18231d30;
   --radius-control: 7px;
   --radius-panel: 12px;
@@ -44,7 +48,11 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --surface: #1d201e;
+    --surface: #222523;
+    --canvas: #1b1e1c;
+    --context-surface: #2a2e2b;
+    --action: #e9ede7;
+    --on-action: #242923;
     --sidebar: #181b19;
     --panel: #1a1e1b;
     --text: #e9ede7;

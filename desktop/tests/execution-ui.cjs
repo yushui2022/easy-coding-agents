@@ -55,7 +55,11 @@ async function capture(name,selector) {
   await capture('composer-footer','.composer-meta');
   await page.locator('.checks>summary').click();
   await page.getByLabel('验证命令').fill('npm test\nnpm run build');
-  await capture('composer-check-settings','.composer-wrap');
+  await capture('composer-check-settings','.conversation');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.checks')).not.toHaveAttribute('open');
+  await expect(page.locator('.checks>summary')).toBeFocused();
+  await page.locator('.checks>summary').click();
   await page.getByLabel('验证命令').fill('');
   await page.locator('.checks>summary').click();
   await group.getByRole('button',{name:'查看全部 8 项操作'}).click();
@@ -86,6 +90,8 @@ async function capture(name,selector) {
   await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setContentSize(1440,900));
   await page.getByRole('button',{name:'新建会话',exact:true}).click();
   await expect(page.locator('.welcome h1')).toBeVisible();
+  await page.locator('.welcome-art').evaluate(image=>image.decode());
+  await expect(page.getByRole('button',{name:'切换工作项目'})).toHaveText('场景 工作区');
   await expect(page.locator('.model-chip')).toContainText('快速');
   await page.getByRole('button',{name:'了解项目',exact:true}).click();
   await expect(page.getByLabel('任务指令')).toHaveValue('梳理项目结构、运行方式和核心模块，先不要修改代码。');
@@ -121,7 +127,7 @@ async function capture(name,selector) {
   await expect(page.getByLabel('任务指令')).toBeVisible();
   await page.getByLabel('任务指令').fill('检查窄窗口输入与布局');
   await capture('visual-welcome-narrow');
-  report.checks=['grouping','visible failures','relative paths','lazy output','keyboard expansion','full records','opened-row pinning','dark and narrow layouts','reload','welcome and settings in both themes','side chat empty state','narrow workspace Escape and editable composer','thinking badge and quick task draft without submission'];
+  report.checks=['grouping','visible failures','relative paths','lazy output','keyboard expansion','full records','opened-row pinning','dark and narrow layouts','reload','welcome and settings in both themes','side chat empty state','narrow workspace Escape and editable composer','thinking badge and quick task draft without submission','local welcome image and project context','verification popover Escape restores focus'];
   report.renderer_errors=errors;if(errors.length)throw Error(errors.join('\n'));
   report.version=await app.evaluate(({app})=>app.getVersion());
   fs.writeFileSync(path.join(output,'execution-ui-report.json'),JSON.stringify(report,null,2));

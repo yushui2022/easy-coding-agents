@@ -6,4 +6,5 @@ await build({entryPoints:['src/main/terminal-host.ts'],outfile:'dist/main/termin
 await build({entryPoints:['src/preload/index.ts'],outfile:'dist/preload/index.cjs',bundle:true,platform:'node',format:'cjs',external:['electron']});
 await build({entryPoints:['src/renderer/index.tsx'],outfile:'dist/renderer/app.js',bundle:true,platform:'browser',format:'iife',minify:true,define:{'process.env.NODE_ENV':'"production"'}});
 await copyFile('../docs/assets/eca-logo-v1.png','dist/renderer/logo.png');
+await copyFile('src/renderer/assets/eca-code-loop.png','dist/renderer/welcome-loop.png');
 await writeFile('dist/renderer/index.html', `<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><title>ECA Desktop</title><link rel="stylesheet" href="./app.css"></head><body><div id="root"></div><script src="./app.js"></script></body></html>`);

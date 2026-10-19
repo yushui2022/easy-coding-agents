@@ -47,7 +47,7 @@ body {margin: 0; font-family: var(--font-ui);}
 .eca-app .brand strong {font-size: 17px; letter-spacing: -.5px;}
 .eca-app .brand > span {color: var(--secondary); font-size: 12px;}
 .eca-app .brand .preview {font-size: 10px; margin-left: auto; color: var(--muted); padding: 2px 4px; border-radius: 4px; background: var(--hover);}
-.eca-app .open-project {width: 100%; justify-content: flex-start; margin: 6px 0 0; min-height: 36px; background: var(--surface); border-color: var(--border); box-shadow: var(--shadow-control);}
+.eca-app .open-project {width: 100%; justify-content: flex-start; margin: 6px 0 0; min-height: 36px; background: transparent; border-color: transparent; box-shadow: none;}
 .eca-app .open-project > svg:last-child {margin-left: auto; color: var(--muted);}
 .eca-app .section-heading {
   display: flex; justify-content: space-between; align-items: center;
@@ -62,14 +62,17 @@ body {margin: 0; font-family: var(--font-ui);}
 .eca-app .session-heading {margin-top: 18px; margin-bottom: 5px;}
 .eca-app .session-list {overflow: auto; min-height: 50px; flex: 1;}
 .eca-app .session-list button {border: 0; background: transparent; width: 100%; text-align: left; justify-content: flex-start; margin: 3px 0; min-height: 36px; color: var(--secondary);}
-.eca-app .session-list button.selected {background: var(--selected); color: var(--text); box-shadow: var(--shadow-control);}
+.eca-app .session-list button.selected {background:var(--hover);color:var(--text);box-shadow:none;}
 .eca-app .session-list button.selected > svg {color: var(--accent);}
 .eca-app .sidebar-bottom {border-top: 1px solid var(--border); margin-top: 16px; padding: 10px 0 12px;}
 .eca-app .settings-button {border: 0; background: transparent; justify-content: flex-start; width: 100%;}
 .eca-app .settings-button .connection-dot {margin-left: auto;}
 .eca-app .sidebar footer {display: flex; justify-content: space-between; color: var(--muted); font-size: 11px; padding: 9px 10px 0;}
-.eca-app .conversation {display: flex; flex-direction: column; min-width: 0; min-height: 0;}
+.eca-app .conversation {display:flex;flex-direction:column;min-width:0;min-height:0;container-type:inline-size;background:var(--canvas);}
 .eca-app .conversation-header {height: var(--header-height); flex-shrink: 0; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; padding: 0 22px;}
+.eca-app .conversation:has(.is-empty) .conversation-header {border-bottom-color:transparent;}
+.eca-app .conversation:has(.is-empty) .workspace-title>span {display:none;}
+.eca-app .conversation:has(.is-empty) .status {background:transparent;}
 .eca-app .workspace-title {display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; color: var(--secondary);}
 .eca-app .workspace-title > span {font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
 .eca-app .workspace-title strong {font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
@@ -80,32 +83,40 @@ body {margin: 0; font-family: var(--font-ui);}
 .eca-app .status-dot.active {background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);}
 .eca-app .work-area {position: relative; display: flex; flex: 1; flex-direction: column; min-height: 0;}
 .eca-app .transcript {flex: 1; overflow: auto; padding: 28px var(--space-8) var(--space-3); min-height: 0; overflow-anchor: none;}
-.eca-app .work-area.is-empty {overflow-y: auto; padding-top: clamp(36px, 12vh, 112px); padding-bottom: 24px;}
-.eca-app .is-empty .transcript {flex: 0 0 auto; overflow: visible; padding-top: 0; padding-bottom: 0;}
-.eca-app .welcome {max-width: 640px; margin: 0 auto 22px;}
-.eca-app .welcome h1 {font-size: 24px; letter-spacing: -.4px; font-weight: 600; line-height: 1.5; margin: 0 0 8px;}
-.eca-app .welcome p {font-size: 13px; color: var(--secondary); margin: 0;}
-.eca-app .composer-wrap {flex-shrink: 0; width: 100%; max-width: 864px; padding: var(--space-3) var(--space-8) var(--space-4); margin: 0 auto;}
-.eca-app .is-empty .composer-wrap {max-width: 704px; padding-top: 0;}
-.eca-app .composer {background: var(--surface); border: 1px solid var(--control-border); border-radius: 14px; box-shadow: var(--shadow-composer); transition: border-color 120ms ease, box-shadow 120ms ease;}
-.eca-app .composer:focus-within {border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft);}
-.eca-app .composer textarea {display: block; width: 100%; border: 0; background: transparent; border-radius: 14px 14px 0 0; min-height: 72px; max-height: min(180px, 25vh); padding: 16px 18px; font: 14px/1.75 var(--font-reading); resize: vertical;}
-.eca-app .composer textarea:focus-visible {outline: none;}
-.eca-app .is-empty .composer textarea {min-height: 96px;}
-.eca-app .composer-toolbar {display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; padding: 8px 10px; background: var(--panel); border-top: 1px solid var(--border); border-radius: 0 0 13px 13px;}
-.eca-app .model-chip {border: 0; color: var(--secondary); background: transparent; min-height: 30px; max-width: 100%; font-size: 12px; padding: 5px 7px;}
-.eca-app .model-chip > span:nth-child(2) {overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
-.eca-app .send-button {min-height: 32px; min-width: 32px; border-radius: 9px; padding: 6px 8px; font-size: 12px; white-space: nowrap;}
-.eca-app .send-button span {padding: 0 2px;}
-.eca-app .stop-button {min-height: 31px; color: var(--danger); border-color: var(--control-border); font-size: 12px;}
-.eca-app .composer-meta {position: relative; margin-top: 5px; color: var(--secondary); font-size: 11px; container-type: inline-size;}
-.eca-app .checks summary {display: flex; align-items: center; gap: 6px; width: fit-content; min-height: 28px; padding: 3px 7px; border-radius: 5px; list-style: none; color: var(--secondary); cursor: pointer; transition: background 120ms ease;}
-.eca-app .checks summary::-webkit-details-marker {display: none;}
-.eca-app .checks summary:hover,.eca-app .checks[open] summary {background: var(--hover); color: var(--text);}
+.eca-app .work-area.is-empty {overflow-y:auto;}
+.eca-app .is-empty .transcript {display:grid;place-items:center;flex:1 0 240px;overflow:visible;padding:32px var(--space-8) 64px;}
+.eca-app .welcome {width:100%;max-width:820px;margin:auto;text-align:center;}
+.eca-app .welcome-art {display:block;width:64px;height:64px;object-fit:contain;margin:0 auto 26px;}
+.eca-app .welcome h1 {font-size:clamp(24px,3.2cqw,32px);letter-spacing:-.7px;font-weight:450;line-height:1.55;margin:0;text-wrap:balance;}
+.eca-app .welcome-project {display:inline;max-width:100%;min-height:0;font:inherit;vertical-align:baseline;color:inherit;background:transparent;border:0;border-radius:2px;padding:0;text-decoration:underline dotted var(--control-border);text-underline-offset:6px;text-decoration-thickness:1px;overflow-wrap:anywhere;}
+.eca-app .welcome-project:hover:not(:disabled) {background:transparent;text-decoration-color:var(--secondary);}
+.eca-app .welcome p {font-size:13px;color:var(--secondary);margin:12px 0 0;}
+.eca-app .composer-wrap {position:relative;flex-shrink:0;width:100%;max-width:900px;padding:var(--space-3) var(--space-8) var(--space-3);margin:0 auto;}
+.eca-app .composer-context {display:flex;align-items:center;gap:18px;min-width:0;margin:0 14px -14px;padding:6px 14px 20px;background:var(--context-surface);border-radius:16px 16px 0 0;color:var(--secondary);font-size:11px;}
+.eca-app .composer-context button {border:0;background:transparent;font-size:11px;min-height:26px;padding:3px 2px;min-width:0;max-width:65%;color:var(--secondary);}
+.eca-app .composer-context button span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.eca-app .local-context {display:inline-flex;align-items:center;gap:6px;white-space:nowrap;color:var(--muted);}
+.eca-app .composer {position:relative;container:composer / inline-size;background:var(--surface);border:1px solid var(--border);border-radius:22px;box-shadow:var(--shadow-composer);transition:border-color 120ms ease,box-shadow 120ms ease;}
+.eca-app .composer:focus-within {border-color:var(--control-border);box-shadow:var(--shadow-composer),0 0 0 1px var(--border);}
+.eca-app .composer textarea {display:block;width:100%;border:0;background:transparent;border-radius:22px 22px 0 0;min-height:80px;max-height:min(180px,25vh);padding:16px 18px 8px;font:14px/1.75 var(--font-reading);resize:none;}
+.eca-app .composer textarea:focus-visible {outline:none;}
+.eca-app .composer-toolbar {display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 14px;padding:8px 12px 10px;}
+.eca-app .model-chip {border:0;color:var(--secondary);background:transparent;min-height:30px;min-width:0;max-width:280px;font-size:12px;padding:5px 4px;}
+.eca-app .model-chip > span:nth-child(2) {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.eca-app .model-chip > .connection-dot {width:5px;height:5px;}
+.eca-app button.send-button {flex-shrink:0;min-height:32px;min-width:32px;border-radius:50%;padding:6px;background:var(--action);border-color:var(--action);color:var(--on-action);font-size:12px;white-space:nowrap;}
+.eca-app button.send-button:hover:not(:disabled) {background:var(--action);}
+.eca-app .send-button:has(span) {border-radius:16px;padding-inline:10px;}
+.eca-app .send-button span {padding:0 2px;}
+.eca-app .stop-button {flex-shrink:0;min-height:32px;color:var(--danger);border-color:transparent;border-radius:16px;background:var(--danger-soft);font-size:12px;}
+.eca-app .composer-meta {display:flex;justify-content:flex-end;align-items:center;min-height:22px;padding:4px 6px 0;color:var(--muted);font-size:10px;}
+.eca-app .checks summary {display:flex;align-items:center;gap:5px;width:fit-content;min-height:30px;padding:4px 5px;border-radius:6px;list-style:none;color:var(--secondary);cursor:pointer;transition:background 120ms ease;}
+.eca-app .checks summary::-webkit-details-marker {display:none;}
+.eca-app .checks summary:hover,.eca-app .checks[open] summary {background:var(--hover);color:var(--text);}
 .eca-app .check-count {font-variant-numeric: tabular-nums; padding: 0 5px; border-radius: 3px; background: var(--code); color: var(--secondary); font-size: 10px;}
 .eca-app .checks-caret {color: var(--muted); transition: transform 120ms ease;}
 .eca-app .checks[open] .checks-caret {transform: rotate(180deg);}
-.eca-app .check-settings {margin-top: 6px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel);}
+.eca-app .check-settings {position:absolute;z-index:4;bottom:calc(100% + 10px);left:10px;width:min(380px,calc(100% - 20px));max-height:min(340px,60vh);overflow:auto;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface);box-shadow:var(--shadow-dialog);text-align:left;}
 .eca-app .check-settings-heading {display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 5px 12px; font-size: 11px;}
 .eca-app .check-settings-heading label {font-weight: 500; color: var(--text);}
 .eca-app .check-settings-heading span {color: var(--muted);}
@@ -117,14 +128,19 @@ body {margin: 0; font-family: var(--font-ui);}
 .eca-app .impact-review summary {cursor: pointer; color: var(--secondary);}
 .eca-app .impact-review strong {display: block; margin-top: 12px; font-weight: 500;}
 .eca-app .impact-review p {color: var(--secondary); line-height: 1.6;}
-.eca-app .keyboard-hint {position: absolute; right: 5px; top: 0; display: flex; align-items: center; gap: 12px; height: 28px; color: var(--muted); font-size: 10px; pointer-events: none;}
-.eca-app .keyboard-hint>span {display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;}
-.eca-app .keyboard-hint kbd {font: 10px/17px var(--font-ui); color: var(--muted);}
-@container (max-width: 360px) {.eca-app .keyboard-hint>span:first-child {display: none;}}
-.eca-app .suggestions {display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; margin-top: 24px;}
-.eca-app .suggestions-label {font-size: 11px; color: var(--muted); margin-right: 4px;}
-.eca-app .suggestions button {min-height: 30px; font-size: 12px; color: var(--secondary); background: transparent; border: 0; border-radius: 6px; padding: 5px 6px;}
-.eca-app .suggestions button:hover:not(:disabled) {color: var(--text);}
+.eca-app .keyboard-hint {display:flex;align-items:center;gap:12px;color:var(--muted);font-size:10px;pointer-events:none;opacity:0;transition:opacity 120ms ease;}
+.eca-app .composer-wrap:focus-within .keyboard-hint,.eca-app .composer-wrap:hover .keyboard-hint {opacity:1;}
+.eca-app .keyboard-hint>span {display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+.eca-app .keyboard-hint kbd {font:10px/17px var(--font-ui);color:inherit;}
+.eca-app .suggestions {display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:6px 20px;margin-top:24px;}
+.eca-app .suggestions button {min-height:28px;font-size:11px;color:var(--muted);background:transparent;border:0;border-radius:6px;padding:5px 4px;}
+.eca-app .suggestions button:hover:not(:disabled) {color:var(--text);}
+@container composer (max-width:480px) {
+  .eca-app .checks summary>span:not(.check-count),.eca-app .checks-caret {display:none;}
+  .eca-app .model-chip {max-width:180px;}
+  .eca-app .thinking-badge {display:none;}
+  .eca-app .composer-toolbar {gap:6px;}
+}
 .eca-app .composer-notice {display: flex; align-items: center; gap: 6px; color: var(--success); font-size: 12px; margin-top: 12px;}
 .eca-app .error-banner {background: var(--accent-soft); border-bottom: 1px solid var(--border); color: var(--danger); padding: 10px 20px; display: flex; align-items: center; gap: 10px; max-height: 170px; overflow: auto;}
 .eca-app .error-banner span {flex: 1; overflow-wrap: anywhere; line-height: 1.6;}
@@ -244,8 +260,9 @@ body {margin: 0; font-family: var(--font-ui);}
   .eca-app .composer-wrap {padding-left: 20px; padding-right: 20px;}
 }
 @media (max-height: 680px) {
-  .eca-app .work-area.is-empty {padding-top: 26px; padding-bottom: 10px;}
-  .eca-app .welcome h1 {font-size: 22px;}
+  .eca-app .is-empty .transcript {flex-basis:190px;padding:20px 24px 28px;}
+  .eca-app .welcome-art {width:48px;height:48px;margin-bottom:16px;}
+  .eca-app .welcome h1 {font-size:24px;}
   .eca-app .suggestions {margin-top: 18px;}
   .eca-app .dialog-body {padding-top: 16px;}
 }
@@ -295,11 +312,12 @@ body {margin: 0; font-family: var(--font-ui);}
 /* Live work is visible even while the model is only producing reasoning or arguments. */
 .run-activity{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:8px 2px;background:var(--surface);font-size:12px}
 .run-activity>div{display:grid;gap:5px;flex:1}.run-activity strong{font-weight:500}.run-activity small,.run-activity time{color:var(--muted)}.run-activity time{font-variant-numeric:tabular-nums}
-.eca-app .composer-options {display:flex;align-items:center;min-width:0;flex:1 1 160px;max-width:320px;}
-.eca-app .composer-actions {display:flex;align-items:center;gap:10px;flex-shrink:0;margin-left:auto;}
+.eca-app .composer-options {display:flex;align-items:center;gap:8px;min-width:0;flex-shrink:0;font-size:12px;}
+.eca-app .composer-actions {display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0;max-width:100%;margin-left:auto;}
 .eca-app .permission-control {display:flex;align-items:center;gap:1px;color:var(--secondary);border-radius:6px;padding-left:6px;}
-.eca-app .permission-control.full-access {color:var(--accent);background:var(--accent-soft);}
-.eca-app .thinking-badge {flex-shrink:0;font-size:10px;color:var(--muted);padding:2px 5px;border-radius:4px;background:var(--surface);border:1px solid var(--border);}
+.eca-app .permission-control.full-access {color:var(--accent);}
+.eca-app .thinking-badge {flex-shrink:0;font-size:11px;color:var(--muted);padding-left:2px;}
+.eca-app .thinking-badge::before {content:"·";margin-right:6px;}
 .eca-app .permission-picker {max-width:120px;font:12px/1.4 var(--font-ui);padding:5px 6px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--secondary);}
 .eca-app .permission-picker:hover:not(:disabled) {background:var(--hover);}
-.eca-app .permission-picker.full-access {color:var(--accent);background:var(--accent-soft);}
+.eca-app .permission-picker.full-access {color:var(--accent);}

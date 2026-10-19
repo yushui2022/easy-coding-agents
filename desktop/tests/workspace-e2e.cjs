@@ -102,6 +102,13 @@ if(process.env.ECA_TEST_EXE){env.PATH=`${process.env.SystemRoot}/System32;${proc
   assert(await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].contentView.children.filter(v=>v.webContents?.getURL().startsWith('eca-preview:')).every(v=>!v.getVisible())));
   await invoke('workspace.occluded',{owner,value:false});
   report.modal_browser_occlusion='passed';
+  await page.locator('.checks>summary').click();
+  const previewVisible=()=>app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].contentView.children.some(v=>v.webContents?.getURL().startsWith('eca-preview:')&&v.getVisible()));
+  await expect.poll(previewVisible).toBe(false);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.checks>summary')).toBeFocused();
+  await expect.poll(previewVisible).toBe(true);
+  report.verification_popover_browser_occlusion='passed';
   await page.setViewportSize({width:960,height:720});await expect(page.locator('.conversation')).toBeHidden();
   await page.getByRole('button',{name:'收起任务详情',exact:true}).click();await expect(page.locator('.conversation')).toBeVisible();
   await page.setViewportSize({width:1360,height:860});await page.getByRole('button',{name:'任务详情',exact:true}).click();

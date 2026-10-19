@@ -1,4 +1,4 @@
-# ECA Desktop 0.27.1 预览版
+# ECA Desktop 0.28.0 预览版
 
 Windows x64 桌面入口，复用 ECA Python 核心。CLI 的 `eca` / `ecs` 继续可用。
 首版包含模型配置、项目与会话、流式对话、授权和提问、任务停止、修改审查、验证与用量。
@@ -16,9 +16,11 @@ Windows x64 桌面入口，复用 ECA Python 核心。CLI 的 `eca` / `ecs` 继�
 
 0.27.1 收紧新任务页面与输入区，将模型、模式及操作权限分组，快捷任务改为轻量入口。见 [新任务区域调整与验证](WELCOME-0.27.1.md)。
 
+0.28.0 参考用户提供的 Pi Desktop 与 Codex 截图，改为居中开场、底部悬浮输入区，集成 ECA 原创视觉图形。验证设置按需展开，输入区随内容增长。见 [布局与验证记录](WELCOME-0.28.0.md)。
+
 ## 安装与使用
 
-安装包位于 `output/release/desktop/ECA-Desktop-0.27.1-x64-Setup.exe`，可选择安装目录。
+安装包位于 `output/release/desktop/ECA-Desktop-0.28.0-x64-Setup.exe`，可选择安装目录。
 本机 C 盘空间不足时，开发者使用 `pwsh -File desktop/scripts/install-local.ps1` 安装；它将临时解压放在 G 盘，并核对安装文件和后端启动。仅选择 G 盘安装目录不会自动迁移安装器的临时解压目录。
 这是未签名的本地预览包；不要将“构建成功”理解为签名或干净机器验收通过。
 程序携带 Electron、Python 和 MCP 客户端依赖，首次运行不执行 npm/pip 安装。

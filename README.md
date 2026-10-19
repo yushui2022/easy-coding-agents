@@ -4,7 +4,7 @@
 
 <h1 align="center">ECA — Easy Coding Agent</h1>
 
-**ECA Desktop 0.27.1 Windows 预览版**：桌面工程位于 `desktop/`，提供项目与会话导航、右侧独立聊天、网页预览、PowerShell 交互终端、修改审查与验证；长会话使用预览与增量更新。与 CLI 共用 Python 核心和项目数据。[安装、开发与验收说明](docs/desktop/README.md)。npm 启动器同时提供 `eca` 和兼容命令 `ecs`。
+**ECA Desktop 0.28.0 Windows 预览版**：桌面工程位于 `desktop/`，提供项目与会话导航、右侧独立聊天、网页预览、PowerShell 交互终端、修改审查与验证；长会话使用预览与增量更新。与 CLI 共用 Python 核心和项目数据。[安装、开发与验收说明](docs/desktop/README.md)。npm 启动器同时提供 `eca` 和兼容命令 `ecs`。
 
 主 Agent 默认不限响应轮数和输出截断恢复次数，可用 Ctrl+C 中断。旧配置中的显式上限仍有效，可运行 `ecs --max-turns 0 --output-recovery-limit 0` 取消这两项限制。模型单次输出上限、子 Agent 限额和共享预算的区别见 [输出与持续执行配置](docs/OUTPUT_LIMITS.md)。
 
@@ -18,7 +18,7 @@
   <a href="docs/UPGRADE-v0.18.md">验证记录</a>
 </p>
 
-<p align="center"><code>CLI + Windows Desktop</code> · <code>v0.27.1</code> · <code>预览版</code></p>
+<p align="center"><code>CLI + Windows Desktop</code> · <code>v0.28.0</code> · <code>预览版</code></p>
 
 ---
 
@@ -76,7 +76,7 @@ ECA（Easy Coding Agent）是一个可自行配置模型的编程助手，提供
 已有本地 npm 安装包时（需要 Node.js 20+ 和 Python 3.11+）：
 
 ```sh
-npm install -g ./easy-coding-agent-cli-0.27.1.tgz
+npm install -g ./easy-coding-agent-cli-0.28.0.tgz
 ecs
 ```
 

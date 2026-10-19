@@ -1,11 +1,13 @@
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {FolderOpen, GearSix, Plus, Stop, ArrowUp, Check, ArrowCounterClockwise, X, ArrowClockwise, FileText, ChatCircle, SidebarSimple, CaretDown, Code, Bug, TestTube, MagnifyingGlass, ArrowDown, ListChecks, ShieldCheck} from '@phosphor-icons/react';
+import {FolderOpen, GearSix, Plus, Stop, ArrowUp, Check, ArrowCounterClockwise, X, ArrowClockwise, FileText, ChatCircle, SidebarSimple, CaretDown, Desktop, MagnifyingGlass, ArrowDown, ListChecks, ShieldCheck} from '@phosphor-icons/react';
 import {Dialog} from './Dialog';
 import {ModelPicker, ModelSettings} from './ModelSettings';
 import {Transcript, LazyDetail, LogText} from './Transcript';
 import {Workspace} from './workspace/Workspace';
 import {EmptyState} from './ui/EmptyState';
+import {Welcome} from './Welcome';
+import {TaskVerification} from './TaskVerification';
 import './tokens.css';
 import './style.css';
 import './workbench.css';
@@ -215,7 +217,14 @@ function App() {
   const prices=Object.entries(usage.priced_subtotals || {});
   const empty = !state.messages?.length && !state.stream && !waiting;
   const model = state.project ? state.settings?.model : config.model?.model;
-  const checkCount=checks.split('\n').filter(command=>command.trim()).length;
+  useLayoutEffect(()=>{
+    const input=promptInput.current;
+    if(!input)return;
+    const fit=()=>{input.style.height='auto';input.style.height=Math.min(input.scrollHeight,180)+'px';};
+    fit();
+    window.addEventListener('resize',fit);
+    return()=>window.removeEventListener('resize',fit);
+  },[prompt,empty,navCollapsed,detailsOpen]);
   const permissionHint=state.approval_mode==='full-access'?'完全访问仅对本次打开的项目生效':state.approval_mode==='accept-edits'?'自动批准文件修改，命令仍需确认':'需要授权的操作逐次确认';
   const modelSource = state.project
     ? (state.settings?.source==='desktop'
@@ -311,10 +320,7 @@ function App() {
       {error&&<div role="alert" className="error-banner"><span>{error}</span><button className="icon-button" aria-label="关闭错误" onClick={()=>setError('')}><X size={17}/></button></div>}
       <div className={'work-area'+(empty?' is-empty':'')}>
         <div className="transcript" ref={scroll} onScroll={()=>{const el=scroll.current!;bottom.current=el.scrollHeight-el.scrollTop-el.clientHeight<100;setFollowing(bottom.current);}}>
-          {empty?<div className="welcome">
-            <h1>{state.project?'这次想完成什么？':'开始一个编码任务'}</h1>
-            <p>{state.project?'从一个想法、一处修改，或一段报错开始。':'写下任务，选择项目，即可开始。'}</p>
-          </div>:<div className="messages">
+          {empty?<Welcome project={projectName} choosing={projectChanging||sending} onProject={pick} onDraft={value=>{setPrompt(value);promptInput.current?.focus();}}/>:<div className="messages">
             {(cursor??state.message_total-50)>0&&<button className="load-older" disabled={historyLoading} onClick={loadOlder}>{historyLoading?'正在加载…':'加载更早的消息'}</button>}
             {older.length>=150&&<p className="fine-print">历史记录分段显示；继续加载查看更早内容。</p>}
             <Transcript messages={messages} sessionId={state.session_id} root={state.project||''} busy={state.busy}/>
@@ -331,8 +337,9 @@ function App() {
             {waiting.kind==='approval'?<div className="actions"><button disabled={answered===waiting.id} onClick={()=>reply(false)}>拒绝</button><button className="primary" disabled={answered===waiting.id} onClick={()=>reply(true)}>本次允许</button></div>
               :<form onSubmit={e=>{e.preventDefault();void reply(answer);setAnswer('');}}><input aria-label="回答" value={answer} onChange={e=>setAnswer(e.target.value)}/><button className="primary" type="submit" disabled={answered===waiting.id}>发送回答</button></form>}
           </section>}
+          {empty&&<div className="composer-context"><button onClick={pick} disabled={projectChanging||sending} title={state.project||'选择项目文件夹'} aria-label="选择任务项目"><FolderOpen size={15}/><span>{projectName||'选择项目'}</span><CaretDown size={11}/></button><span className="local-context"><Desktop size={14}/>本地工作区</span></div>}
           <div className="composer">
-            <textarea ref={promptInput} id="prompt" aria-label="任务指令" placeholder="描述任务，或粘贴需要排查的报错…" value={prompt} onChange={e=>setPrompt(e.target.value)}
+            <textarea rows={3} ref={promptInput} id="prompt" aria-label="任务指令" placeholder={state.project?'描述你想完成的事…':'写下想法，稍后选择项目…'} value={prompt} onChange={e=>setPrompt(e.target.value)}
               onCompositionStart={()=>{composing.current=true;}}
               onCompositionEnd={()=>{composing.current=false;compositionEndedAt.current=performance.now();}}
               onKeyDown={e=>{
@@ -343,39 +350,22 @@ function App() {
               }}/>
             <div className="composer-toolbar">
               <div className="composer-options">
-              <button className="model-chip" title={modelSource} disabled={state.busy||sending||modelChanging||projectChanging} onClick={()=>{setModelSelectionError('');setModelPickerOpen(true);}}><span className={model?'connection-dot':'status-dot'}/><span>{model||'配置模型'}</span>{model?.toLowerCase().startsWith('deepseek')&&<span className="thinking-badge">{thinkingLabels[(state.project?state.settings?.thinking_mode:config.model?.thinking_mode)||'default']}</span>}<CaretDown size={13}/></button>
+              <TaskVerification open={checkOptionsOpen} onOpenChange={setCheckOptionsOpen} checks={checks} attempts={repairAttempts} busy={state.busy} codeMode={state.settings?.mode==='code'} onChange={verificationDraft}/>
+              {state.project&&<div className={'permission-control '+(state.approval_mode==='full-access'?'full-access':'')}><ShieldCheck size={14}/><select className={'permission-picker '+(state.approval_mode==='full-access'?'full-access':'')} aria-label="审批模式" title={permissionHint} value={state.approval_mode||'ask'} disabled={permissionChanging||projectChanging} onChange={e=>e.target.value==='full-access'?setConfirmFull(true):void choosePermission(e.target.value)}>{Object.entries(permissionLabels).map(([value,text])=><option key={value} value={value}>{text}</option>)}</select></div>}
               </div>
               <div className="composer-actions">
-              {state.project&&<div className={'permission-control '+(state.approval_mode==='full-access'?'full-access':'')}><ShieldCheck size={14}/><select className={'permission-picker '+(state.approval_mode==='full-access'?'full-access':'')} aria-label="审批模式" title={permissionHint} value={state.approval_mode||'ask'} disabled={permissionChanging||projectChanging} onChange={e=>e.target.value==='full-access'?setConfirmFull(true):void choosePermission(e.target.value)}>{Object.entries(permissionLabels).map(([value,text])=><option key={value} value={value}>{text}</option>)}</select></div>}
+              <button className="model-chip" title={modelSource} disabled={state.busy||sending||modelChanging||projectChanging} onClick={()=>{setModelSelectionError('');setModelPickerOpen(true);}}><span className={model?'connection-dot':'status-dot'}/><span>{model||'配置模型'}</span>{model?.toLowerCase().startsWith('deepseek')&&<span className="thinking-badge">{thinkingLabels[(state.project?state.settings?.thinking_mode:config.model?.thinking_mode)||'default']}</span>}<CaretDown size={13}/></button>
               {state.busy?<button className="stop-button" disabled={stopping} onClick={()=>{setStopping(true);void perform('task.cancel',{run_id:state.run_id}).then(result=>{if(!result)setStopping(false);});}}><Stop size={13} weight="fill"/>{stopping?'正在停止':'停止'}</button>
                 :<button className="send-button" aria-label="发送任务" title={state.project?'发送任务 · Enter':'选择项目后确认发送'} disabled={!prompt.trim()||sending||modelChanging||projectChanging} onClick={start}>{!state.project&&<span>{sending?'正在打开…':'选择项目并继续'}</span>}<ArrowUp size={17}/></button>}
               </div>
             </div>
           </div>
           {notice&&<div className="composer-notice" role="status"><Check size={15}/>{notice}</div>}
-          <div className="composer-meta">
-            <details className="checks" open={checkOptionsOpen} onToggle={e=>setCheckOptionsOpen(e.currentTarget.open)}>
-              <summary aria-label="验证与自动修复" title="配置任务完成后的检查与修复" onClick={e=>{if(state.busy)e.preventDefault();}}><TestTube size={14}/><span>任务验证</span>{checkCount>0&&<span className="check-count">{checkCount} 项</span>}<CaretDown size={11} className="checks-caret"/></summary>
-              <div className="check-settings">
-                <div className="check-settings-heading"><label htmlFor="verification-commands">完成任务后运行</label><span>每行一条命令</span></div>
-                <textarea id="verification-commands" aria-label="验证命令" placeholder={'npm test\nnpm run build'} value={checks} onChange={e=>verificationDraft(e.target.value,repairAttempts)} disabled={state.busy}/>
-                <label className="repair-option">检查失败时<select aria-label="自动修复次数" value={repairAttempts} disabled={state.busy||!checks.trim()||state.settings?.mode!=='code'} onChange={e=>verificationDraft(checks,Number(e.target.value))}><option value={0}>停止，保留结果</option>{[1,2,3].map(count=><option key={count} value={count}>最多自动修复 {count} 次</option>)}</select></label>
-                <p className="fine-print">修复后重跑全部检查。授权被拒绝、超时或取消时停止。</p>
-              </div>
-            </details>
-            <span className="keyboard-hint" aria-label="Enter 发送，Shift 加 Enter 换行"><span><kbd>↵</kbd>发送</span><span><kbd>Shift ↵</kbd>换行</span></span>
-          </div>
-          {empty&&<div className="suggestions" aria-label="任务示例">
-            <span className="suggestions-label">快速开始</span>
-            {[[Code,'了解项目','梳理项目结构、运行方式和核心模块，先不要修改代码。'],[Bug,'排查问题','帮我定位并修复一个问题：'],[TestTube,'补充测试','检查项目现有测试，为缺少覆盖的关键逻辑补充测试。']].map(([Icon,text,value])=>{
-              const SuggestionIcon=Icon as typeof Code;
-              return <button key={String(text)} onClick={()=>{setPrompt(String(value));promptInput.current?.focus();}}><SuggestionIcon size={16}/>{String(text)}</button>;
-            })}
-          </div>}
+          <div className="composer-meta"><span className="keyboard-hint" aria-label="Enter 发送，Shift 加 Enter 换行"><span><kbd>↵</kbd>发送</span><span><kbd>Shift ↵</kbd>换行</span></span></div>
         </div>
       </div>
     </main>
-    {state.project&&<Workspace key={state.session_id} state={state} config={config} review={inspector} open={detailsOpen} onOpen={setDetailsOpen} narrow={narrow} blocked={!!(settingsOpen||modelPickerOpen||confirmFull||diff||diagnostic||waiting)} onDraft={(text:string)=>{setPrompt(p=>p?p+'\n\n'+text:text);setNotice('已放入主对话草稿，确认后发送。');promptInput.current?.focus();}}/>}
+    {state.project&&<Workspace key={state.session_id} state={state} config={config} review={inspector} open={detailsOpen} onOpen={setDetailsOpen} narrow={narrow} blocked={!!(settingsOpen||modelPickerOpen||confirmFull||diff||diagnostic||waiting||checkOptionsOpen)} onDraft={(text:string)=>{setPrompt(p=>p?p+'\n\n'+text:text);setNotice('已放入主对话草稿，确认后发送。');promptInput.current?.focus();}}/>}
     {modelPickerOpen&&<ModelPicker config={config} state={state} busy={state.busy||modelChanging} error={modelSelectionError} onClose={()=>setModelPickerOpen(false)} onChoose={chooseModel} onManage={()=>{setModelPickerOpen(false);setSettingsOpen(true);}}/>}
     <ModelSettings open={settingsOpen} config={config} state={state} onConfig={setConfig} onClose={()=>setSettingsOpen(false)} onUse={chooseModel}/>
     {confirmFull&&<Dialog title="开启完全访问" closeLabel="取消完全访问" onClose={()=>setConfirmFull(false)}><p>在当前项目中自动批准文件修改、命令、联网及外部工具操作，也会放行正在等待的授权。</p><p>命令按当前系统账户权限执行，可能访问项目外文件和网络；不会获得管理员权限。文件工具仍保留路径和冲突检查，已有沙箱及只读模式继续生效。</p><p className="fine-print">仅本次打开项目有效，重新打开后恢复项目审批设置。随时可切回逐次确认；已执行的操作不会因此撤销。</p><div className="actions"><button onClick={()=>setConfirmFull(false)}>取消</button><button className="primary" disabled={permissionChanging} onClick={()=>choosePermission('full-access')}>开启完全访问</button></div></Dialog>}
