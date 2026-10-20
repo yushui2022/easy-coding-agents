@@ -484,3 +484,14 @@ C:\Users\xiaoy\Documents\Obsidian Vault\产品设计方法论
 **本机 `G:\Apps\ECA Desktop` 仍是 0.34.1**，本轮没有重装（用户未要求，且安装需先退出应用）。仍待人工完成：向微软提交 Defender 误报、决定是否保留 prerelease 与许可证口径。
 
 证据：`output/release/desktop/release-0.34.2.json`、`output/release/desktop/SHA256SUMS.txt`、`output/playwright/message-copy.png`。
+
+### 2026-10-20 后续：0.34.3 已发布并安装
+
+- 版本升到 `0.34.3`，包含侧栏项目行左对齐与「本地阶段计时」（思考/执行/等待模型都有秒表在走，待返回行显示已等待时长并脉冲）。
+- 打包并覆盖安装到 `G:\Apps\ECA Desktop`：产品版本 `0.34.3.0`，后端握手 `0.34.3`，328 个 payload 文件哈希一致，`preferences.json` 安装前后 SHA256 相同（`2658662c…61f1`）。
+- 安装包 `ECA-Desktop-0.34.3-x64-Setup.exe`，162,201,510 字节，SHA256 `1d5740f1…41b3`；已发 prerelease <https://github.com/yushui2022/easy-coding-agents/releases/tag/v0.34.3>。
+- 验收：打包版 `execution-ui.cjs` 通过（含复制按钮、侧栏对齐断言），开发版 `workspace-e2e.cjs` 通过并用「持续 0s → 持续 1s」证明无后端事件时计时仍在走，0 次付费 API 调用。
+
+**仍未做**：命令执行期间的实时输出（需要后端 `tool_progress` 事件）；`v0.34.2` 仍是线上旧包，可考虑删除或标注为旧版；主流程 `e2e.cjs` 在本机环境中途退出（用旧包复现，非本次改动），`clay-design.cjs` 仍停留在 0.33.0 之前的选择器。
+
+证据：`output/release/desktop/release-0.34.3.json`、`output/release/desktop/SHA256SUMS.txt`。
