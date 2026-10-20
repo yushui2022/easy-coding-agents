@@ -136,6 +136,13 @@ body {margin: 0; font-family: var(--font-ui);}
 .eca-app .message.user {padding: 14px 18px; margin-top: 4px; margin-bottom: 28px; border-radius: var(--radius-panel); background: var(--panel); border: 1px solid var(--border);}
 .eca-app .message.user :last-child {margin-bottom: 0;}
 .eca-app .message.user .message-label {color: var(--muted); margin-bottom: 6px; font-weight: 500;}
+.eca-app .message-actions {display: flex; justify-content: flex-end; margin-top: 10px;}
+.eca-app .message.user .message-actions {justify-content: flex-start; margin-top: 2px;}
+.eca-app .message-copy {display: inline-flex; align-items: center; gap: 5px; min-height: 26px; padding: 3px 9px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); font: 500 11px/1.4 var(--font-ui); cursor: pointer; transition: background 120ms ease, border-color 120ms ease, color 120ms ease;}
+.eca-app .message-copy:hover {background: var(--hover); border-color: var(--control-border); color: var(--text);}
+.eca-app .message-copy:focus-visible {outline: 2px solid var(--accent); outline-offset: 1px;}
+.eca-app .message-copy.done {color: var(--accent);}
+.eca-app .message-copy.error {color: var(--danger);}
 .eca-app .message :where(p, ul, ol) {margin: 8px 0 12px; line-height: 1.8;}
 .eca-app .message :where(h1, h2, h3) {font-size: 18px; font-weight: 600; line-height: 1.5;}
 .eca-app .message code {font: 12px/1.7 var(--font-code); background: var(--code); border-radius: 3px; padding: 2px 5px;}

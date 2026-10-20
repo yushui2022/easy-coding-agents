@@ -40,6 +40,17 @@ async function capture(name,selector) {
   await expect(group.locator('.tool-target').first()).toContainText('glass-terrarium/shot.png');
   await expect(group.locator('pre')).toHaveCount(0);
   await expect(page.locator('.message.assistant .message-label')).toHaveCount(1);
+  // Each turn carries a copy button; the text is copied by the desktop process.
+  const savedClipboard=await app.evaluate(({clipboard})=>clipboard.readText());
+  await expect(page.locator('.message.user .message-copy')).toHaveCount(1);
+  const copy=page.locator('.message.assistant .message-copy').first();
+  await expect(copy).toContainText('复制');
+  await copy.click();
+  await expect(copy).toContainText('已复制');
+  const copied=await app.evaluate(({clipboard})=>clipboard.readText());
+  expect(copied).toContain('先检查场景文件和本地运行环境，再执行页面检查。');
+  await capture('message-copy');
+  await app.evaluate(({clipboard},text)=>clipboard.writeText(text),savedClipboard);
   report.compact_height=await group.evaluate(el=>Math.round(el.getBoundingClientRect().height));
   await capture('execution-compact');
   const cdp=await page.context().newCDPSession(page);

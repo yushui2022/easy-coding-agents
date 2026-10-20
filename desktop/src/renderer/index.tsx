@@ -22,6 +22,7 @@ declare global { interface Window { eca: {
   invoke: (method: string, params?: Record<string, unknown>) => Promise<any>;
   subscribe: (callback: (data:{event?:string}) => void) => () => void;
   onFailure: (callback: (message: string) => void) => () => void;
+  copy: (text: string) => Promise<boolean>;
 }; } }
 const invoke = window.eca.invoke;
 const labels: Record<string,string> = {idle:'等待指令', running:'执行中', repairing:'正在修复', interrupted:'已停止', error:'遇到问题', blocked:'需要处理', limit:'达到配置上限', passed:'通过', failed:'失败', not_run:'未验证', stale:'结果已过期', task_incomplete:'任务未完成', unconfirmed_snapshot:'结果待核实', applied:'已修改', accepted:'已审查', undone:'已撤销'};

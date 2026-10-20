@@ -1,10 +1,10 @@
 import {createContext,useContext} from 'react';
 import {AttachmentNames} from './Attachments';
 const ProjectContext=createContext<string|undefined>(undefined);
-import React, {memo, useMemo, useState} from 'react';
+import React, {memo, useEffect, useMemo, useRef, useState} from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import {CaretRight, TerminalWindow, FileText, CheckCircle, WarningCircle, Code, Circle, ListChecks, MinusCircle} from '@phosphor-icons/react';
+import {CaretRight, TerminalWindow, FileText, CheckCircle, WarningCircle, Code, Circle, ListChecks, MinusCircle, Copy, Check} from '@phosphor-icons/react';
 import {transcriptNodes,resultInfo,toolArgs,toolTarget,failureHint,visibleEntries,type ToolEntry} from './transcript-model';
 import {AgentCards,agentsForCall,type ChildAgent} from './subagents/AgentCards';
 
@@ -85,6 +85,26 @@ function ExecutionEntries({entries,sessionId,root,pending,agents,onOpenAgent}:{e
   return <>{parts}</>;
 }
 
+const CopyButton=memo(function CopyButton({text}:{text:string}) {
+  const [state,setState]=useState<'idle'|'done'|'error'>('idle');
+  const timer=useRef<number|undefined>(undefined);
+  useEffect(()=>()=>{if(timer.current!==undefined)window.clearTimeout(timer.current);},[]);
+  const copy=async()=>{
+    let ok=false;
+    try {ok=typeof window.eca?.copy==='function'?await window.eca.copy(text):false;} catch {ok=false;}
+    setState(ok?'done':'error');
+    if(timer.current!==undefined)window.clearTimeout(timer.current);
+    timer.current=window.setTimeout(()=>setState('idle'),1600);
+  };
+  const label=state==='done'?'已复制':state==='error'?'复制失败':'复制';
+  return <div className="message-actions">
+    <button type="button" className={'message-copy '+state} onClick={copy} aria-label={label+'这条消息'}
+      title={state==='done'?'原文已放入剪贴板':'复制这条消息的原文'}>
+      {state==='done'?<Check size={13}/>:state==='error'?<WarningCircle size={13}/>:<Copy size={13}/>}
+      <span>{label}</span>
+    </button>
+  </div>;
+});
 const Message=memo(function Message({message,sessionId}:{message:any;sessionId:string}) {
   const project_id=useContext(ProjectContext);
   const [full,setFull]=useState<any>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
@@ -97,6 +117,7 @@ const Message=memo(function Message({message,sessionId}:{message:any;sessionId:s
   return <article className={'message '+message.role}><div className="message-label">{message.role==='user'?'你':'ECA'}{message.role==='assistant'&&<span>编码助手</span>}</div>
     {typeof data.content==='string'&&data.content&&<RichText text={data.content}/>}
     <AttachmentNames items={data.attachments}/>{more}
+    {typeof data.content==='string'&&data.content.trim()&&<CopyButton text={data.content}/>}
   </article>;
 });
 

@@ -15,5 +15,6 @@ contextBridge.exposeInMainWorld('eca', {
     const listener = (_event: unknown, message: string) => callback(message);
     ipcRenderer.on('eca:failure', listener);
     return () => ipcRenderer.removeListener('eca:failure', listener);
-  }
+  },
+  copy: async (text: string) => Boolean(await ipcRenderer.invoke('eca:copy', text))
 });

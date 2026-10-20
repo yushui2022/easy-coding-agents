@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, safeStorage, shell, screen, protocol } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, safeStorage, shell, screen, protocol, clipboard } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -270,6 +270,15 @@ else {
       if (!trusted(event)) return {ok: false, error: 'Untrusted window'};
       try {return {ok: true, value: await action(method, params)};}
       catch (error) {return {ok: false, error: error instanceof Error ? error.message : '操作失败'};}
+    });
+    // Copy stays in the desktop process: the renderer keeps no clipboard, shell
+    // or filesystem access of its own.
+    ipcMain.handle('eca:copy', async (event, text) => {
+      if (!trusted(event)) return false;
+      const value = typeof text === 'string' ? text : '';
+      if (!value || value.length > 1_000_000) return false;
+      clipboard.writeText(value);
+      return true;
     });
     window.on('close', event => {if (!quitting) {event.preventDefault(); void closeWindow();}});
     void window.loadFile(html);
