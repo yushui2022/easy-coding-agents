@@ -1,6 +1,6 @@
 import React,{useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
-import {Check,MagnifyingGlass,Plus} from '@phosphor-icons/react';
+import {Check,MagnifyingGlass} from '@phosphor-icons/react';
 import './model-menu.css';
 
 export const effortLabels:Record<string,string>={default:'默认',none:'关闭',minimal:'极低',low:'低',medium:'中',high:'高',xhigh:'极高',max:'最高'};
@@ -77,8 +77,6 @@ export function ModelMenu({anchor,label,connections,recent,selectedId,reasoning,
         <div className="model-effort-stops">{options.map(value=><button key={value} disabled={busy} aria-label={'推理强度：'+effortLabels[value]} aria-pressed={preview===value} onClick={()=>apply(value)}>{effortLabels[value]}</button>)}</div></>:null}
       <p>{busy?'当前正在处理，请稍候。':reasoning?.note||'默认跟随服务；较高强度通常需要更长时间。'}</p>
     </div>
-    {special.length>0&&<div className="model-menu-special">{special.map(item=><button key={item.id} disabled={busy||item.disabled} aria-pressed={item.selected} onClick={()=>choose(item.id)}>{item.label}{item.selected&&<Check size={12}/>}</button>)}</div>}
     {error&&<p className="model-menu-error" role="alert">{error}</p>}
-    {onManage&&<button className="model-menu-manage" onClick={onManage}><Plus size={14}/>添加或管理连接</button>}
   </div>,document.querySelector('.eca-app')!);
 }

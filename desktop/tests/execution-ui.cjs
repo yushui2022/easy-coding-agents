@@ -72,8 +72,13 @@ async function capture(name,selector) {
   await expect(menu).toBeVisible();
   await expect(menu.getByRole('button',{name:/压缩上下文|任务运行中/})).toBeVisible();
   await expect(menu).toContainText('本地估算');
+  await expect(menu.locator('.context-part').first()).toBeVisible();
+  await expect(menu.locator('.context-part-value').first()).toHaveText(/^\d{1,3}%$/);
+  report.context_parts=await menu.locator('.context-part').count();
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
+  // The meter sits left of the model chip in the composer actions.
+  await expect(page.locator('.composer-actions .context-meter')).toHaveCount(1);
   // The window is frameless: our own title bar replaces the native one. A native
   // title bar would subtract roughly 30 px from the content height; only the
   // invisible resize border (about 2 px) may remain here.

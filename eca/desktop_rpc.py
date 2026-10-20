@@ -213,6 +213,12 @@ class DesktopRPC:
             value = {'estimated_tokens': int(used), 'input_limit': int(limit),
                      'ratio': (used / limit) if limit else 0.0,
                      'auto_compact': bool(agent.settings.auto_compact), 'estimated': True}
+            parts = getattr(agent, 'context_parts', None)
+            if parts:
+                sizes = parts()
+                total = sum(sizes.values()) or 1
+                value['parts'] = [{'id': key, 'chars': size, 'tokens': int(round(used * size / total))}
+                                  for key, size in sizes.items() if size]
             self._context_usage = (key, now, value)
             return value
         except Exception:

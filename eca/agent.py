@@ -463,6 +463,33 @@ If execution was interrupted, inspect the actual state before repeating mutation
                 len(self.state.get("context_anchor", "")) +
                 len(json.dumps(self.state["messages"][self.state.get("context_start", 0):], ensure_ascii=False)))
 
+    def context_parts(self):
+        """Character sizes of the pieces that make up the next request.
+
+        Proportions only: the token estimate itself stays in ContextBudget, and the
+        desktop scales each part by it so the numbers add up to the same total.
+        """
+        messages = self.state['messages'][self.state.get('context_start', 0):]
+        tool_chars = user_chars = assistant_chars = result_chars = 0
+        for message in messages:
+            size = len(json.dumps(message, ensure_ascii=False))
+            role = message.get('role')
+            if role == 'tool':
+                result_chars += size
+            elif role == 'assistant':
+                assistant_chars += size
+            else:
+                user_chars += size
+        return {
+            'system': len(self.system_prompt()) + len(self.memory_context),
+            'tools': len(json.dumps(self.tool_schemas(), ensure_ascii=False)),
+            'user': user_chars,
+            'assistant': assistant_chars,
+            'tool': result_chars,
+            'summary': len(self.state.get('summary') or ''),
+            'progress': len(self.progress_context()),
+        }
+
     def tool_schemas(self):
         if self.state.get('kind') == 'side_chat':
             return [s for s in SCHEMAS if s['function']['name'] in {'read', 'glob', 'grep'}]

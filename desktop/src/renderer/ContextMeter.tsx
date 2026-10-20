@@ -21,6 +21,8 @@ export const ContextMeter=memo(function ContextMeter({context,busy,onCompact}:{c
   const radius=6.5,circumference=2*Math.PI*radius,used=Math.min(1,ratio);
   const tokens=Number(context.estimated_tokens)||0;
   const limit=Number(context.input_limit)||0;
+  const partNames:Record<string,string>={system:'系统提示',tools:'工具定义',user:'你说的话',assistant:'模型回答',tool:'工具结果',summary:'历史摘要',progress:'进度索引'};
+  const parts:any[]=Array.isArray(context.parts)?[...context.parts].sort((a,b)=>Number(b.tokens)-Number(a.tokens)):[];
   const compact=async()=>{
     if(!onCompact||working)return;
     setWorking(true);setError('');
@@ -44,6 +46,13 @@ export const ContextMeter=memo(function ContextMeter({context,busy,onCompact}:{c
     </button>
     {open&&<div className="context-menu" role="dialog" aria-label="上下文设置">
       <p className="context-menu-title">上下文约 {tokens.toLocaleString()} / {limit.toLocaleString()} tokens</p>
+      {parts.length>0&&<div className="context-parts">
+        {parts.map(part=><div className="context-part" key={part.id}>
+          <span className="context-part-label">{partNames[part.id]||part.id}</span>
+          <span className="context-part-bar"><i style={{width:`${Math.max(2,Math.round(100*part.tokens/(tokens||1)))}%`}}/></span>
+          <span className="context-part-value">{Math.round(100*part.tokens/(tokens||1))}%</span>
+        </div>)}
+      </div>}
       <p className="fine-print">本地估算，不是计费；{context.auto_compact?'接近上限会自动压缩':'自动压缩已关闭'}。</p>
       <button type="button" className="context-compact" disabled={blocked||working} onClick={compact}>
         {working?'正在压缩…':busy?'任务运行中，稍后可压缩':'压缩上下文'}

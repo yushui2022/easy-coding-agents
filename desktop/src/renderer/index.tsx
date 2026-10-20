@@ -368,6 +368,7 @@ function App() {
               {state.project&&<div className={'permission-control '+(state.approval_mode==='full-access'?'full-access':'')}><ShieldCheck size={14}/><select className={'permission-picker '+(state.approval_mode==='full-access'?'full-access':'')} aria-label="审批模式" title={permissionHint} value={state.approval_mode||'ask'} disabled={permissionChanging||projectChanging} onChange={e=>e.target.value==='full-access'?setConfirmFull(true):void choosePermission(e.target.value)}>{Object.entries(permissionLabels).map(([value,text])=><option key={value} value={value}>{text}</option>)}</select></div>}
               </div>
               <div className="composer-actions">
+              <ContextMeter context={state.context} busy={state.busy} onCompact={async()=>{const result=await perform('context.compact'); if(result)setNotice('上下文已压缩，原始历史仍保留。');}}/>
               <button ref={modelButton} className="model-chip" aria-label="主对话模型" aria-haspopup="dialog" aria-expanded={modelPickerOpen} title={modelSource} disabled={state.busy||sending||projectChanging} onClick={()=>{setModelSelectionError('');setModelPickerOpen(v=>!v);}}><span className={model?'connection-dot':'status-dot'}/><span>{model||'配置模型'}</span>{model&&<span className="thinking-badge">{effortLabels[(state.project?state.settings?.reasoning:config.model?.reasoning)?.value]||'默认'}</span>}<CaretDown size={13}/></button>
               {state.busy?<button className="stop-button" disabled={stopping} onClick={()=>{setStopping(true);void perform('task.cancel',{run_id:state.run_id}).then(result=>{if(!result)setStopping(false);});}}><Stop size={13} weight="fill"/>{stopping?'正在停止':'停止'}</button>
                 :<button className="send-button" aria-label="发送任务" title={state.project?'发送任务 · Enter':'选择项目后确认发送'} disabled={(!prompt.trim()&&!attachments.items.length)||attachments.busy||sending||modelChanging||projectChanging} onClick={start}>{!state.project&&<span>{sending?'正在打开…':'选择项目并继续'}</span>}<ArrowUp size={17}/></button>}
@@ -375,7 +376,7 @@ function App() {
             </div>
           </div>
           {notice&&<div className="composer-notice" role="status"><Check size={15}/>{notice}</div>}
-          <div className="composer-meta"><ContextMeter context={state.context} busy={state.busy} onCompact={async()=>{const result=await perform('context.compact'); if(result)setNotice('上下文已压缩，原始历史仍保留。');}}/><span className="keyboard-hint" aria-label="Enter 发送，Shift 加 Enter 换行"><span><kbd>↵</kbd>发送</span><span><kbd>Shift ↵</kbd>换行</span></span></div>
+          <div className="composer-meta"><span className="keyboard-hint" aria-label="Enter 发送，Shift 加 Enter 换行"><span><kbd>↵</kbd>发送</span><span><kbd>Shift ↵</kbd>换行</span></span></div>
         </div>
       </div>
     </main>

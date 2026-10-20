@@ -149,6 +149,8 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
         self.assertLess(usage['ratio'], 1)
         self.assertGreaterEqual(usage['ratio'], 0)
         self.assertFalse(usage['auto_compact'])  # the fixture project disables it
+        self.assertTrue(usage['parts'])  # per-module proportions
+        self.assertAlmostEqual(sum(part['tokens'] for part in usage['parts']), usage['estimated_tokens'], delta=6)
         self.assertEqual(self.rpc.snapshot()['context'], usage)
         # Unchanged state within two seconds reuses the cached estimate.
         self.assertEqual((await self.rpc.dispatch('live', {}))['context'], usage)

@@ -127,6 +127,12 @@ body {margin: 0; font-family: var(--font-ui);}
 .eca-app .context-menu {position:absolute;z-index:5;bottom:calc(100% + 8px);left:0;width:min(280px,70vw);padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:var(--shadow-dialog);text-align:left;}
 .eca-app .context-menu-title {margin:0 0 6px;font-size:11px;color:var(--text);font-variant-numeric:tabular-nums;}
 .eca-app .context-menu .fine-print {margin:0 0 8px;}
+.eca-app .context-parts {margin:2px 0 8px;display:grid;gap:5px;}
+.eca-app .context-part {display:grid;grid-template-columns:64px minmax(0,1fr) 34px;align-items:center;gap:7px;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;}
+.eca-app .context-part-label {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.eca-app .context-part-bar {height:5px;border-radius:3px;background:var(--code);overflow:hidden;box-shadow:var(--material-inset);}
+.eca-app .context-part-bar i {display:block;height:100%;border-radius:3px;background:var(--accent);opacity:.75;}
+.eca-app .context-part-value {text-align:right;color:var(--secondary);}
 .eca-app .context-compact {width:100%;min-height:28px;margin:2px 0 8px;font-size:11px;}
 .eca-app .context-meter svg {flex:none;}
 .eca-app .context-meter .track {fill:none;stroke:var(--border);stroke-width:2;}

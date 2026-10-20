@@ -1,10 +1,10 @@
-[build-system]
+﻿[build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "easy-coding-agent"
-version = "0.34.5"
+version = "0.34.6"
 description = "An asynchronous, project-scoped terminal coding assistant"
 readme = "README.md"
 requires-python = ">=3.11"
