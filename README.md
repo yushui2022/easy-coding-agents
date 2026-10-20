@@ -4,7 +4,7 @@
 
 <h1 align="center">ECA — Easy Coding Agent</h1>
 
-**ECA Desktop 0.34.0 Windows 预览版**：桌面工程位于 `desktop/`，支持多项目与多会话并发、主对话与侧聊附件、网页预览、PowerShell 交互终端，以及按需打开的修改审查。与 CLI 共用 Python 核心和项目数据。[安装、开发与验收说明](docs/desktop/README.md)。npm 启动器同时提供 `eca` 和兼容命令 `ecs`。
+**ECA Desktop 0.34.1 Windows 预览版**：桌面工程位于 `desktop/`，支持多项目与多会话并发、主对话与侧聊附件、网页预览、PowerShell 交互终端，以及按需打开的修改审查。与 CLI 共用 Python 核心和项目数据。[安装、开发与验收说明](docs/desktop/README.md)。npm 启动器同时提供 `eca` 和兼容命令 `ecs`。
 
 新 Agent 接手请先读 [完整接力文档](HANDOFF.md)：包含本机路径、未提交代码状态、依赖、G 盘缓存、打包更新、测试与陶土界面约定。
 
@@ -20,7 +20,7 @@
   <a href="docs/UPGRADE-v0.18.md">验证记录</a>
 </p>
 
-<p align="center"><code>CLI + Windows Desktop</code> · <code>v0.34.0</code> · <code>预览版</code></p>
+<p align="center"><code>CLI + Windows Desktop</code> · <code>v0.34.1</code> · <code>预览版</code></p>
 
 ---
 
@@ -78,7 +78,7 @@ ECA（Easy Coding Agent）是一个可自行配置模型的编程助手，提供
 已有本地 npm 安装包时（需要 Node.js 20+ 和 Python 3.11+）：
 
 ```sh
-npm install -g ./easy-coding-agent-cli-0.28.0.tgz
+npm install -g ./easy-coding-agent-cli-0.34.1.tgz
 ecs
 ```
 

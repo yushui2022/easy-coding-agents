@@ -163,7 +163,12 @@ async function capture(name) {
   await invoke('project.close',{project_id:openedB.project_id});
   await page.reload();await expect(page.locator('.project-group')).toHaveCount(1);
   assert((await invoke('live')).busy,'Closing idle B must preserve running A');
-  await page.getByRole('button',{name:'收起任务详情',exact:true}).click();
+  // Review is now opt-in; a reload can already leave the workspace collapsed.
+  const detailsToggle=page.getByRole('button',{name:'任务详情',exact:true});
+  if(await detailsToggle.getAttribute('aria-expanded')==='true'){
+    await page.getByRole('button',{name:'收起任务详情',exact:true}).click();
+  }
+  await expect(detailsToggle).toHaveAttribute('aria-expanded','false');
   await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setContentSize(960,720));
   // Fractional Windows DPI can round a requested 960 DIP content area to 961.
   await page.waitForFunction(()=>innerWidth<1180);

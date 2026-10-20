@@ -61,6 +61,41 @@ class WebTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(ValueError):
                 await web.public_url('https://example.com')
 
+    async def test_fake_ip_resolves_public_ip_and_pins_dns_tls(self):
+        rows = [(2, 1, 6, '', ('198.18.0.66', 443))]
+        payload = {'Status': 0, 'Answer': [{'type': 5, 'data': 'cdn.example.com'},
+                                         {'type': 1, 'data': '93.184.215.14'}]}
+        with patch.object(asyncio.get_running_loop(), 'getaddrinfo', AsyncMock(return_value=rows)), self.client(lambda _: httpx.Response(200, json=payload)):
+            self.assertEqual(await web.public_url('https://example.com'), '93.184.215.14')
+        request = self.requests[0]
+        self.assertEqual(request.url.host, '1.1.1.1')
+        self.assertEqual(request.url.params['name'], 'example.com')
+        self.assertEqual(request.headers['host'], 'cloudflare-dns.com')
+        self.assertEqual(request.extensions['sni_hostname'], 'cloudflare-dns.com')
+
+    async def test_fake_ip_never_allows_private_mixed_or_literal_targets(self):
+        for url, ips in [('https://198.18.0.66', ['198.18.0.66']),
+                         ('https://example.com', ['198.18.0.66', '127.0.0.1']),
+                         ('https://example.com', ['93.184.215.14', '10.0.0.1'])]:
+            rows = [(2, 1, 6, '', (ip, 443)) for ip in ips]
+            with patch.object(asyncio.get_running_loop(), 'getaddrinfo', AsyncMock(return_value=rows)), patch('eca.web.resolve_fake_ip', AsyncMock()) as resolver:
+                with self.assertRaisesRegex(ValueError, 'non-public'):
+                    await web.public_url(url)
+                resolver.assert_not_awaited()
+
+    async def test_fake_ip_dns_invalid_results_fail_closed(self):
+        for payload in ({'Status': 3}, {'Status': 0, 'Answer': []},
+                        {'Status': 0, 'Answer': [{'type': 1, 'data': '127.0.0.1'}]},
+                        {'Status': 0, 'Answer': [{'type': 1, 'data': '198.18.0.1'}]}):
+            with self.client(lambda _, p=payload: httpx.Response(200, json=p)):
+                with self.assertRaisesRegex(ValueError, 'Fake-IP DNS detected'):
+                    await web.resolve_fake_ip('example.com')
+
+    async def test_fake_ip_dns_cancellation_propagates(self):
+        with patch('eca.web.httpx.AsyncClient', side_effect=asyncio.CancelledError):
+            with self.assertRaises(asyncio.CancelledError):
+                await web.resolve_fake_ip('example.com')
+
     async def test_limits_content_type_and_errors(self):
         for response, expected in [
             (httpx.Response(200, headers={'content-type':'application/pdf'}, content=b'pdf'), 'Unsupported'),

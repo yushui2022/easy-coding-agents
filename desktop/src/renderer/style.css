@@ -110,20 +110,6 @@ body {margin: 0; font-family: var(--font-ui);}
 .eca-app .send-button span {padding:0 2px;}
 .eca-app .stop-button {flex-shrink:0;min-height:32px;color:var(--danger);border-color:transparent;border-radius:16px;background:var(--danger-soft);font-size:12px;}
 .eca-app .composer-meta {display:flex;justify-content:flex-end;align-items:center;min-height:22px;padding:4px 6px 0;color:var(--muted);font-size:10px;}
-.eca-app .checks summary {display:flex;align-items:center;gap:5px;width:fit-content;min-height:30px;padding:4px 5px;border-radius:6px;list-style:none;color:var(--secondary);cursor:pointer;transition:background 120ms ease;}
-.eca-app .checks summary::-webkit-details-marker {display:none;}
-.eca-app .checks summary:hover,.eca-app .checks[open] summary {background:var(--hover);color:var(--text);}
-.eca-app .check-count {font-variant-numeric: tabular-nums; padding: 0 5px; border-radius: 3px; background: var(--code); color: var(--secondary); font-size: 10px;}
-.eca-app .checks-caret {color: var(--muted); transition: transform 120ms ease;}
-.eca-app .checks[open] .checks-caret {transform: rotate(180deg);}
-.eca-app .check-settings {position:absolute;z-index:4;bottom:calc(100% + 10px);left:10px;width:min(380px,calc(100% - 20px));max-height:min(340px,60vh);overflow:auto;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface);box-shadow:var(--shadow-dialog);text-align:left;}
-.eca-app .check-settings-heading {display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 5px 12px; font-size: 11px;}
-.eca-app .check-settings-heading label {font-weight: 500; color: var(--text);}
-.eca-app .check-settings-heading span {color: var(--muted);}
-.eca-app .checks textarea {display: block; width: 100%; min-height: 62px; margin-top: 8px; max-height: 120px; font: 12px/1.6 var(--font-code);}
-.eca-app .repair-option {display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 10px; color: var(--secondary); font-size: 11px;}
-.eca-app .repair-option select {padding: 4px 7px; max-width: 100%; font-size: 11px;}
-.eca-app .check-settings .fine-print {margin: 9px 0 0; font-size: 10px; line-height: 1.6;}
 .eca-app .impact-review {margin-top: 18px; font-size: 12px; overflow-wrap: anywhere;}
 .eca-app .impact-review summary {cursor: pointer; color: var(--secondary);}
 .eca-app .impact-review strong {display: block; margin-top: 12px; font-weight: 500;}
@@ -136,7 +122,6 @@ body {margin: 0; font-family: var(--font-ui);}
 .eca-app .suggestions button {min-height:28px;font-size:11px;color:var(--muted);background:transparent;border:0;border-radius:6px;padding:5px 4px;}
 .eca-app .suggestions button:hover:not(:disabled) {color:var(--text);}
 @container composer (max-width:480px) {
-  .eca-app .checks summary>span:not(.check-count),.eca-app .checks-caret {display:none;}
   .eca-app .model-chip {max-width:180px;}
   .eca-app .thinking-badge {display:none;}
   .eca-app .composer-toolbar {gap:6px;}

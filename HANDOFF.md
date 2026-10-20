@@ -23,14 +23,14 @@
 | 真正的仓库根目录 | `G:\Projects\easy-coding-agents`，注意末尾是复数 **agents** |
 | Git origin | `https://github.com/yushui2022/easy-coding-agents.git` |
 | 当前分支 | `main` |
-| 文档编写时的 HEAD | `bcb8e84`，提交标题 `feat(desktop): refine welcome and floating composer for 0.28.0` |
-| 本地源码 / 安装包版本 | `0.34.0` |
+| 2026-10-20 复核 HEAD | `cf79151`，提交标题 `feat(desktop): concurrent projects, subagents, activity and attachments (0.29-0.34)` |
+| 本地源码 / 安装包版本 | 源码 `0.34.1`（含未提交改动） / 安装版 `0.34.0` |
 | 本机安装目录 | `G:\Apps\ECA Desktop` |
 | 程序入口 | `G:\Apps\ECA Desktop\ECA Desktop.exe` |
 | 模型连接及加密凭据 | `G:\Data\ECA\Desktop\preferences.json` |
 | 项目会话 | 各用户项目自己的 `.eca`，不是源码仓库中的统一会话库 |
 | 发布产物 | `G:\Projects\easy-coding-agents\output\release\desktop` |
-| 当前发布报告 | `output/release/desktop/release-0.34.0.json` |
+| 当前发布报告 | `output/release/desktop/release-0.34.0.json`（对应 0.34.0 安装，不含 0.34.1 源码） |
 | 桌面构建 Python | `G:\Projects\easy-coding-agents\desktop\.venv\Scripts\python.exe` |
 | 快速搜索 | `C:\Users\xiaoy\.local\bin\rg.exe` |
 
@@ -38,7 +38,7 @@
 
 ### 特别重要：本地未提交内容
 
-文档编写时，工作区存在大量修改与未跟踪文件，覆盖多个已交付版本。**本地 0.34.0 并不等于 Git HEAD，也不代表远端已经发布 0.34.0。** 本轮未提交、未推送；没有核实远端最新提交或 GitHub Releases。
+2026-10-20 复核：0.29–0.34 的累积源码和本接力文档已进入本地提交 `cf79151`。之后的未提交改动：移除输入框“验证命令／自动修复”入口及相应测试调整、版本升到 0.34.1，以及 `web_fetch` 的代理 Fake-IP DNS 修复。不要恢复该入口；核心验证工作流与历史结果仍保留。**源码为 0.34.1、安装版仍为 0.34.0**，不能凭版本号判断代码是否一致。远端已推送 `cf79151`，之后无新提交。
 
 先运行：
 
@@ -455,7 +455,7 @@ C:\Users\xiaoy\Documents\Obsidian Vault\产品设计方法论
 - 用户 `preferences.json` 安装前后 SHA256 相同，模型配置与加密凭据文件未改变；没有操作用户项目会话。
 - 安装后的附件端到端测试通过：3 次本地模拟请求、0 次付费 API 调用、无 renderer 错误。覆盖主对话与侧聊图片输入、草稿恢复、会话隔离、纯图片发送、粘贴、拖放、移除、格式拒绝、服务视觉错误、按需审查、深浅主题及窄输入区。
 - 没有自动启动用户的交互窗口，也没有重放任何用户任务。
-- 完整交接文档及本轮导航入口尚未提交到 Git；既有大量新版源码也仍未提交。
+- 此项为安装当时的历史记录；随后源码与交接文档已进入 `cf79151`，当前未提交状态见第 2 节。
 - 干净 Windows、真实服务商视觉能力和全部历史 Python 测试仍未因此获得验收。
 
 证据：`output/release/desktop/install-0.34.0.log`、`output/playwright/attachments/installed.json`、`output/release/desktop/attachments-installed-0.34.0.log`、`output/release/desktop/release-0.34.0.json`。

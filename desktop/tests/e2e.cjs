@@ -21,8 +21,8 @@ let catalogueMode='normal';
 let releaseCatalogue;
 let delay=false;
 let modelError=false;
-let repairFixture=false;
 let targetFile='hello.txt';
+let shellIssued=false;
 let sockets=new Set();
 const server=http.createServer(async(req,res)=>{
   if(req.headers.authorization!=='Bearer desktop-fixture-credential'){res.writeHead(401);res.end('Missing fixture credential');return;}
@@ -40,10 +40,12 @@ const server=http.createServer(async(req,res)=>{
   if(modelError){res.writeHead(401,{'Content-Type':'application/json'});res.end(JSON.stringify({error:{message:'Fixture rejected the model request',type:'authentication_error'}}));return;}
   if(delay)return;
   const hasResult=body.messages.some(message=>message.role==='tool');
-  const repairRequested=body.messages.some(message=>message.role==='user'&&String(message.content).includes('Repair the failed user-selected verification'));
-  const repairSaved=body.messages.some(message=>message.role==='tool'&&String(message.content).includes('Saved repair.txt'));
-  const write=repairFixture?repairRequested&&!repairSaved:!hasResult;
-  const delta=write?{tool_calls:[{index:0,id:'fixture-write-'+requests.length,type:'function',function:{name:'write',arguments:JSON.stringify({path:repairFixture?'repair.txt':targetFile,content:repairFixture?'fixed':'hello'})}}]}:{content:'已完成修改，等待验证。'};
+  // One follow-up shell call keeps the approval-mode coverage that the removed
+  // verification panel used to provide: a command still needs its own approval.
+  const savedHello=body.messages.some(message=>message.role==='tool'&&String(message.content).includes('Saved hello.txt'));
+  let delta={content:'已完成修改，等待检查。'};
+  if(!hasResult)delta={tool_calls:[{index:0,id:'fixture-write-'+requests.length,type:'function',function:{name:'write',arguments:JSON.stringify({path:targetFile,content:'hello'})}}]};
+  else if(savedHello&&!shellIssued){shellIssued=true;delta={tool_calls:[{index:0,id:'fixture-shell-'+requests.length,type:'function',function:{name:'shell',arguments:JSON.stringify({command:"Write-Output 'shell ok'"})}}]};}
   res.writeHead(200,{'Content-Type':'text/event-stream'});
   for(const [piece,reason] of [[delta,null],[{},delta.tool_calls?'tool_calls':'stop']])res.write('data: '+JSON.stringify({id:'fixture',object:'chat.completion.chunk',created:0,model:'fixture',choices:[{index:0,delta:piece,finish_reason:reason}]})+'\n\n');
   res.end('data: [DONE]\n\n');
@@ -79,7 +81,7 @@ async function checkContrast(page,theme){
       const channels=color.match(/[\d.]+/g).slice(0,3).map(Number).map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4;});
       return channels[0]*.2126+channels[1]*.7152+channels[2]*.0722;
     };
-    return ['.open-project','.session-list .selected','.status','.model-chip','.verification>.passed','.fine-print'].map(selector=>{
+    return ['.open-project','.session-list .selected','.status','.model-chip','.verification>span','.composer-meta'].map(selector=>{
       const element=document.querySelector(selector);
       let parent=element,bg;
       do{bg=getComputedStyle(parent).backgroundColor;parent=parent.parentElement;}while(parent&&(bg==='transparent'||bg==='rgba(0, 0, 0, 0)'));
@@ -256,8 +258,6 @@ async function launch(){
   await expect(page.locator('.workspace-review')).toBeVisible();
   report.responsive_details_and_controls='passed';
   await expect(page.getByLabel('任务指令')).toBeEnabled();
-  await page.locator('.checks summary').click();
-  await page.getByLabel('验证命令').fill("if ((Get-Content hello.txt -Raw) -ne 'hello') { exit 1 }; Write-Output '1 passed'");
   const taskInput=page.getByLabel('任务指令');
   const beforeKeyboard=requests.length;
   await taskInput.fill('第一行');
@@ -307,7 +307,6 @@ async function launch(){
   await page.getByLabel('审批模式').selectOption('full-access');
   await expect(page.getByRole('dialog',{name:'开启完全访问',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'开启完全访问',exact:true}).click();
-  await expect(page.locator('.verification>.passed')).toHaveText('所选检查通过',{timeout:30000});
   await expect(page.locator('.tool-record')).toHaveCount(2);
   await expect(page.locator('.tool-record pre')).toHaveCount(0);
   await page.locator('.tool-record summary').first().click();
@@ -350,32 +349,6 @@ async function launch(){
   report.resume='passed';
   await expect(page.getByLabel('审批模式')).toHaveValue('ask');
   report.full_access_resets_on_reopen='passed';
-  // A real failed shell check triggers one model repair and a complete rerun.
-  repairFixture=true;
-  await page.getByRole('button',{name:'新建会话',exact:true}).click();
-  await page.getByLabel('审批模式').selectOption('full-access');
-  await page.getByRole('button',{name:'开启完全访问',exact:true}).click();
-  await page.locator('.checks>summary').click();
-  const repairCheck="if (!(Test-Path repair.txt)) { exit 1 }; if ((Get-Content repair.txt -Raw) -ne 'fixed') { exit 1 }; Write-Output '1 passed'";
-  await page.getByLabel('验证命令').fill(repairCheck);
-  await page.getByLabel('自动修复次数').selectOption('1');
-  await page.reload();
-  await page.locator('.checks>summary').click();
-  await expect(page.getByLabel('验证命令')).toHaveValue(repairCheck);
-  await expect(page.getByLabel('自动修复次数')).toHaveValue('1');
-  await page.getByRole('button',{name:'审查',exact:true}).click();
-  await page.getByLabel('任务指令').fill('创建 repair.txt，内容为 fixed，并执行所选检查。');
-  await page.getByRole('button',{name:'发送任务'}).click();
-  await expect(page.locator('.verification>.passed')).toHaveText('所选检查通过',{timeout:30000});
-  await page.getByRole('tab',{name:'检查结果',exact:true}).click();
-  await expect(page.locator('.verification')).toContainText('第 1 轮 · 失败');
-  await expect(page.locator('.verification')).toContainText('第 2 轮 · 通过');
-  assert.equal(fs.readFileSync(path.join(project,'repair.txt'),'utf8'),'fixed');
-  report.verification_failure_repair_rerun_and_draft_reload='passed';
-  await capture('desktop-verification-repair.png');
-  repairFixture=false;
-  await page.locator('.checks>summary').click();
-  await page.getByLabel('验证命令').fill('');
   await page.getByLabel('审批模式').selectOption('ask');
   // Cancel an HTTP request which never returns. This must not wait for network timeout.
   delay=true;

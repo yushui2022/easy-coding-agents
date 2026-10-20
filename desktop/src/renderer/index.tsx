@@ -9,7 +9,6 @@ import {Transcript, LazyDetail, LogText} from './Transcript';
 import {Workspace} from './workspace/Workspace';
 import {EmptyState} from './ui/EmptyState';
 import {Welcome} from './Welcome';
-import {TaskVerification} from './TaskVerification';
 import {Sidebar} from './Sidebar';
 import {useAttachments} from './Attachments';
 import {AgentCards,type ChildAgent} from './subagents/AgentCards';
@@ -59,9 +58,6 @@ function App() {
   const [following,setFollowing] = useState(true);
   const [narrow,setNarrow] = useState(() => window.innerWidth < 1180);
   const [sheetOpen,setSheetOpen] = useState(false);
-  const [checks,setChecks] = useState('');
-  const [checkOptionsOpen,setCheckOptionsOpen]=useState(false);
-  const [repairAttempts,setRepairAttempts] = useState(1);
   const [sending,setSending] = useState(false);
   const [stopping,setStopping] = useState(false);
   const [sideTab,setSideTab] = useState('changes');
@@ -143,22 +139,10 @@ function App() {
   useEffect(() => {
     setOlder([]);setCursor(null);setDiff(null);setAgentView(null);bottom.current=true;setFollowing(true);
     setStopping(false);setAnswer('');setAnswered(null);setError('');setNotice('');
-    setModelPickerOpen(false);setConfirmFull(false);setCheckOptionsOpen(false);setDiagnostic(null);
+    setModelPickerOpen(false);setConfirmFull(false);setDiagnostic(null);
     reportedError.current=0;
   },[viewKey]);
   const messages=useMemo(()=>[...older,...state.messages],[older,state.messages]);
-  useEffect(() => {
-    if(!state.project)return;
-    try {
-      const saved=JSON.parse(sessionStorage.getItem('eca.verification.'+viewKey)||'null');
-      setChecks(typeof saved?.checks==='string'?saved.checks:'');
-      setRepairAttempts(Number.isInteger(saved?.repairAttempts)&&saved.repairAttempts>=0&&saved.repairAttempts<=3?saved.repairAttempts:1);
-    } catch {setChecks('');setRepairAttempts(1);}
-  },[viewKey]);
-  const verificationDraft = (text:string, attempts:number) => {
-    setChecks(text);setRepairAttempts(attempts);
-    if(state.session_id)try {sessionStorage.setItem('eca.verification.'+viewKey,JSON.stringify({checks:text,repairAttempts:attempts}));} catch { /* optional draft storage */ }
-  };
   useEffect(() => {if (!state.busy) setStopping(false);},[state.busy]);
   useEffect(() => {
     if(state.seq<reportedError.current)reportedError.current=0; // A restarted backend begins a new sequence.
@@ -202,9 +186,7 @@ function App() {
       // Choosing a directory never implicitly runs a draft against that project.
       if (!state.project) {const picked=await pick();if(picked&&attachments.items.length)await attachments.moveTo('main.'+draftKey+'.'+(picked.workspace_owner||picked.session_id));return;}
       const submitted=prompt;
-      const commands=checks.split('\n').map(x=>x.trim()).filter(Boolean);
-      setCheckOptionsOpen(false);
-      const result=await perform('task.start',{prompt:submitted,attachments:attachments.items,checks:commands,repair_attempts:commands.length&&state.settings?.mode==='code'?repairAttempts:0});
+      const result=await perform('task.start',{prompt:submitted,attachments:attachments.items});
       if(result) {setPrompt(current=>current===submitted?'':current);await attachments.clear();}
     } finally {startBusy.current=false;setSending(false);}
   };
@@ -301,7 +283,7 @@ function App() {
       {sideTab==='checks'&&<>
         <div className="panel-label">验证结果</div>
         <div className="verification"><span className={verificationStatus==='passed'?'passed':''}>{verificationStatus==='passed'?'所选检查通过':label(verificationStatus)}</span>
-          <p>{state.suite?.commands?.join(' · ')||state.verification?.command||'设置验证命令，或让 ECA 执行检查。'}</p>
+          <p>{state.suite?.commands?.join(' · ')||state.verification?.command||'可在对话中要求 ECA 运行测试或构建；普通工具执行记录请在对话中查看。'}</p>
           {!!state.suite?.commands?.length&&<p>自动修复上限：{state.suite.repair_budget||0} 次 · 已进行 {Math.max(0,(state.suite.rounds?.length||0)-1)} 次</p>}
           {state.suite?.stop_reason&&<p role="status">{stopReasons[state.suite.stop_reason]||state.suite.stop_reason}</p>}
           {state.suite?.rounds?.map((round:any,i:number)=><div className="check-round" key={i}><div className="check-round-title">第 {i+1} 轮 · {label(round.status)}</div>{round.checks?.map((check:any,j:number)=><LazyDetail key={j} className="check-record" title={<><span className={check.status==='failed'?'failed':''}>{label(check.status)}</span><code>{check.command}</code></>} text={JSON.stringify(check,null,2)}/>)}</div>)}
@@ -373,7 +355,6 @@ function App() {
               }}/>
             <div className="composer-toolbar">
               <div className="composer-options">{attachments.button}
-              <TaskVerification open={checkOptionsOpen} onOpenChange={setCheckOptionsOpen} checks={checks} attempts={repairAttempts} busy={state.busy} codeMode={state.settings?.mode==='code'} onChange={verificationDraft}/>
               {state.project&&<div className={'permission-control '+(state.approval_mode==='full-access'?'full-access':'')}><ShieldCheck size={14}/><select className={'permission-picker '+(state.approval_mode==='full-access'?'full-access':'')} aria-label="审批模式" title={permissionHint} value={state.approval_mode||'ask'} disabled={permissionChanging||projectChanging} onChange={e=>e.target.value==='full-access'?setConfirmFull(true):void choosePermission(e.target.value)}>{Object.entries(permissionLabels).map(([value,text])=><option key={value} value={value}>{text}</option>)}</select></div>}
               </div>
               <div className="composer-actions">
@@ -388,7 +369,7 @@ function App() {
         </div>
       </div>
     </main>
-    {state.project&&<Workspace key={viewKey} agentView={agentView} state={state} config={config} review={inspector} open={detailsOpen} onOpen={setDetailsOpen} narrow={narrow} blocked={!!(settingsOpen||modelPickerOpen||confirmFull||diff||diagnostic||waiting||checkOptionsOpen)} onDraft={(text:string)=>{setPrompt(p=>p?p+'\n\n'+text:text);setNotice('已放入主对话草稿，确认后发送。');promptInput.current?.focus();}}/>}
+    {state.project&&<Workspace key={viewKey} agentView={agentView} state={state} config={config} review={inspector} open={detailsOpen} onOpen={setDetailsOpen} narrow={narrow} blocked={!!(settingsOpen||modelPickerOpen||confirmFull||diff||diagnostic||waiting)} onDraft={(text:string)=>{setPrompt(p=>p?p+'\n\n'+text:text);setNotice('已放入主对话草稿，确认后发送。');promptInput.current?.focus();}}/>}
     {modelPickerOpen&&<ModelMenu anchor={modelButton} label="选择模型" connections={config.connections||[]} recent={config.recentModels||[]} selectedId={state.project?state.model_selection?.connection_id:config.defaultId} reasoning={state.project?state.settings?.reasoning:config.model?.reasoning} busy={state.busy||modelChanging} error={modelSelectionError} onClose={()=>setModelPickerOpen(false)} onChoose={id=>chooseModel(id,true)} onEffort={chooseEffort} onManage={()=>{setModelPickerOpen(false);setSettingsOpen(true);}} special={state.project?[{id:'default',label:'跟随桌面默认',selected:state.model_selection?.choice==='default',disabled:!config.defaultId},{id:'project',label:'沿用项目配置',selected:state.model_selection?.choice==='project'}]:[]}/>}
     <ModelSettings open={settingsOpen} config={config} state={state} onConfig={setConfig} onClose={()=>setSettingsOpen(false)} onUse={chooseModel}/>
     {confirmFull&&<Dialog title="开启完全访问" closeLabel="取消完全访问" onClose={()=>setConfirmFull(false)}><p>在当前会话中自动批准文件修改、命令、联网及外部工具操作，也会放行本会话正在等待的授权。</p><p>命令按当前系统账户权限执行，可能访问项目外文件和网络；不会获得管理员权限。文件工具仍保留路径和冲突检查，已有沙箱及只读模式继续生效。</p><p className="fine-print">不会改变其他会话的审批模式。重新打开项目后恢复项目审批设置；已执行的操作不会因切回逐次确认而撤销。</p><div className="actions"><button onClick={()=>setConfirmFull(false)}>取消</button><button className="primary" disabled={permissionChanging} onClick={()=>choosePermission('full-access')}>开启完全访问</button></div></Dialog>}
