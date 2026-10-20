@@ -23,7 +23,9 @@ class ActivityTests(unittest.TestCase):
         self.assertEqual(snapshot['first_response_ms'], 40000)
         self.assertEqual(snapshot['generation_ms'], 2000)
         self.assertEqual(snapshot['throughput_source'], 'estimate')
-        self.assertNotIn('private thought', str(events))
+        # Thinking text reaches the events now, capped so a long stream stays bounded.
+        self.assertIn('private thought', str(events))
+        self.assertNotIn('reasoning_scope', str(events))
         now[0] = 100.0  # delayed usage packet doesn't reduce output speed
         final = activity.snapshot({'completion_tokens': 100})
         self.assertEqual(final['tokens_per_second'], 50.0)
@@ -119,4 +121,6 @@ class AdapterActivityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(events[-1][1]['status'], 'cancelled')
         self.assertIsNone(events[-1][1]['output_tokens'])
         self.assertEqual(events[-1][1]['reasoning_chars'], 15)
-        self.assertNotIn('private thought', str(events))
+        # Thinking text is shown to the user now; the provider replay scope is not.
+        self.assertIn('private thought', str(events))
+        self.assertNotIn('reasoning_scope', str(events))

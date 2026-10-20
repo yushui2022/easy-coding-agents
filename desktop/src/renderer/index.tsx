@@ -1,6 +1,6 @@
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {FolderOpen, Stop, ArrowUp, Check, ArrowCounterClockwise, X, ArrowClockwise, FileText, ChatCircle, SidebarSimple, CaretDown, Desktop, ArrowDown, ListChecks, ShieldCheck} from '@phosphor-icons/react';
+import {FolderOpen, Stop, ArrowUp, Check, ArrowCounterClockwise, X, ArrowClockwise, FileText, ChatCircle, SidebarSimple, CaretDown, Desktop, ArrowDown, ListChecks, ShieldCheck, Sparkle} from '@phosphor-icons/react';
 import {Dialog} from './Dialog';
 import {ModelSettings} from './ModelSettings';
 import {ModelMenu,effortLabels} from './ModelMenu';
@@ -333,10 +333,14 @@ function App() {
           {empty?<Welcome project={projectName} choosing={projectChanging||sending} onProject={pick} onDraft={value=>{setPrompt(value);promptInput.current?.focus();}}/>:<div className="messages">
             {(cursor??state.message_total-50)>0&&<button className="load-older" disabled={historyLoading} onClick={loadOlder}>{historyLoading?'正在加载…':'加载更早的消息'}</button>}
             {older.length>=150&&<p className="fine-print">历史记录分段显示；继续加载查看更早内容。</p>}
-            <Transcript key={viewKey} projectId={state.project_id} messages={messages} sessionId={state.session_id} root={state.project||''} busy={state.busy} agents={state.children} onOpenAgent={agent=>{setDetailsOpen(true);setAgentView(old=>({id:agent.id,nonce:(old?.nonce||0)+1}));}}/>
+            <Transcript key={viewKey} projectId={state.project_id} messages={messages} sessionId={state.session_id} root={state.project||''} busy={state.busy} agents={state.children} changes={state.changes} onOpenAgent={agent=>{setDetailsOpen(true);setAgentView(old=>({id:agent.id,nonce:(old?.nonce||0)+1}));}}/>
             {(state.children||[]).some((agent:ChildAgent)=>!agent.parent_call_id)&&<section aria-label="历史子任务"><p className="fine-print">其他子任务记录</p><AgentCards agents={state.children.filter((agent:ChildAgent)=>!agent.parent_call_id)} onOpen={agent=>{setDetailsOpen(true);setAgentView(old=>({id:agent.id,nonce:(old?.nonce||0)+1}));}}/></section>}
             {older.length>0&&<button className="log-more" onClick={()=>{setOlder([]);setCursor(null);bottom.current=true;setFollowing(true);if(scroll.current)scroll.current.scrollTop=scroll.current.scrollHeight;}}>返回最近记录</button>}
           </div>}
+          {state.busy&&typeof state.activity?.reasoning_text==='string'&&state.activity.reasoning_text.trim()&&
+            <article className="message assistant live"><div className="message-label">ECA <span>正在思考</span></div>
+              <details className="message-reasoning" open><summary><Sparkle size={13}/><span>思考</span></summary>
+                <div className="message-reasoning-text">{state.activity.reasoning_text}</div></details></article>}
           {state.stream&&<article className="message assistant live"><div className="message-label">ECA <span>正在输出</span></div><div className="stream-text">{state.stream}</div></article>}
         </div>
         <div className="composer-wrap">

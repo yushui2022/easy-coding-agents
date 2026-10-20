@@ -57,6 +57,16 @@ async function capture(name,selector) {
   await expect(meter.locator('span')).toHaveText(/^\d{1,3}%$/);
   await expect(meter).toHaveAttribute('title',/本地估算/);
   report.context_meter=await meter.locator('span').innerText();
+  // Thinking is shown as a collapsed block inside the assistant turn.
+  const thinking=page.locator('.message.assistant .message-reasoning').first();
+  await expect(thinking).toBeVisible();
+  await expect(thinking.locator('summary')).toContainText('思考');
+  await expect(thinking.locator('.message-reasoning-text')).toBeHidden();
+  await thinking.locator('summary').click();
+  await expect(thinking.locator('.message-reasoning-text')).toBeVisible();
+  await expect(thinking.locator('.message-reasoning-text')).toContainText('先看目录结构');
+  await capture('message-reasoning');
+  report.thinking_block='passed';
   await meter.click();
   const menu=page.getByRole('dialog',{name:'上下文设置'});
   await expect(menu).toBeVisible();

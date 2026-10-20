@@ -162,6 +162,17 @@ body {margin: 0; font-family: var(--font-ui);}
 .eca-app .message.user {padding: 14px 18px; margin-top: 4px; margin-bottom: 28px; border-radius: var(--radius-panel); background: var(--panel); border: 1px solid var(--border);}
 .eca-app .message.user :last-child {margin-bottom: 0;}
 .eca-app .message.user .message-label {color: var(--muted); margin-bottom: 6px; font-weight: 500;}
+.eca-app .message-reasoning {max-width: 800px; margin: 0 auto 10px; color: var(--secondary);}
+.eca-app .message-reasoning>summary {display: flex; align-items: center; gap: 6px; width: fit-content; padding: 2px 0; font: 500 11px/1.5 var(--font-ui); color: var(--muted); cursor: pointer; list-style: none;}
+.eca-app .message-reasoning>summary::-webkit-details-marker {display: none;}
+.eca-app .message-reasoning>summary:hover {color: var(--text);}
+.eca-app .message-reasoning>summary svg {color: var(--accent); flex-shrink: 0;}
+.eca-app .message-reasoning>summary i {font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums;}
+.eca-app .message-reasoning-text {margin-top: 6px; padding: 8px 12px; border-left: 2px solid var(--border); border-radius: 0 8px 8px 0; font: 12px/1.85 var(--font-reading); color: var(--secondary); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow: auto;}
+.eca-app .message.live .message-reasoning {margin-bottom: 6px;}
+.eca-app .tool-diff {display: inline-flex; gap: 4px; flex-shrink: 0; font: 500 10px/1 var(--font-ui); font-variant-numeric: tabular-nums;}
+.eca-app .tool-diff b {font-weight: 600; color: #2f7d4f;}
+.eca-app .tool-diff i {font-style: normal; color: #b13643;}
 .eca-app .message-actions {display: flex; justify-content: flex-end; margin-top: 10px;}
 .eca-app .message.user .message-actions {justify-content: flex-start; margin-top: 2px;}
 .eca-app .message-copy {display: inline-flex; align-items: center; gap: 5px; min-height: 26px; padding: 3px 9px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); font: 500 11px/1.4 var(--font-ui); cursor: pointer; transition: background 120ms ease, border-color 120ms ease, color 120ms ease;}

@@ -47,7 +47,7 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
         arguments = json.dumps({'path': 'large.txt', 'content': '界'*5000})
         result = json.dumps({'exit_code': 2, 'timed_out': False, 'stdout': 'line\n'*2000})
         state['messages'] = [{'role':'user', 'content': str(i)} for i in range(60)] + [
-            {'role':'assistant', 'content':'done', 'reasoning_content':'private',
+            {'role':'assistant', 'content':'done',
              'tool_calls':[{'id':'big','type':'function','function':{'name':'write','arguments':arguments}}]},
             {'role':'tool','tool_call_id':'big','content':result}]
         preview = await self.rpc.dispatch('snapshot', {'preview':True})
@@ -136,7 +136,8 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(self.rpc.runtime.agent.store, 'list', side_effect=AssertionError('live must not query history')):
             live = await self.rpc.dispatch('live', {})
         self.assertEqual(live['activity']['reasoning_chars'], 42)
-        self.assertNotIn('private thought', str(self.rpc.snapshot()))
+        self.assertIn('private thought', str(self.rpc.snapshot()))  # thinking is shown, bounded
+        self.assertNotIn('reasoning_scope', str(self.rpc.snapshot()))  # replay scope stays internal
         self.assertNotIn('model_activity', [entry['event'] for entry in self.rpc.events])
 
     async def test_context_usage_is_a_bounded_estimate_and_exposed_everywhere(self):

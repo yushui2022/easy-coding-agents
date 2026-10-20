@@ -19,7 +19,8 @@ state = store.create()
 state['title'] = '玻璃生态 · 检查页面与运行结果'
 state['messages'] = [
     {'role': 'user', 'content': '检查玻璃立方体场景的页面和运行结果，保留已有修改。'},
-    {'role': 'assistant', 'content': '先检查场景文件和本地运行环境，再执行页面检查。'},
+    {'role': 'assistant', 'content': '先检查场景文件和本地运行环境，再执行页面检查。',
+     'reasoning_content': '先看目录结构，再读场景文件；注意保留已有修改。', 'reasoning_scope': 'fixture:deepseek-flash'},
 ]
 tools = Tools(Settings(root), state, None, None, lambda *_: None)
 for i in range(8):

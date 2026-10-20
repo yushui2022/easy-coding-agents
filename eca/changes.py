@@ -3,6 +3,30 @@ import difflib
 
 from .tools import atomic_write
 
+# Above this many combined lines the counts are skipped: the change list is part of
+# every snapshot and must stay cheap.
+COUNT_LIMIT = 20000
+
+
+def line_counts(before, after):
+    """Added and removed line counts for a stored change; None when not measured."""
+    try:
+        old = (before or b'').decode('utf-8', 'replace').splitlines()
+        new = (after or b'').decode('utf-8', 'replace').splitlines()
+    except Exception:
+        return {'added': None, 'removed': None}
+    if len(old) + len(new) > COUNT_LIMIT:
+        return {'added': None, 'removed': None}
+    added = removed = 0
+    for line in difflib.unified_diff(old, new, n=0, lineterm=''):
+        if line.startswith('+++') or line.startswith('---') or line.startswith('@@'):
+            continue
+        if line.startswith('+'):
+            added += 1
+        elif line.startswith('-'):
+            removed += 1
+    return {'added': added, 'removed': removed}
+
 
 class Changes:
     def __init__(self, store, session_id, resolve):
@@ -40,9 +64,9 @@ class Changes:
         return target, target.read_bytes() if target.exists() else None
 
     def list(self):
-        rows = self.db.execute("SELECT id,path,status FROM file_changes WHERE session_id=? ORDER BY id DESC LIMIT 100",
+        rows = self.db.execute("SELECT id,path,status,before,after FROM file_changes WHERE session_id=? ORDER BY id DESC LIMIT 100",
                                (self.session_id,)).fetchall()
-        return [{"id": i, "path": p, "status": s} for i, p, s in rows]
+        return [{"id": i, "path": p, "status": s, **line_counts(before, after)} for i, p, s, before, after in rows]
 
     def diff(self, ident):
         _, path, before, after, _ = self.get(ident)

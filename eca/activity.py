@@ -39,6 +39,7 @@ class StreamActivity:
         self.units = 0.0
         self.counts = dict(reasoning_chars=0, text_chars=0, tool_argument_chars=0)
         self.updates = 0
+        self.reasoning_text = ''
         self.opaque_reasoning = False
 
     def observe(self, *, text='', reasoning='', arguments='', tool='', phase=''):
@@ -51,6 +52,8 @@ class StreamActivity:
             self.counts[key] += len(value)
             ascii_count = sum(ord(c) < 128 for c in value)
             self.units += ascii_count / 4 + (len(value) - ascii_count) / 1.5
+        if reasoning:
+            self.reasoning_text = (self.reasoning_text + reasoning)[-4000:]
         if text or reasoning or arguments:
             if self.first is None:
                 self.first = now
@@ -73,7 +76,7 @@ class StreamActivity:
             isinstance(hidden_tokens, (int, float)) and hidden_tokens > 0 and not self.counts['reasoning_chars'])
         tokens = actual if reported else math.ceil(self.units)
         return dict(request_id=self.request_id, phase=self.phase or 'waiting_model', tool=self.tool,
-                    **self.counts, estimated_output_tokens=math.ceil(self.units),
+                    reasoning_text=self.reasoning_text, **self.counts, estimated_output_tokens=math.ceil(self.units),
                     output_tokens=actual if reported else None,
                     throughput_source='unavailable' if unmeasured else 'provider' if reported else 'estimate',
                     throughput_unavailable_reason='unobserved_reasoning' if unmeasured else None,

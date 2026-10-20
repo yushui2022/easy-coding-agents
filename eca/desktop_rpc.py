@@ -141,6 +141,10 @@ class DesktopRPC:
         rows = []
         for index, message in enumerate(messages, start):
             row = {k: v for k, v in message.items() if k in {'role', 'content', 'tool_calls', 'tool_call_id'}}
+            if message.get('reasoning_content'):
+                # Thinking is shown in the conversation, bounded; provider replay data
+                # still only travels back to the same model and endpoint.
+                row['reasoning_content'] = message['reasoning_content'][:8000]
             if message.get('attachments'):
                 from .attachments import public
                 row['attachments'] = public(message['attachments'])
