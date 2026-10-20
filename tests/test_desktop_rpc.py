@@ -323,6 +323,7 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
     async def test_finished_run_renames_the_session_and_pushes_the_title_event(self):
         await self.fake([{'role': 'assistant', 'content': 'done'},
                          {'role': 'assistant', 'content': '"附件链路审计。"'}])
+        self.rpc.runtime.agent.settings.api_key = 'test-key'
         await self.rpc.dispatch('task.start', {'prompt': '只读调查（禁止修改任何文件）：审计图片附件链路'})
         await self.rpc.finishing
         session_id = self.rpc.runtime.agent.state['id']
@@ -331,6 +332,25 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
         events = [e['params'] for e in self.events if e.get('params', {}).get('event') == 'title']
         self.assertEqual(events[-1]['data'], {'title': '附件链路审计'})
 
+
+    async def test_name_missing_titles_renames_old_sessions_once(self):
+        store = self.rpc.runtime.agent.store
+        agent = self.rpc.runtime.agent
+        old = store.create()
+        old['messages'].append({'role': 'user', 'content': '只读调查（禁止修改任何文件）：审计图片附件链路'})
+        old['title'] = old['messages'][0]['content'][:80]
+        store.save(old)
+        agent.settings.api_key = ''
+        self.assertEqual(await self.rpc.dispatch('sessions.name-missing', {}),
+                         {'renamed': [], 'reason': 'no_credentials'})
+        agent.settings.api_key = 'test-key'
+        await self.fake([{'role': 'assistant', 'content': '附件链路审计'}])
+        result = await self.rpc.dispatch('sessions.name-missing', {})
+        self.assertEqual(result['renamed'], [{'id': old['id'], 'title': '附件链路审计'}])
+        self.assertEqual(store.load(old['id'])['title_source'], 'model')
+        self.assertEqual(await self.rpc.dispatch('sessions.name-missing', {}), {'renamed': []})
+        with self.assertRaises(ValueError):
+            await self.rpc.dispatch('sessions.name-missing', {'limit': 0})
     async def test_cancel_during_repair_stops_provider_and_keeps_first_failure(self):
         entered = asyncio.Event()
         class RepairWait(FakeProvider):

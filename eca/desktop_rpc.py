@@ -301,6 +301,31 @@ class DesktopRPC:
             rows.append({**entry, 'data': text[:2000], 'truncated': len(text)>2000})
         return rows
 
+    async def name_missing_titles(self, limit=8):
+        """Name sessions whose title is still the truncated first prompt.
+
+        Serial and bounded: one attempt per session, no retry after a failure.
+        """
+        agent = self.runtime.agent
+        if not agent.settings.api_key:
+            return {'renamed': [], 'reason': 'no_credentials'}
+        if type(limit) is not int or limit < 1:
+            raise ValueError('Invalid session naming limit')
+        renamed = []
+        for ident, _title, _updated in agent.store.list(top_level=True):
+            if len(renamed) >= limit:
+                break
+            try:
+                state = agent.store.load(ident)
+            except Exception:
+                continue
+            title = await agent.name_state(state)
+            if title:
+                renamed.append({'id': ident, 'title': title})
+        if renamed:
+            self.emit('title', {'renamed': renamed})
+        return {'renamed': renamed}
+
     async def finish(self, task):
         try:
             await task
@@ -317,7 +342,7 @@ class DesktopRPC:
             self.activity = {}
             self.emit('run_finished', {'status': self.runtime.agent.state['status']})
             self.run_id = None
-            if self.runtime.agent.state.get('status') == 'idle':
+            if self.runtime.agent.state.get('status') == 'idle' and self.runtime.agent.settings.api_key:
                 try:
                     await self.runtime.agent.name_session()
                 except asyncio.CancelledError:
@@ -447,6 +472,8 @@ class DesktopRPC:
                 self.stream_id += 1
                 self.events.clear()
                 return self.snapshot(preview=params.get('preview') is True)
+            if method == 'sessions.name-missing':
+                return await self.name_missing_titles(params.get('limit', 8))
             if method == 'session.message':
                 runtime = self.require()
                 state = runtime.agent.state if params['id'] == runtime.agent.state['id'] else runtime.agent.store.peek(params['id'])

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "easy-coding-agent"
-version = "0.35.0"
+version = "0.35.1"
 description = "An asynchronous, project-scoped terminal coding assistant"
 readme = "README.md"
 requires-python = ">=3.11"

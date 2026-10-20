@@ -258,39 +258,53 @@ If execution was interrupted, inspect the actual state before repeating mutation
             self.emit("notice", f"Context window omitted {trimmed} old messages; full history remains on disk. Use /compact for a summary.")
         return [{"role": "system", "content": system}, *messages]
 
-    async def name_session(self):
-        """Name a session whose title is still the truncated first prompt.
+    @staticmethod
+    def truncation(state):
+        """The fallback title: the first user prompt, cut to 80 characters."""
+        first = next((m.get('content') for m in state.get('messages', [])
+                      if m.get('role') == 'user' and isinstance(m.get('content'), str)), '')
+        return first[:80].replace("\n", " ")
 
-        Runs after the turn has finished so the naming request never competes
-        with task requests; any failure keeps the truncated fallback.
+    async def name_state(self, state):
+        """Give one session a model-written title; '' means keep what it has.
+
+        Runs only after a turn finished, so the naming request never competes
+        with task requests. A session counts as unnamed while its title is
+        still the truncated first prompt, which also covers sessions saved
+        before titles carried a source.
         """
-        if self.state.get('title_source') != 'truncated':
+        if state.get('title_source') not in {None, 'truncated'}:
             return ''
-        prompt = next((m.get('content') for m in self.state['messages']
-                       if m.get('role') == 'user' and isinstance(m.get('content'), str)), '')
-        if not prompt.strip():
+        first = next((m.get('content') for m in state.get('messages', [])
+                      if m.get('role') == 'user' and isinstance(m.get('content'), str)), '')
+        if not first.strip() or state.get('title') != self.truncation(state):
             return ''
         messages = [
             {'role': 'system', 'content':
              'Name this work session. Reply with the title only: no quotes, no trailing punctuation, '
              'no "Title:" prefix. Use the language of the request. '
              'At most 6 CJK characters or 40 Latin characters.'},
-            {'role': 'user', 'content': prompt[:2000]},
+            {'role': 'user', 'content': first[:2000]},
         ]
         try:
             response, _ = await self.model_complete(messages, [], lambda event, data: None, purpose='title')
         except Exception:
-            return ''
-        if response.get('tool_calls') or not response.get('content'):
-            return ''
-        title = clean_title(response['content'])
+            response = None
+        title = clean_title(response['content']) if response and not response.get('tool_calls') and response.get('content') else ''
         if not title:
+            # One attempt per session: mark it so a dead model is not retried on every switch.
+            state['title_source'] = 'failed'
+            self.store.save(state)
             return ''
-        self.state['title'] = title
-        self.state['title_source'] = 'model'
-        self.store.save(self.state)
-        self.emit('title', {'title': title})
+        state['title'] = title
+        state['title_source'] = 'model'
+        self.store.save(state)
+        if state.get('id') == self.state.get('id'):
+            self.emit('title', {'title': title})
         return title
+
+    async def name_session(self):
+        return await self.name_state(self.state)
 
     async def run(self, prompt, attachments=None):
         if self.busy:

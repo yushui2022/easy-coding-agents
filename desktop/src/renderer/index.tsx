@@ -123,6 +123,16 @@ function App() {
       }
     } catch(e){setError(String(e));} finally {liveBusy.current=false;}
   };
+  const namedProjects = useRef<Record<string,boolean>>({});
+  useEffect(() => {
+    const projectId = state.project_id;
+    if (!projectId || namedProjects.current[projectId]) return;
+    namedProjects.current[projectId] = true;
+    // Older sessions kept the truncated first prompt as their title; name them once per project.
+    void invoke('sessions.name-missing', {limit: 8})
+      .then((result:any) => { if (result?.renamed?.length) void refresh(); })
+      .catch(() => {});
+  }, [state.project_id]);
   useEffect(() => {
     void loadConfig().catch(e => setError(String(e))); void refresh();
     let timer: ReturnType<typeof setTimeout>|undefined;

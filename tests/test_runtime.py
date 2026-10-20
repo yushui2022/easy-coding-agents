@@ -200,7 +200,18 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         await agent.run("只读调查：审计")
         self.assertEqual(await agent.name_session(), "")
         self.assertEqual(self.state["title"], "只读调查：审计")
-        self.assertEqual(self.state["title_source"], "truncated")
+        self.assertEqual(self.state["title_source"], "failed")
+        self.assertEqual(await agent.name_session(), "", "a failed naming must not retry")
+
+    async def test_session_naming_covers_sessions_saved_before_title_sources(self):
+        provider = FakeProvider([{"role": "assistant", "content": "done"},
+                                 {"role": "assistant", "content": "附件链路审计"}])
+        agent = Agent(self.settings, self.store, self.state, yes, yes, lambda *_: None, provider)
+        await agent.run("只读调查（禁止修改任何文件）：审计图片附件链路")
+        self.state.pop("title_source")  # a session written by 0.34.x has no source
+        self.assertEqual(await agent.name_session(), "附件链路审计")
+        self.assertEqual(self.state["title"], "附件链路审计")
+        self.assertEqual(self.store.load(self.state["id"])["title_source"], "model")
 
     def test_clean_title_strips_wrapping_prefixes_and_length(self):
         from eca.agent import clean_title
