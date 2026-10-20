@@ -75,7 +75,7 @@ class DesktopRPC:
         elif event == 'model_activity':
             if data.get('request_id') and data['request_id'] != self.activity.get('request_id'):
                 return
-            self.activity = {**self.activity, **data}
+            self.activity = {**self.activity, **data, 'updated_at': time.time()}
         elif event == 'request_end':
             self.last_request = data
             if data['id'] == self.activity.get('request_id'):

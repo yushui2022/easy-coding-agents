@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 import httpx
 from openai import AsyncOpenAI
 from .retry import retryable
-from .errors import OutputLimitError, ContextLimitError, context_rejection
+from .errors import OutputLimitError, ContextLimitError, StalledStreamError, context_rejection
 from .activity import StreamActivity
 
 
@@ -114,26 +114,44 @@ class Provider:
         stream = await self.client.chat.completions.create(**kwargs)
         content, calls, usage, finish = "", {}, {}, None
         reasoning = ''
+        # A connected stream can stall while the provider keeps the socket warm with
+        # empty keep-alive chunks. Only real content resets this clock, so a silent
+        # stream fails with a clear message instead of waiting forever.
+        idle = max(1, int(self.settings.request_timeout))
+        last_content = time.monotonic()
+        chunks = stream.__aiter__()
         try:
-            async for chunk in stream:
+            while True:
+                try:
+                    chunk = await asyncio.wait_for(chunks.__anext__(), timeout=idle)
+                except StopAsyncIteration:
+                    break
+                except asyncio.TimeoutError:
+                    raise StalledStreamError(idle) from None
                 if chunk.usage:
                     usage = chunk.usage.model_dump()
                     self.last_usage = usage
                 if not chunk.choices:
+                    if time.monotonic() - last_content > idle:
+                        raise StalledStreamError(idle)
                     continue
                 choice = chunk.choices[0]
                 if choice.finish_reason:
                     finish = choice.finish_reason
                 delta = choice.delta
+                produced = False
                 thought = getattr(delta, 'reasoning_content', None)
                 if isinstance(thought, str) and thought:
+                    produced = True
                     emit('model_delta', {'reasoning': thought})
                     if deepseek:
                         reasoning += thought
                 if delta.content:
+                    produced = True
                     content += delta.content
                     emit("text", delta.content)
                 for tc in delta.tool_calls or []:
+                    produced = True
                     call = calls.setdefault(tc.index, {"id": "", "type": "function", "function": {"name": "", "arguments": ""}})
                     if tc.id:
                         call["id"] = tc.id
@@ -142,6 +160,10 @@ class Provider:
                         call["function"]["arguments"] += tc.function.arguments or ""
                         emit('model_delta', {'tool': call['function']['name'],
                                             'arguments': tc.function.arguments or ''})
+                if produced:
+                    last_content = time.monotonic()
+                elif time.monotonic() - last_content > idle:
+                    raise StalledStreamError(idle)
         finally:
             await stream.close()
         if finish == 'length':

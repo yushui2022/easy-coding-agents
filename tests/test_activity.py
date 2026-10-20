@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 from eca.activity import StreamActivity, tool_target
 from eca.config import Settings
+from eca.errors import StalledStreamError
 from eca.provider import Provider
 
 
@@ -124,3 +125,38 @@ class AdapterActivityTests(unittest.IsolatedAsyncioTestCase):
         # Thinking text is shown to the user now; the provider replay scope is not.
         self.assertIn('private thought', str(events))
         self.assertNotIn('reasoning_scope', str(events))
+
+    async def test_stalled_chat_stream_fails_with_a_clear_message(self):
+        class Stream:
+            async def __aiter__(self):
+                yield NS(usage=None, choices=[NS(finish_reason=None,
+                    delta=NS(content='The', reasoning_content=None, tool_calls=None))])
+                await asyncio.Event().wait()
+            async def close(self):
+                pass
+        provider = Provider(Settings(Path.cwd(), api_key='fixture', network_retries=0, request_timeout=1))
+        provider.client = NS(chat=NS(completions=NS(create=AsyncMock(return_value=Stream()))), close=AsyncMock())
+        events = []
+        try:
+            with self.assertRaises(StalledStreamError) as caught:
+                await provider.complete([], [], lambda *e: events.append(e))
+        finally:
+            await provider.close()
+        self.assertIn('no new content for 1 seconds', str(caught.exception))
+        self.assertEqual(events[-1][1]['status'], 'failed')
+
+    async def test_keepalive_chunks_do_not_hide_a_stalled_stream(self):
+        class Stream:
+            async def __aiter__(self):
+                for _ in range(10):
+                    await asyncio.sleep(.2)
+                    yield NS(usage=None, choices=[])
+            async def close(self):
+                pass
+        provider = Provider(Settings(Path.cwd(), api_key='fixture', network_retries=0, request_timeout=1))
+        provider.client = NS(chat=NS(completions=NS(create=AsyncMock(return_value=Stream()))), close=AsyncMock())
+        try:
+            with self.assertRaises(StalledStreamError):
+                await provider.complete([], [], lambda *_: None)
+        finally:
+            await provider.close()

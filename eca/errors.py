@@ -11,6 +11,14 @@ class ContextLimitError(RuntimeError):
         super().__init__('Provider rejected the context size; no tools executed for this request.')
 
 
+class StalledStreamError(RuntimeError):
+    """A connected stream that stopped producing content (keep-alives do not count)."""
+    def __init__(self, seconds):
+        super().__init__(f'Provider sent no new content for {seconds} seconds; the stream was '
+                         'aborted before any tool ran. Retry, lower the thinking effort, '
+                         'or switch model or connection.')
+
+
 def context_rejection(status, body):
     """Strict protocol signals only; never classify generic HTTP/payload failures."""
     if status not in {400, 413} or not isinstance(body, dict):

@@ -51,6 +51,10 @@ const formatClock=(seconds:number)=>seconds>=60?`${Math.floor(seconds/60)}:${Str
   // The phase clock runs locally, so it keeps moving even when the backend has
   // nothing new to report (a long tool call, or a provider that is just slow).
   const clocked=['preparing','waiting_model','thinking','responding','tool_arguments','executing','verifying','repairing'].includes(phase)?`${subtitle} · 持续 ${formatClock(phaseElapsed)}`:subtitle;
+  // A stream can stay connected while producing nothing; say so instead of looking frozen.
+  const silent=typeof activity.updated_at==='number'?Math.floor(now/1000-activity.updated_at):0;
+  const stall=['waiting_model','thinking','responding'].includes(phase)&&silent>=15
+    ?`${clocked} · 已 ${silent} 秒没有新数据`:`${clocked}`;
   const previous=['executing','tool_done','approval','question'].includes(phase);
   const metrics=previous?(state.last_request||{}):activity;
   const available=typeof metrics.tokens_per_second==='number'&&Number.isFinite(metrics.tokens_per_second)&&metrics.throughput_source!=='unavailable';
@@ -64,7 +68,7 @@ const formatClock=(seconds:number)=>seconds>=60?`${Math.floor(seconds/60)}:${Str
       <img className="activity-mark" src={workMark} alt="" width={32} height={32} draggable={false}/>
       <div className="activity-main">
         <div className="activity-heading"><span className="activity-title" role="status" aria-live="polite" aria-atomic="true">{title}</span>{activity.tool&&<span className="activity-tool-name" title={activity.tool}>{activity.tool}</span>}</div>
-        <div className="activity-subtitle" title={clocked}>{clocked}</div>
+        <div className="activity-subtitle" title={stall}>{stall}</div>
       </div>
       <div className="activity-metrics" title={speedNote}>
         <div className="activity-speed"><strong>{speed}</strong><span>tokens/s</span></div>
