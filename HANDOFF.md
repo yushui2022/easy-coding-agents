@@ -24,7 +24,7 @@
 | Git origin | `https://github.com/yushui2022/easy-coding-agents.git` |
 | 当前分支 | `main` |
 | 2026-10-20 复核 HEAD | `cf79151`，提交标题 `feat(desktop): concurrent projects, subagents, activity and attachments (0.29-0.34)` |
-| 本地源码 / 安装包版本 | 源码与安装版均为 `0.34.1`（安装于 2026-10-20 16:36） |
+| 本地源码 / 安装包版本 | 源码 `0.34.2`（已发 prerelease） / 本机安装版仍为 `0.34.1` |
 | 本机安装目录 | `G:\Apps\ECA Desktop` |
 | 程序入口 | `G:\Apps\ECA Desktop\ECA Desktop.exe` |
 | 模型连接及加密凭据 | `G:\Data\ECA\Desktop\preferences.json` |
@@ -471,3 +471,16 @@ C:\Users\xiaoy\Documents\Obsidian Vault\产品设计方法论
 - 没有自动启动安装后的窗口，也没有重放用户任务。干净 Windows 与第三方代理环境仍未验收。
 
 证据：`output/release/desktop/release-0.34.1.json`、`output/release/desktop/e2e-packaged-0.34.1.log`、`output/playwright/desktop-packaged-report.json`、`output/release/desktop/preferences-before-0.34.1.sha256`。
+
+### 2026-10-20 后续：0.34.2 已发布（未安装到本机）
+
+按用户要求走「不买证书、GitHub Releases 分发」的路线，本轮完成：
+
+- 版本升到 `0.34.2`（五个来源同步），新增每轮对话的复制按钮与 `docs/desktop/UNSIGNED-DISTRIBUTION.md`。
+- 重建后端并打包：`ECA-Desktop-0.34.2-x64-Setup.exe`，162,201,165 字节，SHA256 `1eb67e8c…ffdf`；打包 payload 与 `win-unpacked` 哈希一致，后端握手 `0.34.2`。
+- 打包版 `execution-ui.cjs` 通过（含复制按钮与剪贴板断言），0 次付费 API 调用，无 renderer 错误。
+- 以 **prerelease** 发布：<https://github.com/yushui2022/easy-coding-agents/releases/tag/v0.34.2>，资产为安装包与 `SHA256SUMS.txt`（远端下载已验证 HTTP 200）。
+
+**本机 `G:\Apps\ECA Desktop` 仍是 0.34.1**，本轮没有重装（用户未要求，且安装需先退出应用）。仍待人工完成：向微软提交 Defender 误报、决定是否保留 prerelease 与许可证口径。
+
+证据：`output/release/desktop/release-0.34.2.json`、`output/release/desktop/SHA256SUMS.txt`、`output/playwright/message-copy.png`。
