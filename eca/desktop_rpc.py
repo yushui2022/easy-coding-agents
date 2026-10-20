@@ -203,7 +203,9 @@ class DesktopRPC:
         if not agent:
             return None
         try:
-            key = (agent.state['id'], len(agent.state['messages']), len(self.stream), agent.settings.mode)
+            # Bucket the live stream: per-token keys forced a full recompute on every
+            # poll, which cost ~50 ms per call on a long session and stalled the run.
+            key = (agent.state['id'], len(agent.state['messages']), len(self.stream) // 4000, agent.settings.mode)
             cached = getattr(self, '_context_usage', None)
             now = time.time()
             if cached and cached[0] == key and now - cached[1] < 2:

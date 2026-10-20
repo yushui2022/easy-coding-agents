@@ -13,6 +13,8 @@
 .activity-speed>span{font:10px/1.5 var(--font-ui);color:var(--muted)}
 .activity-timing{display:flex;justify-content:flex-end;align-items:center;gap:5px;font:10px/1.5 var(--font-ui);color:var(--muted);margin-top:3px;white-space:nowrap}
 .activity-time{flex:none;font:11px/1.5 var(--font-ui);font-variant-numeric:tabular-nums;color:var(--muted);letter-spacing:.02em}
+.activity-speed.is-stale strong{color:var(--muted);opacity:.75}
+.activity-speed.is-stale>span{opacity:.75}
 .eca-app .activity-disclosure{display:grid;place-items:center;width:24px;min-height:26px;flex:none;margin:0;padding:0;border:0;border-radius:8px;background:transparent;box-shadow:none;color:var(--muted)}
 .eca-app .activity-disclosure:hover{background:var(--hover);color:var(--text)}.eca-app .activity-disclosure:active{background:var(--selected)}
 .eca-app .activity-disclosure:focus-visible{outline:2px solid var(--accent);outline-offset:2px}

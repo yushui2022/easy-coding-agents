@@ -213,6 +213,14 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.state["title"], "附件链路审计")
         self.assertEqual(self.store.load(self.state["id"])["title_source"], "model")
 
+    async def test_session_naming_accepts_the_whitespace_normalized_fallback(self):
+        provider = FakeProvider([{"role": "assistant", "content": "done"},
+                                 {"role": "assistant", "content": "附件链路审计"}])
+        agent = Agent(self.settings, self.store, self.state, yes, yes, lambda *_: None, provider)
+        await agent.run("只读调查：审计\n\n  图片附件链路")
+        self.state["title"] = " ".join(self.state["title"].split())  # a child keeps the normalized form
+        self.assertEqual(await agent.name_session(), "附件链路审计")
+
     def test_clean_title_strips_wrapping_prefixes_and_length(self):
         from eca.agent import clean_title
         self.assertEqual(clean_title('  "标题：附件链路审计。"  \n第二行'), "附件链路审计")

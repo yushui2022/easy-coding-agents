@@ -1,7 +1,7 @@
 {
   "name": "eca-desktop",
   "productName": "ECA Desktop",
-  "version": "0.36.1",
+  "version": "0.37.0",
   "private": true,
   "description": "Easy Coding Agent desktop workspace",
   "author": "ECA contributors",

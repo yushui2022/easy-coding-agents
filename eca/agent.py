@@ -134,6 +134,13 @@ class Agent:
             child = Agent(settings,self.store,state,self.tools.approve,self.tools.question,child_emit,child=True)
             child.budget = self.budget
             await asyncio.wait_for(child.run(task),timeout=self.settings.subagent_timeout)
+            if state['status'] == 'idle' and settings.api_key:
+                try:
+                    await child.name_session()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    pass
         except TimeoutError:
             state['status']='timeout'
             state['stop_reason']='Subagent time limit reached; inspect changes before continuing.'
@@ -277,7 +284,7 @@ If execution was interrupted, inspect the actual state before repeating mutation
             return ''
         first = next((m.get('content') for m in state.get('messages', [])
                       if m.get('role') == 'user' and isinstance(m.get('content'), str)), '')
-        if not first.strip() or state.get('title') != self.truncation(state):
+        if not first.strip() or state.get('title') not in {self.truncation(state), ' '.join(first.split())[:80]}:
             return ''
         messages = [
             {'role': 'system', 'content':

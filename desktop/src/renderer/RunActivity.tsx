@@ -55,9 +55,12 @@ const formatClock=(seconds:number)=>seconds>=60?`${Math.floor(seconds/60)}:${Str
   const silent=typeof activity.updated_at==='number'?Math.floor(now/1000-activity.updated_at):0;
   const stall=['waiting_model','thinking','responding'].includes(phase)&&silent>=15
     ?`${clocked} · 已 ${silent} 秒没有新数据`:`${clocked}`;
-  const previous=['executing','tool_done','approval','question'].includes(phase);
-  const metrics=previous?(state.last_request||{}):activity;
-  const available=typeof metrics.tokens_per_second==='number'&&Number.isFinite(metrics.tokens_per_second)&&metrics.throughput_source!=='unavailable';
+  // Prefer this round's live figure. Fall back to the finished request's average,
+  // but say so: a frozen number labelled plainly reads as a broken clock.
+  const usable=(value:any)=>typeof value?.tokens_per_second==='number'&&Number.isFinite(value.tokens_per_second)&&value.throughput_source!=='unavailable';
+  const liveUsable=usable(activity),lastUsable=usable(state.last_request);
+  const metrics=liveUsable?activity:lastUsable?state.last_request:{};
+  const available=liveUsable||lastUsable,stale=available&&!liveUsable;
   const speed=available?(metrics.throughput_source==='estimate'?'≈':'')+metrics.tokens_per_second.toFixed(1):'—';
   const speedNote=metrics.throughput_unavailable_reason==='unobserved_reasoning'
     ?'服务端包含不可观测的推理用量，无法可靠计算速度。'
@@ -71,8 +74,8 @@ const formatClock=(seconds:number)=>seconds>=60?`${Math.floor(seconds/60)}:${Str
         <div className="activity-subtitle" title={stall}>{stall}</div>
       </div>
       <div className="activity-metrics" title={speedNote}>
-        <div className="activity-speed"><strong>{speed}</strong><span>tokens/s</span></div>
-        <div className="activity-timing">{previous&&<span>上一轮 ·</span>}<time className="activity-time" aria-label={`任务已用时 ${Math.floor(elapsed/60)} 分 ${elapsed%60} 秒`}>{time}</time></div>
+        <div className={'activity-speed'+(stale?' is-stale':'')}><strong>{speed}</strong><span>tokens/s{stale?' · 上轮':''}</span></div>
+        <div className="activity-timing"><time className="activity-time" aria-label={`任务已用时 ${Math.floor(elapsed/60)} 分 ${elapsed%60} 秒`}>{time}</time></div>
       </div>
       <button className="activity-disclosure" aria-label={expanded?'收起运行详情':'展开运行详情'} aria-expanded={expanded} aria-controls={detailsId} onClick={()=>setExpanded(value=>!value)}><CaretDown size={14}/></button>
     </div>

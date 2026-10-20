@@ -154,3 +154,17 @@ class ChildActivityTests(unittest.IsolatedAsyncioTestCase):
         meta = self.rpc.snapshot(preview=True)['children'][0]
         self.assertEqual((meta['parent_call_id'], meta['parent_message_index']), ('old-call', 0))
         self.assertNotIn('parent_call_id', self.agent.store.peek(state['id']))
+
+    async def test_finished_child_is_renamed_by_the_model(self):
+        class Naming(FakeProvider):
+            def __init__(self):
+                super().__init__([DONE, {'role': 'assistant', 'content': '入口审计'}])
+        self.agent.settings.api_key = 'fixture'
+        self.agent.provider = FakeProvider([call('delegate', {'task': 'Inspect entry point thoroughly'}), DONE])
+        with patch('eca.agent.Provider', return_value=Naming()):
+            await self.rpc.dispatch('task.start', {'prompt': 'Delegate inspection'})
+            await asyncio.wait_for(self.rpc.finishing, 10)
+        child = self.agent.state['children'][0]
+        stored = self.agent.store.peek(child)
+        self.assertEqual((stored['title'], stored.get('title_source')), ('入口审计', 'model'))
+        self.assertEqual(self.view(child)['title'], '入口审计')

@@ -77,7 +77,7 @@ async def parallel(agent, tasks):
     states = []
     for task, config in zip(tasks, selected):
         state = agent.store.create(task.get('mode', 'plan'))
-        state.update(status='preparing', title=task['task'][:80], parent_id=agent.state['id'], billing_root=agent.state.get('billing_root', agent.state['id']),
+        state.update(status='preparing', title=' '.join(task['task'].split())[:80], parent_id=agent.state['id'], billing_root=agent.state.get('billing_root', agent.state['id']),
                      isolated=True, model_profile=config.model_profile, baseline={p: digest(data) for p, data in files.items()},
                      usage_tracking_complete=agent.state.get('usage_tracking_complete', True))
         state.update(origin(agent, task['task'], config))
@@ -131,6 +131,13 @@ async def parallel(agent, tasks):
                 state['status'] = 'running'
                 emit('status', 'running')
                 await asyncio.wait_for(child.run(task['task']), agent.settings.subagent_timeout)
+                if state['status'] == 'idle' and settings.api_key:
+                    try:
+                        await child.name_session()
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception:
+                        pass
         except TimeoutError:
             state.update(status='timeout', stop_reason='Child time limit reached')
         except asyncio.CancelledError:

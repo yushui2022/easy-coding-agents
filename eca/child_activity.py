@@ -11,7 +11,8 @@ def describe(state):
 
 
 def origin(agent, task, settings):
-    return dict(title=task[:80], delegated_task=task, model=settings.model,
+    # Same normalization as Agent.truncation; a child names itself once it finishes.
+    return dict(title=' '.join(task.split())[:80], delegated_task=task, model=settings.model,
                 parent_call_id=getattr(agent, 'active_call_id', None),
                 parent_message_index=getattr(agent, 'active_message_index', None))
 
