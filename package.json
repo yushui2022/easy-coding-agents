@@ -1,6 +1,6 @@
 {
   "name": "easy-coding-agent-cli",
-  "version": "0.34.6",
+  "version": "0.34.7",
   "private": true,
   "description": "Easy Coding Agent terminal launcher (ecs)",
   "license": "UNLICENSED",
