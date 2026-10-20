@@ -317,6 +317,13 @@ class DesktopRPC:
             self.activity = {}
             self.emit('run_finished', {'status': self.runtime.agent.state['status']})
             self.run_id = None
+            if self.runtime.agent.state.get('status') == 'idle':
+                try:
+                    await self.runtime.agent.name_session()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    pass
 
     async def dispatch(self, method, params):
         if method == 'initialize':

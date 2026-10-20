@@ -304,7 +304,7 @@ function App() {
         {!state.tasks.length&&<EmptyState icon={<ListChecks size={25} weight="light"/>} title="等待任务计划">ECA 制定计划后，可以在这里跟踪进度。</EmptyState>}
         {state.tasks.map((t:any,i:number)=><div className="task-row" key={i}><span>{t.status==='completed'?'✓':'·'}</span><span>{t.content}</span><small>{({completed:'已完成',in_progress:'进行中',pending:'待处理'} as Record<string,string>)[t.status]||t.status}</small></div>)}
         <div className="panel-label verification-label">执行活动</div>
-        {state.events.filter((event:any)=>!['text','usage','model_activity'].includes(event.event)).slice(-30).reverse().map((event:any)=><LazyDetail className="activity" key={event.seq} title={event.event==='subagent_progress'?'子 Agent 活动':({tool:'工具调用',result:'工具返回',request_start:'模型请求',request_end:'请求结束',notice:'运行提示',verification_suite:'验证结果',verification_progress:'验证进度',turn:'新一轮处理'} as Record<string,string>)[event.event]||event.event} text={shorten(typeof event.data==='string'?event.data:JSON.stringify(event.data,null,2),10000)}/>)}
+        {state.events.filter((event:any)=>!['text','usage','model_activity','title'].includes(event.event)).slice(-30).reverse().map((event:any)=><LazyDetail className="activity" key={event.seq} title={event.event==='subagent_progress'?'子 Agent 活动':({tool:'工具调用',result:'工具返回',request_start:'模型请求',request_end:'请求结束',notice:'运行提示',verification_suite:'验证结果',verification_progress:'验证进度',turn:'新一轮处理'} as Record<string,string>)[event.event]||event.event} text={shorten(typeof event.data==='string'?event.data:JSON.stringify(event.data,null,2),10000)}/>)}
       </details>
       <details className="review-extra"><summary>用量</summary>
         <div className="panel-label">当前会话、子任务与侧聊</div>

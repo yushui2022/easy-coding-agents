@@ -1,3 +1,3 @@
 """Easy Coding Agent: a local, inspectable coding assistant."""
 
-__version__ = "0.34.12"
+__version__ = "0.35.0"

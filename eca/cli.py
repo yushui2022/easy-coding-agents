@@ -234,6 +234,8 @@ class App:
             if self.streaming:
                 self.console.print()
                 self.streaming = False
+        if self.state["status"] == "idle":
+            await self.agent.name_session()
         return (0 if verified else 3) if self.state["status"] == "idle" else 2
 
     def show_sessions(self):

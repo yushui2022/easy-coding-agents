@@ -180,6 +180,36 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(loaded["messages"][-1]["content"], "Created hello.py")
         self.assertEqual([m["role"] for m in loaded["messages"]], ["user", "assistant", "tool", "assistant"])
 
+    async def test_session_naming_renames_the_truncated_fallback_once(self):
+        provider = FakeProvider([{"role": "assistant", "content": "done"},
+                                 {"role": "assistant", "content": '"附件链路审计。"'}])
+        agent = Agent(self.settings, self.store, self.state, yes, yes, lambda *_: None, provider)
+        await agent.run("只读调查（禁止修改任何文件、禁止运行测试）：审计图片附件链路")
+        self.assertEqual(self.state["title_source"], "truncated")
+        self.assertEqual(self.state["title"], "只读调查（禁止修改任何文件、禁止运行测试）：审计图片附件链路"[:80])
+        self.assertEqual(await agent.name_session(), "附件链路审计")
+        self.assertEqual(self.state["title"], "附件链路审计")
+        self.assertEqual(self.state["title_source"], "model")
+        self.assertEqual(await agent.name_session(), "")
+        self.assertEqual(self.state["title"], "附件链路审计")
+        self.assertEqual(self.store.load(self.state["id"])["title"], "附件链路审计")
+
+    async def test_session_naming_keeps_the_fallback_when_the_request_fails(self):
+        provider = FakeProvider([{"role": "assistant", "content": "done"}, RuntimeError("no title")])
+        agent = Agent(self.settings, self.store, self.state, yes, yes, lambda *_: None, provider)
+        await agent.run("只读调查：审计")
+        self.assertEqual(await agent.name_session(), "")
+        self.assertEqual(self.state["title"], "只读调查：审计")
+        self.assertEqual(self.state["title_source"], "truncated")
+
+    def test_clean_title_strips_wrapping_prefixes_and_length(self):
+        from eca.agent import clean_title
+        self.assertEqual(clean_title('  "标题：附件链路审计。"  \n第二行'), "附件链路审计")
+        self.assertEqual(clean_title("Title: web fetch guard"), "web fetch guard")
+        self.assertEqual(clean_title("`session`"), "session")
+        self.assertEqual(clean_title("x" * 200), "x" * 40)
+        self.assertEqual(clean_title("   \n "), "")
+
     async def test_cancel_approval_closes_tool_exchange(self):
         started = asyncio.Event()
         async def wait(*_):

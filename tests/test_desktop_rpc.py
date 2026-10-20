@@ -12,6 +12,12 @@ from eca.store import Store
 from test_runtime import FakeProvider, call
 
 
+def task_contexts(provider):
+    """Model calls made by the task itself, excluding the one-off session naming request."""
+    return [record for record in provider.contexts
+            if 'Name this work session' not in (record[0][0].get('content') or '')]
+
+
 class DesktopTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temp = tempfile.TemporaryDirectory(dir=os.environ.get('ECA_TEST_TMP'))
@@ -284,7 +290,7 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(suite['status'], 'passed')
         self.assertEqual(suite['repair_budget'], 1)
         self.assertEqual([r['status'] for r in suite['rounds']], ['failed','passed'])
-        self.assertEqual(len(self.rpc.runtime.agent.provider.contexts), 2)
+        self.assertEqual(len(task_contexts(self.rpc.runtime.agent.provider)), 2)
         events = [e['params']['data']['status'] for e in self.events
                   if e.get('params',{}).get('event')=='verification_progress']
         self.assertIn('repairing', events)
@@ -312,7 +318,18 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
             await self.rpc.finishing
         process.assert_not_awaited()
         self.assertEqual(self.rpc.snapshot()['suite']['stop_reason'], 'unsafe_to_retry')
-        self.assertEqual(len(self.rpc.runtime.agent.provider.contexts), 1)
+        self.assertEqual(len(task_contexts(self.rpc.runtime.agent.provider)), 1)
+
+    async def test_finished_run_renames_the_session_and_pushes_the_title_event(self):
+        await self.fake([{'role': 'assistant', 'content': 'done'},
+                         {'role': 'assistant', 'content': '"附件链路审计。"'}])
+        await self.rpc.dispatch('task.start', {'prompt': '只读调查（禁止修改任何文件）：审计图片附件链路'})
+        await self.rpc.finishing
+        session_id = self.rpc.runtime.agent.state['id']
+        titles = {row['id']: row['title'] for row in self.rpc.snapshot()['sessions']}
+        self.assertEqual(titles[session_id], '附件链路审计')
+        events = [e['params'] for e in self.events if e.get('params', {}).get('event') == 'title']
+        self.assertEqual(events[-1]['data'], {'title': '附件链路审计'})
 
     async def test_cancel_during_repair_stops_provider_and_keeps_first_failure(self):
         entered = asyncio.Event()

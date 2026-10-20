@@ -16,6 +16,23 @@ from .context import ContextBudget
 from .tools import SCHEMAS, Tools, allowed
 
 
+TITLE_PREFIXES = ('会话标题：', '会话标题:', '标题：', '标题:', 'Title:', 'title:', 'TITLE:')
+TITLE_LIMIT = 40
+
+
+def clean_title(text):
+    """Normalize one model-produced title; empty means "keep the fallback"."""
+    line = next((part.strip() for part in str(text).splitlines() if part.strip()), '')
+    line = line.strip('"\'`“”‘’「」《》〈〉 ').strip()
+    for prefix in TITLE_PREFIXES:
+        if line.startswith(prefix):
+            line = line[len(prefix):].strip()
+            break
+    line = line.rstrip('。．.、,，；;：:!！?？ ').strip()
+    line = ' '.join(line.split())
+    return line[:TITLE_LIMIT].strip()
+
+
 class Agent:
     def __init__(self, settings, store, state, approve, question, emit, provider=None, child=False):
         if state.get('isolated'):
@@ -241,6 +258,40 @@ If execution was interrupted, inspect the actual state before repeating mutation
             self.emit("notice", f"Context window omitted {trimmed} old messages; full history remains on disk. Use /compact for a summary.")
         return [{"role": "system", "content": system}, *messages]
 
+    async def name_session(self):
+        """Name a session whose title is still the truncated first prompt.
+
+        Runs after the turn has finished so the naming request never competes
+        with task requests; any failure keeps the truncated fallback.
+        """
+        if self.state.get('title_source') != 'truncated':
+            return ''
+        prompt = next((m.get('content') for m in self.state['messages']
+                       if m.get('role') == 'user' and isinstance(m.get('content'), str)), '')
+        if not prompt.strip():
+            return ''
+        messages = [
+            {'role': 'system', 'content':
+             'Name this work session. Reply with the title only: no quotes, no trailing punctuation, '
+             'no "Title:" prefix. Use the language of the request. '
+             'At most 6 CJK characters or 40 Latin characters.'},
+            {'role': 'user', 'content': prompt[:2000]},
+        ]
+        try:
+            response, _ = await self.model_complete(messages, [], lambda event, data: None, purpose='title')
+        except Exception:
+            return ''
+        if response.get('tool_calls') or not response.get('content'):
+            return ''
+        title = clean_title(response['content'])
+        if not title:
+            return ''
+        self.state['title'] = title
+        self.state['title_source'] = 'model'
+        self.store.save(self.state)
+        self.emit('title', {'title': title})
+        return title
+
     async def run(self, prompt, attachments=None):
         if self.busy:
             raise RuntimeError("A turn is already running")
@@ -257,6 +308,7 @@ If execution was interrupted, inspect the actual state before repeating mutation
         self.state["messages"].append({"role": "user", "content": prompt, **({"attachments": attachments} if attachments else {})})
         if self.state["title"] == "New session":
             self.state["title"] = prompt[:80].replace("\n", " ")
+            self.state["title_source"] = "truncated"
         self.state["status"] = "running"
         self.state.pop("stop_reason", None)
         self.store.save(self.state)
