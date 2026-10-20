@@ -64,6 +64,17 @@ async function capture(name,selector) {
   await expect(menu).toContainText('本地估算');
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
+  // The window is frameless: our own title bar replaces the native one. A native
+  // title bar would subtract roughly 30 px from the content height; only the
+  // invisible resize border (about 2 px) may remain here.
+  const sizes=await app.evaluate(({BrowserWindow})=>{const w=BrowserWindow.getAllWindows()[0];return {bounds:w.getBounds().height,content:w.getContentSize()[1]};});
+  expect(Math.abs(sizes.bounds-sizes.content)).toBeLessThan(8);
+  await expect(page.locator('.titlebar')).toBeVisible();
+  await expect(page.locator('.titlebar-controls button')).toHaveCount(3);
+  const dragRegion=await page.locator('.titlebar-drag').evaluate(el=>getComputedStyle(el).getPropertyValue('-webkit-app-region').trim());
+  expect(dragRegion==='drag'||dragRegion==='').toBe(true);
+  await capture('titlebar','.titlebar');
+  report.window_titlebar={frameless:Math.abs(sizes.bounds-sizes.content)<8,controls:3,difference:sizes.bounds-sizes.content};
   // Sidebar project rows read from the left edge; the base button rule centres content.
   const rowAlign=await page.locator('.project-group-heading').first().evaluate(el=>{
     const head=el.getBoundingClientRect(),caret=el.querySelector('.project-disclosure').getBoundingClientRect();

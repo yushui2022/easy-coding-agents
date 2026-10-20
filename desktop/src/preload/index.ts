@@ -16,5 +16,11 @@ contextBridge.exposeInMainWorld('eca', {
     ipcRenderer.on('eca:failure', listener);
     return () => ipcRenderer.removeListener('eca:failure', listener);
   },
-  copy: async (text: string) => Boolean(await ipcRenderer.invoke('eca:copy', text))
+  copy: async (text: string) => Boolean(await ipcRenderer.invoke('eca:copy', text)),
+  windowControl: async (action: string) => Boolean(await ipcRenderer.invoke('eca:window', action)),
+  onMaximized: (callback: (value: boolean) => void) => {
+    const listener = (_event: unknown, value: boolean) => callback(Boolean(value));
+    ipcRenderer.on('eca:maximized', listener);
+    return () => ipcRenderer.removeListener('eca:maximized', listener);
+  }
 });

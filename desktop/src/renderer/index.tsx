@@ -11,6 +11,7 @@ import {EmptyState} from './ui/EmptyState';
 import {Welcome} from './Welcome';
 import {Sidebar} from './Sidebar';
 import {ContextMeter} from './ContextMeter';
+import {TitleBar} from './TitleBar';
 import {useAttachments} from './Attachments';
 import {AgentCards,type ChildAgent} from './subagents/AgentCards';
 import './tokens.css';
@@ -24,6 +25,8 @@ declare global { interface Window { eca: {
   subscribe: (callback: (data:{event?:string}) => void) => () => void;
   onFailure: (callback: (message: string) => void) => () => void;
   copy: (text: string) => Promise<boolean>;
+  windowControl: (action: string) => Promise<boolean>;
+  onMaximized: (callback: (value: boolean) => void) => () => void;
 }; } }
 const invoke = window.eca.invoke;
 const labels: Record<string,string> = {idle:'等待指令', running:'执行中', repairing:'正在修复', interrupted:'已停止', error:'遇到问题', blocked:'需要处理', limit:'达到配置上限', passed:'通过', failed:'失败', not_run:'未验证', stale:'结果已过期', task_incomplete:'任务未完成', unconfirmed_snapshot:'结果待核实', applied:'已修改', accepted:'已审查', undone:'已撤销'};
@@ -312,6 +315,7 @@ function App() {
     <button className="diagnose" onClick={async()=>{const result=await perform('diagnostics');if(result)setDiagnostic(result);}} disabled={!state.project}><ArrowClockwise size={15}/>检查项目环境</button>
   </>;
   return <div className={'eca-app workspace'+(state.project&&detailsOpen?' with-inspector':'')+(navCollapsed?' nav-collapsed':'')}>
+    <TitleBar title="ECA Desktop"/>
     <Sidebar state={state} config={config} blocked={sending||projectChanging||modelChanging||permissionChanging}
       onPick={pick} onRecent={index=>void perform('project.recent',{index})} onSession={(id,project_id)=>void perform('session.switch',{id,project_id:project_id||state.project_id})} onClose={project_id=>void perform('project.close',{project_id})} onSettings={()=>setSettingsOpen(true)}/>
     <main className="conversation">

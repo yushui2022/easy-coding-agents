@@ -260,7 +260,7 @@ else {
     const area = screen.getPrimaryDisplay().workAreaSize;
     const width = Math.min(1360, area.width - 32);
     const height = Math.min(860, area.height - 32);
-    window = new BrowserWindow({width, height, minWidth: Math.min(800, width), minHeight: Math.min(560, height), center: true, title: 'ECA Desktop', backgroundColor: '#18191c', autoHideMenuBar: true, show: process.env.ECA_DESKTOP_TEST_HIDDEN !== '1',
+    window = new BrowserWindow({width, height, minWidth: Math.min(800, width), minHeight: Math.min(560, height), center: true, title: 'ECA Desktop', frame: false, backgroundColor: '#18191c', autoHideMenuBar: true, show: process.env.ECA_DESKTOP_TEST_HIDDEN !== '1',
       webPreferences: {preload: path.join(__dirname, '../preload/index.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false}});
     window.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
     browsers=new BrowserManager(window);terminals=new TerminalManager();
@@ -271,6 +271,18 @@ else {
       try {return {ok: true, value: await action(method, params)};}
       catch (error) {return {ok: false, error: error instanceof Error ? error.message : '操作失败'};}
     });
+    // The window has no native frame, so the renderer draws the title bar and
+    // asks for these three actions. Close keeps the existing task confirmation.
+    ipcMain.handle('eca:window', async (event, action) => {
+      if (!trusted(event) || !window) return false;
+      if (action === 'minimize') window.minimize();
+      else if (action === 'maximize') {window.isMaximized() ? window.unmaximize() : window.maximize();}
+      else if (action === 'close') {void closeWindow();}
+      else return false;
+      return window.isMaximized();
+    });
+    window.on('maximize', () => publish('eca:maximized', true));
+    window.on('unmaximize', () => publish('eca:maximized', false));
     // Copy stays in the desktop process: the renderer keeps no clipboard, shell
     // or filesystem access of its own.
     ipcMain.handle('eca:copy', async (event, text) => {
