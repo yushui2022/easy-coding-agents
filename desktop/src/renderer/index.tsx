@@ -26,6 +26,9 @@ declare global { interface Window { eca: {
   onFailure: (callback: (message: string) => void) => () => void;
   copy: (text: string) => Promise<boolean>;
   windowControl: (action: string) => Promise<boolean>;
+  theme: () => Promise<string>;
+  setTheme: (source: string) => Promise<string>;
+  onTheme: (callback: (source: string) => void) => () => void;
   onMaximized: (callback: (value: boolean) => void) => () => void;
 }; } }
 const invoke = window.eca.invoke;

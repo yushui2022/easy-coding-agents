@@ -1,5 +1,5 @@
-import {useState} from 'react';
-import {CaretDown, Desktop, FolderOpen, GearSix, MagnifyingGlass, Plus, X} from '@phosphor-icons/react';
+import {useEffect, useState} from 'react';
+import {CaretDown, Desktop, FolderOpen, GearSix, MagnifyingGlass, Plus, X, Sun, Moon} from '@phosphor-icons/react';
 import './sidebar.css';
 
 type Session = {id:string; title:string; busy?:boolean; side_busy?:boolean; pending_count?:number; status?:string};
@@ -16,6 +16,21 @@ const samePath=(a:string,b:string)=>a.replaceAll('\\','/').toLowerCase()===b.rep
 export function Sidebar({state,config,blocked,onPick,onRecent,onSession,onClose,onSettings}:Props) {
   const [search,setSearch]=useState('');
   const [collapsed,setCollapsed]=useState<string[]>(()=>{try{return JSON.parse(sessionStorage.getItem('eca.projects.collapsed')||'[]');}catch{return [];}});
+  // The theme is a desktop preference: the main process owns the value and
+  // nativeTheme drives prefers-color-scheme, so the CSS needs no variant rules.
+  const [themeSource,setThemeSource]=useState('system');
+  useEffect(()=>{
+    let live=true;
+    void window.eca?.theme?.().then(value=>{if(live)setThemeSource(String(value));}).catch(()=>{});
+    const off=window.eca?.onTheme?.(value=>setThemeSource(String(value)));
+    return()=>{live=false;if(typeof off==='function')off();};
+  },[]);
+  const themeLabel=({system:'跟随系统',light:'浅色',dark:'深色'} as Record<string,string>)[themeSource]||'跟随系统';
+  const cycleTheme=async()=>{
+    const order=['system','light','dark'],next=order[(order.indexOf(themeSource)+1)%order.length];
+    const applied=await window.eca?.setTheme?.(next).catch(()=>null);
+    setThemeSource(String(applied||next));
+  };
   const toggle=(id:string)=>setCollapsed(old=>{const next=old.includes(id)?old.filter(x=>x!==id):[...old,id];sessionStorage.setItem('eca.projects.collapsed',JSON.stringify(next));return next;});
   const projects=state.projects||[];
   const recent=config.recent.filter(path=>!projects.some(p=>samePath(p.path,path)));
@@ -49,6 +64,6 @@ export function Sidebar({state,config,blocked,onPick,onRecent,onSession,onClose,
         {!!recentMatches.length&&<div className="recent-projects"><div className="recent-label">最近项目</div>{recentMatches.map(folder=><button className="recent" key={folder} title={folder} disabled={blocked} onClick={()=>onRecent(config.recent.indexOf(folder))}><FolderOpen size={16}/><span>{folderName(folder)}</span></button>)}</div>}
       </nav>
     </section>
-    <div className="sidebar-bottom"><button className="settings-button" aria-label="模型与设置" title="模型与设置" onClick={onSettings}><span className="settings-glyph"><GearSix size={17}/></span><span className="settings-copy"><strong>模型与设置</strong><small>{connections?`${connections} 个模型连接`:'添加 API 与模型'}</small></span>{config.credential_configured&&<span className="connection-dot" title="已配置密钥"/>}</button><footer><span><Desktop size={12}/>本地工作空间</span><span title="预览版">{config.version||'预览版'}</span></footer></div>
+    <div className="sidebar-bottom"><button className="settings-button" aria-label="模型与设置" title="模型与设置" onClick={onSettings}><span className="settings-glyph"><GearSix size={17}/></span><span className="settings-copy"><strong>模型与设置</strong><small>{connections?`${connections} 个模型连接`:'添加 API 与模型'}</small></span>{config.credential_configured&&<span className="connection-dot" title="已配置密钥"/>}</button><footer><span><Desktop size={12}/>本地工作空间</span><button className="theme-toggle" aria-label={'主题：'+themeLabel} title={'主题：'+themeLabel+'（点击切换）'} onClick={cycleTheme}>{themeSource==='dark'?<Moon size={13}/>:themeSource==='light'?<Sun size={13}/>:<Desktop size={13}/>}</button><span title="预览版">{config.version||'预览版'}</span></footer></div>
   </aside>;
 }

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, safeStorage, shell, screen, protocol, clipboard } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, safeStorage, shell, screen, protocol, clipboard, nativeTheme } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,6 +32,19 @@ process.env.TMP = tempHome;
 const root = path.resolve(__dirname, '../../..');
 const html = path.resolve(__dirname, '../renderer/index.html');
 const connections = new Connections(path.join(home, 'preferences.json'), safeStorage);
+// The theme lives in its own small file: it is a display preference, not a model
+// connection, and nativeTheme.themeSource drives prefers-color-scheme for the UI.
+type ThemeSource = 'system' | 'light' | 'dark';
+const themeFile = path.join(home, 'theme.json');
+const themeSources: ThemeSource[] = ['system', 'light', 'dark'];
+function readTheme(): ThemeSource {
+  try {const raw = JSON.parse(fs.readFileSync(themeFile, 'utf8')); return themeSources.includes(raw?.source) ? raw.source : 'system';}
+  catch {return 'system';}
+}
+function writeTheme(source: ThemeSource) {
+  try {fs.writeFileSync(themeFile, JSON.stringify({source}), {mode: 0o600});} catch { /* a failed write must not block the window */ }
+}
+nativeTheme.themeSource = readTheme();
 let activeSelection: {choice:string; connection_id:string|null; name:string}|undefined;
 const sessionSelections=new Map<string,NonNullable<typeof activeSelection>>();
 let selecting = false;
@@ -270,6 +283,17 @@ else {
       if (!trusted(event)) return {ok: false, error: 'Untrusted window'};
       try {return {ok: true, value: await action(method, params)};}
       catch (error) {return {ok: false, error: error instanceof Error ? error.message : '操作失败'};}
+    });
+    ipcMain.handle('eca:theme', async (event, payload) => {
+      if (!trusted(event)) return nativeTheme.themeSource;
+      if (payload?.action === 'set') {
+        const next = payload?.source;
+        if (!themeSources.includes(next)) return nativeTheme.themeSource;
+        nativeTheme.themeSource = next;
+        writeTheme(next);
+        publish('eca:theme', next);
+      }
+      return nativeTheme.themeSource;
     });
     // The window has no native frame, so the renderer draws the title bar and
     // asks for these three actions. Close keeps the existing task confirmation.

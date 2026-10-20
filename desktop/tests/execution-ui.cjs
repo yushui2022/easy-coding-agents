@@ -211,6 +211,24 @@ async function capture(name,selector) {
   await expect(page.getByLabel('任务指令')).toBeVisible();
   await page.getByLabel('任务指令').fill('检查窄窗口输入与布局');
   await capture('visual-welcome-narrow');
+  // Theme: system -> light -> dark -> system, applied through nativeTheme.
+  await page.setViewportSize({width:1360,height:860});
+  // Drop the media emulation used by the screenshots above, otherwise it overrides
+  // the real prefers-color-scheme value that nativeTheme controls.
+  await page.emulateMedia({colorScheme:null});
+  const themeButton=page.locator('.theme-toggle').first();
+  await expect(themeButton).toBeVisible();
+  const darkNow=()=>page.evaluate(()=>matchMedia('(prefers-color-scheme: dark)').matches);
+  await themeButton.click();
+  await expect(themeButton).toHaveAttribute('aria-label',/浅色/);
+  await expect.poll(darkNow).toBe(false);
+  await themeButton.click();
+  await expect(themeButton).toHaveAttribute('aria-label',/深色/);
+  await expect.poll(darkNow).toBe(true);
+  await themeButton.click();
+  await expect(themeButton).toHaveAttribute('aria-label',/跟随系统/);
+  report.theme_toggle='passed';
+
   report.checks=['grouping','visible failures','relative paths','lazy output','keyboard expansion','full records','opened-row pinning','dark and narrow layouts','reload','welcome and settings in both themes','side chat empty state','narrow workspace Escape and editable composer','thinking badge and quick task draft without submission','local welcome image and project context'];
   report.renderer_errors=errors;if(errors.length)throw Error(errors.join('\n'));
   report.version=await app.evaluate(({app})=>app.getVersion());
