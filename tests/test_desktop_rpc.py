@@ -424,6 +424,37 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
         updated = (await self.rpc.dispatch('queue.update', {'id': entry['id'], 'prompt': 'alpha edited'}))['queue']
         self.assertEqual([row['prompt'] for row in updated], ['alpha edited'])
 
+    async def test_send_now_interrupts_the_active_task_then_runs_the_message(self):
+        entered = asyncio.Event()
+        class Stuck(FakeProvider):
+            async def complete(self, *args):
+                entered.set()
+                await asyncio.Event().wait()
+        self.rpc.runtime.agent.provider = Stuck([])
+        await self.rpc.dispatch('task.start', {'prompt': 'long task'})
+        await asyncio.wait_for(entered.wait(), 3)
+        entry = (await self.rpc.dispatch('queue.add', {'prompt': 'urgent'}))['queue'][0]
+        self.rpc.runtime.agent.provider = FakeProvider([{'role': 'assistant', 'content': 'done'}])
+        result = await self.rpc.dispatch('queue.send-now', {'id': entry['id']})
+        self.assertTrue(result['interrupting'])
+        await asyncio.wait_for(self.rpc.finishing, 5)
+        await asyncio.wait_for(self.rpc.finishing, 5)
+        state = self.rpc.runtime.agent.state
+        prompts = [m['content'] for m in state['messages'] if m.get('role') == 'user']
+        self.assertEqual(prompts, ['long task', 'urgent'])
+        self.assertEqual(state['status'], 'idle')
+        self.assertEqual(self.rpc.snapshot()['queue'], [])
+
+    async def test_send_now_starts_immediately_when_nothing_is_running(self):
+        await self.fake([{'role': 'assistant', 'content': 'done'}])
+        entry = (await self.rpc.dispatch('queue.add', {'prompt': 'go'}))['queue'][0]
+        result = await self.rpc.dispatch('queue.send-now', {'id': entry['id']})
+        self.assertFalse(result['interrupting'])
+        await asyncio.wait_for(self.rpc.finishing, 5)
+        state = self.rpc.runtime.agent.state
+        self.assertEqual([m['content'] for m in state['messages'] if m.get('role') == 'user'], ['go'])
+        self.assertEqual(self.rpc.snapshot()['queue'], [])
+
     async def test_question_and_redaction(self):
         self.rpc.secrets.add('private-test-key')
         task = asyncio.create_task(self.rpc.question('Question private-test-key'))

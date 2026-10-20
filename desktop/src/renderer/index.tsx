@@ -391,7 +391,7 @@ function App() {
                 <span className="queue-actions">
                   <button aria-label="上移这条排队消息" title="上移" disabled={index===0||sending} onClick={()=>{void perform('queue.move',{id:item.id,offset:-1});}}><ArrowUp size={14}/></button>
                   <button aria-label="下移这条排队消息" title="下移" disabled={index===state.queue.length-1||sending} onClick={()=>{void perform('queue.move',{id:item.id,offset:1});}}><ArrowDown size={14}/></button>
-                  <button className="queue-send" title="排到队首；没有任务在跑时立即发送" disabled={sending} onClick={()=>{void perform('queue.priority',{id:item.id});}}>立即发送</button>
+                  <button className="queue-send" title="打断当前任务，立刻执行这条；没有任务在跑时直接开始" disabled={sending} onClick={()=>{void perform('queue.send-now',{id:item.id});}}>立即发送</button>
                   <button aria-label="编辑这条排队消息" title="编辑" disabled={sending} onClick={()=>setQueueEdit({id:item.id,text:item.prompt})}><PencilSimple size={14}/></button>
                   <button aria-label="取消这条排队消息" title="取消排队" disabled={sending} onClick={()=>{void perform('queue.remove',{id:item.id});}}><X size={14}/></button>
                 </span>

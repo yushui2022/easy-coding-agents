@@ -32,6 +32,7 @@ class DesktopRPC:
         self.backend_id = uuid.uuid4().hex
         self.runtime = None
         self.run_id = None
+        self.forced_start = False
         self.pending = {}
         self.stream = ''
         self.stream_id = 0
@@ -350,7 +351,8 @@ class DesktopRPC:
                     raise
                 except Exception:
                     pass
-            if self.runtime.agent.state.get('status') == 'idle':
+            forced, self.forced_start = self.forced_start, False
+            if forced or self.runtime.agent.state.get('status') == 'idle':
                 # A queued message continues the same session without a stop/start round trip.
                 try:
                     await self.start_queued()
@@ -583,6 +585,20 @@ class DesktopRPC:
                     entries[index], entries[target] = entries[target], entries[index]
                     self.queue_changed()
                 return {'queue': self.queue_view()}
+            if method == 'queue.send-now':
+                runtime = self.require()
+                entries = self.queue_entries()
+                index = self.queue_find(params.get('id'))
+                if index:
+                    entries.insert(0, entries.pop(index))
+                    self.queue_changed()
+                if self.run_id is None:
+                    await self.start_queued()
+                    return {'queue': self.queue_view(), 'interrupting': False}
+                # Interrupt on the user's explicit request; the queued message runs next.
+                self.forced_start = True
+                runtime.cancel()
+                return {'queue': self.queue_view(), 'interrupting': True}
             if method == 'queue.priority':
                 self.require()
                 entries = self.queue_entries()
