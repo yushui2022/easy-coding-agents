@@ -24,7 +24,7 @@
 | Git origin | `https://github.com/yushui2022/easy-coding-agents.git` |
 | 当前分支 | `main` |
 | 2026-10-20 复核 HEAD | `cf79151`，提交标题 `feat(desktop): concurrent projects, subagents, activity and attachments (0.29-0.34)` |
-| 本地源码 / 安装包版本 | 源码 `0.34.1`（含未提交改动） / 安装版 `0.34.0` |
+| 本地源码 / 安装包版本 | 源码与安装版均为 `0.34.1`（安装于 2026-10-20 16:36） |
 | 本机安装目录 | `G:\Apps\ECA Desktop` |
 | 程序入口 | `G:\Apps\ECA Desktop\ECA Desktop.exe` |
 | 模型连接及加密凭据 | `G:\Data\ECA\Desktop\preferences.json` |
@@ -459,3 +459,15 @@ C:\Users\xiaoy\Documents\Obsidian Vault\产品设计方法论
 - 干净 Windows、真实服务商视觉能力和全部历史 Python 测试仍未因此获得验收。
 
 证据：`output/release/desktop/install-0.34.0.log`、`output/playwright/attachments/installed.json`、`output/release/desktop/attachments-installed-0.34.0.log`、`output/release/desktop/release-0.34.0.json`。
+
+### 2026-10-20 后续：0.34.1 已安装
+
+在用户完成保存并退出后，将 **0.34.1** 装到原位置 `G:\Apps\ECA Desktop`，安装脚本退出码 0：
+
+- `ECA Desktop.exe` 产品版本 `0.34.1.0` / 文件版本 `0.34.1`；后端握手 `0.34.1`。
+- 安装目录 328 个 payload 文件与 `win-unpacked` 逐文件哈希一致。本次 payload 比 0.34.0 的 371 个少，差额未逐文件追查；该 payload 本身跑过 11 次真实请求的端到端，未发现缺依赖。
+- `preferences.json` 安装前后 SHA256 相同（`e2f4a380…2bfc`），模型配置与加密凭据未改变；未操作用户项目会话。
+- 打包版端到端：`mode=packaged`、11 次本地请求、26 项检查通过、0 次付费 API 调用、无 renderer 错误、取消 41 ms。
+- 没有自动启动安装后的窗口，也没有重放用户任务。干净 Windows 与第三方代理环境仍未验收。
+
+证据：`output/release/desktop/release-0.34.1.json`、`output/release/desktop/e2e-packaged-0.34.1.log`、`output/playwright/desktop-packaged-report.json`、`output/release/desktop/preferences-before-0.34.1.sha256`。
