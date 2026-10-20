@@ -68,12 +68,11 @@ export function ModelMenu({anchor,label,connections,recent,selectedId,reasoning,
   }}>
     <div className="model-menu-search"><MagnifyingGlass size={16}/><input ref={search} aria-label="搜索模型" placeholder="搜索模型或连接" value={query} onChange={e=>setQuery(e.target.value)}/></div>
     <div className="model-menu-list" role="listbox" aria-label="模型连接">
-      {recentRows.length>0&&<><p className="model-menu-heading">最近使用</p>{recentRows.map(row)}</>}
-      {otherRows.length>0&&<><p className="model-menu-heading">{needle?'搜索结果':recentRows.length?'其他模型':'已配置模型'}</p>{otherRows.map(row)}</>}
+      {[...recentRows,...otherRows].map(row)}
       {!matches.length&&<p className="model-menu-empty">{connections.length?'没有匹配的模型':'还没有模型连接'}</p>}
     </div>
     <div className="model-menu-effort">
-      <div><span>推理强度</span><strong>{effortLabels[preview]||preview}</strong></div>
+      <span className="model-effort-label">推理强度<strong>{effortLabels[preview]||preview}</strong></span>
       {options.length>1?<><input aria-label="推理强度" aria-valuetext={effortLabels[preview]||preview} type="range" style={{'--effort-fill':`${100*Math.max(0,options.indexOf(preview))/(options.length-1)}%`} as React.CSSProperties} min={0} max={options.length-1} step={1} value={Math.max(0,options.indexOf(preview))} disabled={busy} onChange={e=>setPreview(options[Number(e.target.value)])} onPointerUp={e=>void apply(options[Number(e.currentTarget.value)])} onKeyUp={e=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown'].includes(e.key))void apply(options[Number(e.currentTarget.value)]);}} onBlur={()=>void apply(preview)}/>
         <div className="model-effort-stops">{options.map(value=><button key={value} disabled={busy} aria-label={'推理强度：'+effortLabels[value]} aria-pressed={preview===value} onClick={()=>apply(value)}>{effortLabels[value]}</button>)}</div></>:null}
       <p>{busy?'当前正在处理，请稍候。':reasoning?.note||'默认跟随服务；较高强度通常需要更长时间。'}</p>

@@ -75,6 +75,22 @@ async function capture(name,selector) {
   expect(dragRegion==='drag'||dragRegion==='').toBe(true);
   await capture('titlebar','.titlebar');
   report.window_titlebar={frameless:Math.abs(sizes.bounds-sizes.content)<8,controls:3,difference:sizes.bounds-sizes.content};
+  // The model picker is a flat list: model name, provider, check, then the slider.
+  await page.locator('.model-chip').click();
+  const picker=page.getByRole('dialog',{name:'选择模型'});
+  await expect(picker).toBeVisible();
+  await expect(picker.locator('.model-menu-heading')).toHaveCount(0);
+  const pickerRows=await picker.locator('.model-menu-row').count();
+  if(pickerRows){
+    await expect(picker.locator('.model-menu-provider').first()).toHaveText(/\S+/);
+    await expect(picker.locator('.model-effort-stops button').first()).toBeVisible();
+  } else {
+    await expect(picker.locator('.model-menu-empty')).toBeVisible();
+  }
+  report.model_picker={rows:pickerRows,effort_stops:await picker.locator('.model-effort-stops button').count(),headings:0};
+  await capture('model-picker','.model-menu');
+  await page.keyboard.press('Escape');
+  await expect(picker).toHaveCount(0);
   // Sidebar project rows read from the left edge; the base button rule centres content.
   const rowAlign=await page.locator('.project-group-heading').first().evaluate(el=>{
     const head=el.getBoundingClientRect(),caret=el.querySelector('.project-disclosure').getBoundingClientRect();
