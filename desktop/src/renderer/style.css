@@ -165,9 +165,9 @@ body {margin: 0; font-family: var(--font-ui);}
 .eca-app .message-label {display: flex; align-items: center; font: 600 12px/1.5 var(--font-ui); margin-bottom: 12px; color: var(--accent);}
 .eca-app .message.assistant .message-label::before {content: ""; width: 4px; height: 13px; border-radius: 2px; background: var(--accent); margin-right: 7px;}
 .eca-app .message-label span {color: var(--muted); margin-left: 8px; font-weight: 400;}
-.eca-app .message.user {width: fit-content; max-width: min(76%, 660px); margin: 4px 0 30px auto; padding: 9px 14px 10px; border-radius: 14px; background: var(--panel); border: 1px solid var(--border); box-shadow: inset 0 1px 1px var(--material-rim);}
+.eca-app .message.user {border: 0; border-left: 2px solid var(--border); border-radius: 0; background: transparent; box-shadow: none; padding: 0 0 0 14px; margin: 0 auto 26px;}
 .eca-app .message.user :last-child {margin-bottom: 0;}
-.eca-app .message.user .message-label {color: var(--muted); margin-bottom: 3px; font: 500 10px/1.4 var(--font-ui); letter-spacing: .04em;}
+.eca-app .message.user .message-label {color: var(--muted); margin-bottom: 4px; font: 500 10px/1.4 var(--font-ui); letter-spacing: .04em;}
 .eca-app .message.user .message-copy {opacity: 0;}
 .eca-app .message.user:hover .message-copy,.eca-app .message.user:focus-within .message-copy {opacity: 1;}
 @media (hover: none) {.eca-app .message.user .message-copy {opacity: 1;}}

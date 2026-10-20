@@ -67,16 +67,15 @@ async function capture(name,selector) {
   await expect(thinking.locator('.message-reasoning-text')).toContainText('先看目录结构');
   await capture('message-reasoning');
   report.thinking_block='passed';
-  // The user bubble hugs its text, sits on the right and keeps copy on hover only.
+  // The user turn is a flat block with a left rule, not a box.
   const bubble=page.locator('.message.user').first();
-  const bubbleBox=await bubble.boundingBox();
-  const transcriptBox=await page.locator('.transcript').boundingBox();
-  expect(bubbleBox.width).toBeLessThan(transcriptBox.width*0.85);
-  expect(bubbleBox.x+bubbleBox.width).toBeGreaterThan(transcriptBox.x+transcriptBox.width*0.85);
+  const bubbleStyle=await bubble.evaluate(el=>{const s=getComputedStyle(el);return {bg:s.backgroundColor,borderLeft:parseFloat(s.borderLeftWidth)||0,width:Math.round(el.getBoundingClientRect().width)};});
+  expect(bubbleStyle.bg).toBe('rgba(0, 0, 0, 0)');
+  expect(bubbleStyle.borderLeft).toBeGreaterThan(0);
   expect(await bubble.locator('.message-copy').evaluate(el=>getComputedStyle(el).opacity)).toBe('0');
   await bubble.hover();
   await expect.poll(()=>bubble.locator('.message-copy').evaluate(el=>getComputedStyle(el).opacity)).toBe('1');
-  report.user_bubble={width:Math.round(bubbleBox.width),transcript:Math.round(transcriptBox.width)};
+  report.user_message=bubbleStyle;
   await meter.click();
   const menu=page.getByRole('dialog',{name:'上下文设置'});
   await expect(menu).toBeVisible();
