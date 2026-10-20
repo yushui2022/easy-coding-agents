@@ -110,7 +110,14 @@ body {margin: 0; font-family: var(--font-ui);}
 .eca-app .send-button span {padding:0 2px;}
 .eca-app .stop-button {flex-shrink:0;min-height:32px;color:var(--danger);border-color:transparent;border-radius:16px;background:var(--danger-soft);font-size:12px;}
 .eca-app .composer-meta {display:flex;justify-content:space-between;align-items:center;min-height:22px;padding:4px 6px 0;color:var(--muted);font-size:10px;}
-.eca-app .context-meter {display:inline-flex;align-items:center;gap:5px;color:var(--muted);font:400 10px/1 var(--font-ui);font-variant-numeric:tabular-nums;}
+.eca-app .context-meter {display:inline-flex;align-items:center;gap:5px;padding:2px 5px;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--muted);font:400 10px/1 var(--font-ui);font-variant-numeric:tabular-nums;cursor:pointer;transition:background 120ms ease,border-color 120ms ease;}
+.eca-app .context-meter:hover {background:var(--hover);border-color:var(--control-border);color:var(--text);}
+.eca-app .context-meter:focus-visible {outline:2px solid var(--accent);outline-offset:1px;}
+.eca-app .context-meter-wrap {position:relative;display:inline-flex;}
+.eca-app .context-menu {position:absolute;z-index:5;bottom:calc(100% + 8px);left:0;width:min(280px,70vw);padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:var(--shadow-dialog);text-align:left;}
+.eca-app .context-menu-title {margin:0 0 6px;font-size:11px;color:var(--text);font-variant-numeric:tabular-nums;}
+.eca-app .context-menu .fine-print {margin:0 0 8px;}
+.eca-app .context-compact {width:100%;min-height:28px;margin:2px 0 8px;font-size:11px;}
 .eca-app .context-meter svg {flex:none;}
 .eca-app .context-meter .track {fill:none;stroke:var(--border);stroke-width:2;}
 .eca-app .context-meter .arc {fill:none;stroke:var(--accent);stroke-width:2;stroke-linecap:round;transition:stroke-dashoffset 240ms ease;}

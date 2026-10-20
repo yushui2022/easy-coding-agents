@@ -169,6 +169,24 @@ class DesktopRPC:
                     row['message_ref'] = DesktopRPC.message_ref(message)
             rows.append(row)
         return rows
+    async def compact_context(self):
+        """User-triggered compaction; refuses mid-turn and never drops history."""
+        agent = self.runtime.agent if self.runtime else None
+        if not agent:
+            raise ValueError('Open a project before compacting')
+        if self.run_id is not None or agent.busy:
+            raise ValueError('Cannot compact while a turn is running')
+        before = self.context_usage() or {}
+        await agent.compact()
+        self._context_usage = None
+        after = self.context_usage() or {}
+        removed = max(0, int(before.get('estimated_tokens') or 0) - int(after.get('estimated_tokens') or 0))
+        self.emit('notice', f'Context compacted on request; roughly {removed} estimated tokens freed. '
+                            'The full history remains on disk.')
+        return {'before_tokens': before.get('estimated_tokens'), 'after_tokens': after.get('estimated_tokens'),
+                'ratio': after.get('ratio'), 'summary_chars': len(agent.state.get('summary') or ''),
+                'context': after}
+
 
     def context_usage(self):
         """Local estimate of the current request against the budget; never billing.
@@ -302,6 +320,8 @@ class DesktopRPC:
             return self.snapshot(preview=params.get('preview') is True)
         if method == 'live':
             return self.live(params)
+        if method == 'context.compact':
+            return await self.compact_context()
         if method == 'subagent.snapshot':
             return self.child_views.snapshot(params)
         if method == 'permissions.set':

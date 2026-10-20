@@ -57,6 +57,13 @@ async function capture(name,selector) {
   await expect(meter.locator('span')).toHaveText(/^\d{1,3}%$/);
   await expect(meter).toHaveAttribute('title',/本地估算/);
   report.context_meter=await meter.locator('span').innerText();
+  await meter.click();
+  const menu=page.getByRole('dialog',{name:'上下文设置'});
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('button',{name:/压缩上下文|任务运行中/})).toBeVisible();
+  await expect(menu).toContainText('本地估算');
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
   // Sidebar project rows read from the left edge; the base button rule centres content.
   const rowAlign=await page.locator('.project-group-heading').first().evaluate(el=>{
     const head=el.getBoundingClientRect(),caret=el.querySelector('.project-disclosure').getBoundingClientRect();

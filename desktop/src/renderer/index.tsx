@@ -367,7 +367,7 @@ function App() {
             </div>
           </div>
           {notice&&<div className="composer-notice" role="status"><Check size={15}/>{notice}</div>}
-          <div className="composer-meta"><ContextMeter context={state.context}/><span className="keyboard-hint" aria-label="Enter 发送，Shift 加 Enter 换行"><span><kbd>↵</kbd>发送</span><span><kbd>Shift ↵</kbd>换行</span></span></div>
+          <div className="composer-meta"><ContextMeter context={state.context} busy={state.busy} onCompact={async()=>{const result=await perform('context.compact'); if(result)setNotice('上下文已压缩，原始历史仍保留。');}}/><span className="keyboard-hint" aria-label="Enter 发送，Shift 加 Enter 换行"><span><kbd>↵</kbd>发送</span><span><kbd>Shift ↵</kbd>换行</span></span></div>
         </div>
       </div>
     </main>

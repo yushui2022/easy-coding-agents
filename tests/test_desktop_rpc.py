@@ -152,6 +152,17 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
         # Unchanged state within two seconds reuses the cached estimate.
         self.assertEqual((await self.rpc.dispatch('live', {}))['context'], usage)
 
+    async def test_manual_compaction_guards_and_reports(self):
+        with patch.object(self.rpc.runtime.agent, 'compact', AsyncMock()) as compact:
+            result = await self.rpc.dispatch('context.compact', {})
+        compact.assert_awaited_once()
+        self.assertIn('before_tokens', result)
+        self.assertIn('context', result)
+        self.assertIn('summary_chars', result)
+        self.rpc.run_id = 'busy'
+        with self.assertRaises(ValueError):
+            await self.rpc.dispatch('context.compact', {})
+
     async def test_live_tool_target_rate_reset_stale_updates_and_approval(self):
         self.rpc.secrets.add('fixture-private-secret')
         self.rpc.emit('request_start', {'id': 'first'})
