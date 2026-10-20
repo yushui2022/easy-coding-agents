@@ -108,10 +108,6 @@ class DesktopSessions(DesktopRPC):
         if state and (state.get('parent_id') or state.get('kind') == 'side_chat'):
             raise ValueError('Open child conversations in the workspace.')
         ident = state['id'] if state else None
-        if ident:
-            # Opening a conversation is activity too: the sidebar lists by recency,
-            # so a click has to move that row to the top even before a new message.
-            self.store.touch(ident)
         if ident not in self.workers:
             worker = self.worker()
             base = Settings.load(self.store.root, **current.model_override)
