@@ -8,6 +8,12 @@ import {CaretRight, TerminalWindow, FileText, CheckCircle, WarningCircle, Code, 
 import {transcriptNodes,resultInfo,toolArgs,toolTarget,failureHint,visibleEntries,type ToolEntry} from './transcript-model';
 import {AgentCards,agentsForCall,type ChildAgent} from './subagents/AgentCards';
 
+function useTick(active:boolean){
+  const [now,setNow]=useState(()=>Date.now());
+  useEffect(()=>{if(!active)return;const timer=window.setInterval(()=>setNow(Date.now()),1000);return()=>window.clearInterval(timer);},[active]);
+  return now;
+}
+const clock=(seconds:number)=>seconds>=60?`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`:`${seconds}s`;
 export const RichText=memo(function RichText({text}:{text:string}) {
   return <Markdown skipHtml remarkPlugins={[remarkGfm]} components={{img:()=>null,table:({children})=><div className="markdown-table" role="region" aria-label="表格，可横向滚动" tabIndex={0}><table>{children}</table></div>,a:({href,children})=><button className="text-link" onClick={()=>href&&window.eca.invoke('link.open',{url:href}).catch(()=>{})}>{children}</button>}}>{text}</Markdown>;
 });
@@ -27,6 +33,11 @@ const ToolRecord=memo(function ToolRecord({entry,sessionId,root,pending,onOpen}:
   const project_id=useContext(ProjectContext);
   const {call,result,source}=entry;
   const [open,setOpen]=useState(false),[full,setFull]=useState<any>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
+  // A pending step keeps a local clock: the backend sends no progress for a
+  // running tool, so the row must prove it is still alive without inventing data.
+  const since=useRef(Date.now());
+  const now=useTick(pending);
+  const waited=pending?Math.max(0,Math.floor((now-since.current)/1000)):0;
   const info=resultInfo(result,pending),target=toolTarget(call,root),hint=failureHint(entry);
   const longScript=call.function.name==='shell'&&target.text.length>160;
   const displayTarget=longScript?`脚本 · ${target.raw.split(/\r?\n/).length} 行 · ${target.raw.length.toLocaleString()} 字符`:target.text;
@@ -48,7 +59,7 @@ const ToolRecord=memo(function ToolRecord({entry,sessionId,root,pending,onOpen}:
   const needsFull=source.truncated&&!callLoaded||result?.truncated&&!resultLoaded;
   const args=toolArgs(data.call),command=typeof args.command==='string'?args.command:null;
   return <details className={'tool-record outcome-'+info.kind} onToggle={e=>{setOpen(e.currentTarget.open);onOpen(entry.key,e.currentTarget.open);}}>
-    <summary><CaretRight size={12}/>{call.function.name==='shell'?<TerminalWindow size={15}/>:<FileText size={15}/>}<span className="tool-name">{names[call.function.name]||call.function.name}</span><span className="tool-target" title={target.raw}>{displayTarget||'查看执行详情'}{hint&&<small className="tool-error-hint">{hint}</small>}</span><span className="tool-outcome" title={info.hint}>{info.kind==='error'?<WarningCircle size={13}/>:info.kind==='returned'?<CheckCircle size={13}/>:info.kind==='denied'||info.kind==='stopped'?<MinusCircle size={13}/>:<Circle size={11}/>}<span>{info.label}</span></span></summary>
+    <summary><CaretRight size={12}/>{call.function.name==='shell'?<TerminalWindow size={15}/>:<FileText size={15}/>}<span className="tool-name">{names[call.function.name]||call.function.name}</span><span className="tool-target" title={target.raw}>{displayTarget||'查看执行详情'}{hint&&<small className="tool-error-hint">{hint}</small>}</span><span className="tool-outcome" title={info.hint}>{info.kind==='error'?<WarningCircle size={13}/>:info.kind==='returned'?<CheckCircle size={13}/>:info.kind==='denied'||info.kind==='stopped'?<MinusCircle size={13}/>:<Circle size={11} className="tool-pulse"/>}<span>{info.label}</span>{pending&&waited>0&&<span className="tool-wait">{clock(waited)}{waited>=20?' · 可能仍在执行':''}</span>}</span></summary>
     {open&&<div className="tool-detail"><div className="panel-label">{command?'命令':'参数'}</div><LogText text={command??data.call.function.arguments}/>{command&&Object.keys(args).length>1&&<LazyDetail title="其他参数" text={JSON.stringify(Object.fromEntries(Object.entries(args).filter(([key])=>key!=='command')),null,2)}/>}{data.result&&<><div className="panel-label">返回结果</div><LogText text={typeof data.result.content==='string'?data.result.content:JSON.stringify(data.result.content,null,2)}/></>}
       {needsFull&&<button disabled={loading} onClick={load}>{loading?'正在加载…':'加载完整工具记录'}</button>}{error&&<p role="alert">{error}</p>}</div>}
   </details>;

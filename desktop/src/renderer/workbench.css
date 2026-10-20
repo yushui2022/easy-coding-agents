@@ -51,6 +51,12 @@
 .eca-app .outcome-error .tool-outcome {color:var(--danger);}
 .eca-app .execution-group .outcome-error {background:var(--danger-soft); margin-block:3px;}
 .eca-app .outcome-pending .tool-outcome {color:var(--accent);}
+.eca-app .outcome-pending .tool-pulse {animation:eca-pulse 1.6s ease-in-out infinite;}
+.eca-app .tool-wait {color:var(--muted);font-variant-numeric:tabular-nums;}
+@keyframes eca-pulse {0%,100% {opacity:.35;transform:scale(.85);} 50% {opacity:1;transform:scale(1.1);}}
+@media (prefers-reduced-motion: reduce) {
+  .eca-app .outcome-pending .tool-pulse {animation:none;opacity:.8;}
+}
 .eca-app .execution-fold,.eca-app .execution-toggle {display:flex;align-items:center;gap:8px;background:transparent;border:0;box-shadow:none;font-size:11px;color:var(--secondary);min-height:30px;padding:5px 8px;}
 .eca-app .execution-toggle {margin-left:20px;}
 .eca-app .execution-fold:hover,.eca-app .execution-toggle:hover {color:var(--text);background:var(--panel);}

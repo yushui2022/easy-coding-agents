@@ -25,6 +25,8 @@ export function RunActivity({state,stopping=false}:{state:any;stopping?:boolean}
   const detailsId=useId(),activity=state.activity||{},phase=activity.phase||'preparing';
   useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[]);
   const elapsed=Math.max(0,Math.floor(now/1000-(state.started_at||now/1000)));
+const formatClock=(seconds:number)=>seconds>=60?`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`:`${seconds}s`;
+  const phaseElapsed=Math.max(0,Math.floor(now/1000-(activity.since||now/1000)));
   const time=`${Math.floor(elapsed/60)}:${String(elapsed%60).padStart(2,'0')}`;
   const activeChildren=(state.children||[]).filter((child:any)=>['preparing','queued','running'].includes(child.status)).length;
   const delegating=['tool_arguments','executing'].includes(phase)&&(['delegate','delegate_parallel'].includes(activity.tool)||phase==='executing'&&activeChildren);
@@ -43,9 +45,12 @@ export function RunActivity({state,stopping=false}:{state:any;stopping?:boolean}
     :phase==='approval'||phase==='question'?'任务正在等待你的回复。'
     :'任务仍在进行，尚无可显示的结果。';
   const subtitle=phase==='tool_arguments'?`参数生成中 · ${count(activity.tool_argument_chars)} 字符 · 尚未执行`
-    :phase==='thinking'?`已接收 ${count(activity.reasoning_chars)} 个思考字符`
+    :phase==='thinking'?`持续 ${formatClock(phaseElapsed)} · 已接收 ${count(activity.reasoning_chars)} 个思考字符`
     :phase==='responding'?`已接收 ${count(activity.text_chars)} 个回答字符`
     :detail;
+  // The phase clock runs locally, so it keeps moving even when the backend has
+  // nothing new to report (a long tool call, or a provider that is just slow).
+  const clocked=['preparing','waiting_model','thinking','responding','tool_arguments','executing','verifying','repairing'].includes(phase)?`${subtitle} · 持续 ${formatClock(phaseElapsed)}`:subtitle;
   const previous=['executing','tool_done','approval','question'].includes(phase);
   const metrics=previous?(state.last_request||{}):activity;
   const available=typeof metrics.tokens_per_second==='number'&&Number.isFinite(metrics.tokens_per_second)&&metrics.throughput_source!=='unavailable';
@@ -59,7 +64,7 @@ export function RunActivity({state,stopping=false}:{state:any;stopping?:boolean}
       <img className="activity-mark" src={workMark} alt="" width={32} height={32} draggable={false}/>
       <div className="activity-main">
         <div className="activity-heading"><span className="activity-title" role="status" aria-live="polite" aria-atomic="true">{title}</span>{activity.tool&&<span className="activity-tool-name" title={activity.tool}>{activity.tool}</span>}</div>
-        <div className="activity-subtitle" title={subtitle}>{subtitle}</div>
+        <div className="activity-subtitle" title={clocked}>{clocked}</div>
       </div>
       <div className="activity-metrics" title={speedNote}>
         <div className="activity-speed"><strong>{speed}</strong><span>tokens/s</span></div>

@@ -88,6 +88,14 @@ if(process.env.ECA_TEST_EXE){env.PATH=`${process.env.SystemRoot}/System32;${proc
   await invoke('browser.navigate',{owner,id:browser,url:'eca-preview://project/index.html'});
   const side=await invoke('sidechat.open',{session_id:opened.session_id});
   const mainStress=await invoke('task.start',{prompt:'hold-main'});
+  // The fixture holds this request, so no backend event will arrive; only a local
+  // timer can keep the activity subtitle moving.
+  const clockA=await page.locator('.activity-subtitle').innerText();
+  assert(/持续/.test(clockA),'活动条应显示阶段计时：'+clockA);
+  await page.waitForTimeout(1200);
+  const clockB=await page.locator('.activity-subtitle').innerText();
+  assert.notEqual(clockA,clockB,'没有后端事件时阶段计时也必须前进');
+  report.local_phase_clock={clockA,clockB};
   const sideStress=await invoke('sidechat.send',{session_id:opened.session_id,id:side.id,prompt:'stream-side'});
   await invoke('terminal.write',{owner,id:terminal,data:"1..6000 | ForEach-Object { Write-Output ('stress-' + $_) }\r"});
   await page.locator('.workspace-tabs').getByRole('button',{name:'侧边聊天',exact:true}).click();
