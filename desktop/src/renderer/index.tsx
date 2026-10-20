@@ -10,6 +10,7 @@ import {Workspace} from './workspace/Workspace';
 import {EmptyState} from './ui/EmptyState';
 import {Welcome} from './Welcome';
 import {Sidebar} from './Sidebar';
+import {ContextMeter} from './ContextMeter';
 import {useAttachments} from './Attachments';
 import {AgentCards,type ChildAgent} from './subagents/AgentCards';
 import './tokens.css';
@@ -366,7 +367,7 @@ function App() {
             </div>
           </div>
           {notice&&<div className="composer-notice" role="status"><Check size={15}/>{notice}</div>}
-          <div className="composer-meta"><span className="keyboard-hint" aria-label="Enter 发送，Shift 加 Enter 换行"><span><kbd>↵</kbd>发送</span><span><kbd>Shift ↵</kbd>换行</span></span></div>
+          <div className="composer-meta"><ContextMeter context={state.context}/><span className="keyboard-hint" aria-label="Enter 发送，Shift 加 Enter 换行"><span><kbd>↵</kbd>发送</span><span><kbd>Shift ↵</kbd>换行</span></span></div>
         </div>
       </div>
     </main>

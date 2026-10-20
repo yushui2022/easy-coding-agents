@@ -170,6 +170,32 @@ class DesktopRPC:
             rows.append(row)
         return rows
 
+    def context_usage(self):
+        """Local estimate of the current request against the budget; never billing.
+
+        Recomputed at most every two seconds and only when the session, message
+        count, stream or mode changes, so the 80 ms live polling stays cheap.
+        """
+        agent = self.runtime.agent if self.runtime else None
+        if not agent:
+            return None
+        try:
+            key = (agent.state['id'], len(agent.state['messages']), len(self.stream), agent.settings.mode)
+            cached = getattr(self, '_context_usage', None)
+            now = time.time()
+            if cached and cached[0] == key and now - cached[1] < 2:
+                return cached[2]
+            tools = agent.tool_schemas()
+            used = agent.context_budget.estimate(agent.raw_context(), tools)
+            limit = agent.context_budget.input_limit
+            value = {'estimated_tokens': int(used), 'input_limit': int(limit),
+                     'ratio': (used / limit) if limit else 0.0,
+                     'auto_compact': bool(agent.settings.auto_compact), 'estimated': True}
+            self._context_usage = (key, now, value)
+            return value
+        except Exception:
+            return None
+
     def live(self, params=None):
         agent = self.runtime.agent if self.runtime else None
         result = {'backend_id': self.backend_id, 'project': str(agent.settings.root) if agent else None,
@@ -178,6 +204,7 @@ class DesktopRPC:
             'stream': self.stream, 'stream_id': self.stream_id, 'stream_offset': len(self.stream),
             'activity': self.activity, 'last_request': self.last_request,
             'started_at': self.started_at, 'approval_mode': self.approval_mode,
+                 'context': self.context_usage(),
             'side_busy': self.side_chats.busy,
             'pending': [entry for entry, future in self.pending.values() if not future.done()], 'seq': self.sequence}
         params = params or {}

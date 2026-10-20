@@ -139,6 +139,19 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('private thought', str(self.rpc.snapshot()))
         self.assertNotIn('model_activity', [entry['event'] for entry in self.rpc.events])
 
+    async def test_context_usage_is_a_bounded_estimate_and_exposed_everywhere(self):
+        live = await self.rpc.dispatch('live', {})
+        usage = live['context']
+        self.assertTrue(usage['estimated'])
+        self.assertGreater(usage['input_limit'], 0)
+        self.assertGreater(usage['estimated_tokens'], 0)
+        self.assertLess(usage['ratio'], 1)
+        self.assertGreaterEqual(usage['ratio'], 0)
+        self.assertFalse(usage['auto_compact'])  # the fixture project disables it
+        self.assertEqual(self.rpc.snapshot()['context'], usage)
+        # Unchanged state within two seconds reuses the cached estimate.
+        self.assertEqual((await self.rpc.dispatch('live', {}))['context'], usage)
+
     async def test_live_tool_target_rate_reset_stale_updates_and_approval(self):
         self.rpc.secrets.add('fixture-private-secret')
         self.rpc.emit('request_start', {'id': 'first'})

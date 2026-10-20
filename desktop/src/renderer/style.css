@@ -109,7 +109,16 @@ body {margin: 0; font-family: var(--font-ui);}
 .eca-app .send-button:has(span) {border-radius:16px;padding-inline:10px;}
 .eca-app .send-button span {padding:0 2px;}
 .eca-app .stop-button {flex-shrink:0;min-height:32px;color:var(--danger);border-color:transparent;border-radius:16px;background:var(--danger-soft);font-size:12px;}
-.eca-app .composer-meta {display:flex;justify-content:flex-end;align-items:center;min-height:22px;padding:4px 6px 0;color:var(--muted);font-size:10px;}
+.eca-app .composer-meta {display:flex;justify-content:space-between;align-items:center;min-height:22px;padding:4px 6px 0;color:var(--muted);font-size:10px;}
+.eca-app .context-meter {display:inline-flex;align-items:center;gap:5px;color:var(--muted);font:400 10px/1 var(--font-ui);font-variant-numeric:tabular-nums;}
+.eca-app .context-meter svg {flex:none;}
+.eca-app .context-meter .track {fill:none;stroke:var(--border);stroke-width:2;}
+.eca-app .context-meter .arc {fill:none;stroke:var(--accent);stroke-width:2;stroke-linecap:round;transition:stroke-dashoffset 240ms ease;}
+.eca-app .context-meter.warn .arc {stroke:#b7791f;}
+.eca-app .context-meter.danger .arc {stroke:var(--danger);}
+.eca-app .context-meter.warn span {color:#8a5a12;}
+.eca-app .context-meter.danger span {color:var(--danger);}
+@media (prefers-reduced-motion: reduce) {.eca-app .context-meter .arc {transition:none;}}
 .eca-app .impact-review {margin-top: 18px; font-size: 12px; overflow-wrap: anywhere;}
 .eca-app .impact-review summary {cursor: pointer; color: var(--secondary);}
 .eca-app .impact-review strong {display: block; margin-top: 12px; font-weight: 500;}

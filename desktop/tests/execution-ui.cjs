@@ -51,6 +51,12 @@ async function capture(name,selector) {
   expect(copied).toContain('先检查场景文件和本地运行环境，再执行页面检查。');
   await capture('message-copy');
   await app.evaluate(({clipboard},text)=>clipboard.writeText(text),savedClipboard);
+  // The composer reports a local context estimate, never a billing number.
+  const meter=page.locator('.context-meter').first();
+  await expect(meter).toBeVisible();
+  await expect(meter.locator('span')).toHaveText(/^\d{1,3}%$/);
+  await expect(meter).toHaveAttribute('title',/本地估算/);
+  report.context_meter=await meter.locator('span').innerText();
   // Sidebar project rows read from the left edge; the base button rule centres content.
   const rowAlign=await page.locator('.project-group-heading').first().evaluate(el=>{
     const head=el.getBoundingClientRect(),caret=el.querySelector('.project-disclosure').getBoundingClientRect();
