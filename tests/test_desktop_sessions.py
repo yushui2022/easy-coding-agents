@@ -58,6 +58,17 @@ class ConcurrentSessions(unittest.IsolatedAsyncioTestCase):
         await asyncio.wait_for(provider.entered.wait(), 3)
         return worker, provider, result
 
+    async def test_clicking_a_session_moves_it_to_the_top(self):
+        first = self.first
+        second = (await self.hub.dispatch('session.switch', {}))['session_id']
+        third = (await self.hub.dispatch('session.switch', {}))['session_id']
+        self.assertEqual([row[0] for row in self.hub.store.list(top_level=True)][:3], [third, second, first])
+        # Opening an existing conversation counts as activity, before any new message.
+        await self.hub.dispatch('session.switch', {'id': first})
+        self.assertEqual(self.hub.store.list(top_level=True)[0][0], first)
+        await self.hub.dispatch('session.switch', {'id': second})
+        self.assertEqual(self.hub.store.list(top_level=True)[0][0], second)
+
     async def test_parallel_switch_stream_cursors_independent_cancel_and_project_lock(self):
         a, pa, ra = await self.start_waiting('session A')
         snap = await self.hub.dispatch('session.switch', {})
