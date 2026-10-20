@@ -67,11 +67,18 @@ async function capture(name,selector) {
   await expect(thinking.locator('.message-reasoning-text')).toContainText('先看目录结构');
   await capture('message-reasoning');
   report.thinking_block='passed';
-  // The user turn is a flat block with a left rule, not a box.
+  // The user turn is a rounded bubble, right aligned, without a role label.
   const bubble=page.locator('.message.user').first();
-  const bubbleStyle=await bubble.evaluate(el=>{const s=getComputedStyle(el);return {bg:s.backgroundColor,borderLeft:parseFloat(s.borderLeftWidth)||0,width:Math.round(el.getBoundingClientRect().width)};});
-  expect(bubbleStyle.bg).toBe('rgba(0, 0, 0, 0)');
-  expect(bubbleStyle.borderLeft).toBeGreaterThan(0);
+  const bubbleStyle=await bubble.evaluate(el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return {bg:s.backgroundColor,radius:s.borderTopLeftRadius,width:Math.round(r.width),height:Math.round(r.height),overflow:el.scrollHeight-el.clientHeight};});
+  expect(bubbleStyle.bg).not.toBe('rgba(0, 0, 0, 0)');
+  expect(parseFloat(bubbleStyle.radius)).toBeGreaterThan(8);
+  const bubbleBox=await bubble.boundingBox();
+  const transcriptBox=await page.locator('.transcript').boundingBox();
+  expect(bubbleBox.width).toBeLessThan(transcriptBox.width*0.85);
+  expect(bubbleBox.x+bubbleBox.width).toBeGreaterThan(transcriptBox.x+transcriptBox.width*0.85);
+  // A one-line message stays a one-line bubble: the copy action must not add height.
+  expect(bubbleStyle.height).toBeLessThan(70);
+  await expect(bubble.locator('.message-label')).toBeHidden();
   expect(await bubble.locator('.message-copy').evaluate(el=>getComputedStyle(el).opacity)).toBe('0');
   await bubble.hover();
   await expect.poll(()=>bubble.locator('.message-copy').evaluate(el=>getComputedStyle(el).opacity)).toBe('1');
