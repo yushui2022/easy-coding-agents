@@ -9,6 +9,7 @@ import httpx
 from openai import AsyncOpenAI
 from .retry import retryable
 from .errors import OutputLimitError, ContextLimitError, context_rejection
+from .activity import StreamActivity
 
 
 class Provider:
@@ -25,11 +26,16 @@ class Provider:
             started_at = time.perf_counter()
             self.last_metrics = {}
             emit("request_start", {"id":ident})
+            activity = StreamActivity(ident, emit)
             emitted = False
             def forward(event, data):
                 nonlocal emitted
+                if event == 'model_delta':
+                    activity.observe(**data)
+                    return
                 if event == "text" and data:
                     emitted = True
+                    activity.observe(text=data)
                 emit(event, data)
             try:
                 status = 'failed'
@@ -42,9 +48,14 @@ class Provider:
                     status = 'cancelled'
                     raise
                 finally:
+                    self.last_metrics.update(activity.snapshot(self.last_usage))
                     emit("request_end", {"id":ident,"usage":self.last_usage,"status":status,
                                          'elapsed_ms': round((time.perf_counter()-started_at)*1000), **self.last_metrics})
             except Exception as exc:
+                if getattr(exc, 'status_code', None) in {400, 415, 422} and any(
+                        any(a.get('mime', '').startswith('image/') for a in m.get('attachments', []))
+                        for m in messages):
+                    raise ValueError('模型服务拒绝了含图片的请求。请切换到支持图片输入的模型后继续，或新建不含图片的会话。') from None
                 if not emitted and context_rejection(getattr(exc, 'status_code', None), getattr(exc, 'body', None)):
                     raise ContextLimitError() from None
                 if emitted or not retryable(exc) or attempt == self.settings.network_retries:
@@ -77,6 +88,9 @@ class Provider:
         payload_messages = []
         for original in messages:
             message = {k: v for k, v in original.items() if k in {'role', 'content', 'tool_calls', 'tool_call_id'}}
+            if original.get('attachments'):
+                from .attachments import content
+                message['content'] = content(original, self.settings.root)
             if deepseek and tools and message['role'] == 'assistant':
                 # Provider replay data is scoped to the model and endpoint, never shown as UI prose.
                 message['reasoning_content'] = original.get('reasoning_content', '') if original.get('reasoning_scope') == scope else ''
@@ -97,12 +111,9 @@ class Provider:
             kwargs["tools"] = tools
         if self.settings.stream_usage:
             kwargs["stream_options"] = {"include_usage": True}
-        started_at = time.perf_counter()
         stream = await self.client.chat.completions.create(**kwargs)
         content, calls, usage, finish = "", {}, {}, None
         reasoning = ''
-        counts = {'reasoning_chars': 0, 'text_chars': 0, 'tool_argument_chars': 0}
-        last_activity, last_phase, first = 0.0, '', True
         try:
             async for chunk in stream:
                 if chunk.usage:
@@ -114,18 +125,13 @@ class Provider:
                 if choice.finish_reason:
                     finish = choice.finish_reason
                 delta = choice.delta
-                now = time.perf_counter()
-                if first:
-                    self.last_metrics['first_response_ms'] = round((now-started_at)*1000)
-                    first = False
                 thought = getattr(delta, 'reasoning_content', None)
                 if isinstance(thought, str) and thought:
-                    counts['reasoning_chars'] += len(thought)
+                    emit('model_delta', {'reasoning': thought})
                     if deepseek:
                         reasoning += thought
                 if delta.content:
                     content += delta.content
-                    counts['text_chars'] += len(delta.content)
                     emit("text", delta.content)
                 for tc in delta.tool_calls or []:
                     call = calls.setdefault(tc.index, {"id": "", "type": "function", "function": {"name": "", "arguments": ""}})
@@ -134,14 +140,8 @@ class Provider:
                     if tc.function:
                         call["function"]["name"] += tc.function.name or ""
                         call["function"]["arguments"] += tc.function.arguments or ""
-                        counts['tool_argument_chars'] += len(tc.function.arguments or '')
-                phase = 'tool_arguments' if delta.tool_calls else 'responding' if delta.content else 'thinking' if thought else last_phase
-                if phase and (phase != last_phase or now-last_activity >= .25):
-                    names = [c['function']['name'] for c in calls.values() if c['function']['name']]
-                    emit('model_activity', {**counts, 'phase': phase, 'tool': names[-1] if names else '',
-                                           'elapsed_ms': round((now-started_at)*1000)})
-                    last_activity, last_phase = now, phase
-                self.last_metrics.update(counts)
+                        emit('model_delta', {'tool': call['function']['name'],
+                                            'arguments': tc.function.arguments or ''})
         finally:
             await stream.close()
         if finish == 'length':

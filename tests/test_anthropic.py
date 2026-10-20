@@ -66,8 +66,12 @@ class AnthropicTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(emitted[-1][1]['usage']['output_tokens'], 7)
 
     async def test_fragmented_tool_arguments(self):
-        (message, _), _, _ = await self.invoke(response_events(True))
+        (message, _), _, emitted = await self.invoke(response_events(True))
         self.assertEqual(json.loads(message["tool_calls"][0]["function"]["arguments"]), {"path": "a.py"})
+        self.assertIn('tool_arguments', [d['phase'] for e,d in emitted if e == 'model_activity'])
+        self.assertEqual(emitted[-1][1]['tool_argument_chars'], len('{"path":"a.py"}'))
+        self.assertEqual(emitted[-1][1]['output_tokens'], 7)
+        self.assertNotIn('model_delta', [e for e,_ in emitted])
 
     async def test_truncated_stream_never_returns_tool(self):
         for length in range(len(response_events(True))):

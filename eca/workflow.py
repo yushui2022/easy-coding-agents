@@ -23,7 +23,7 @@ def validate_checks(agent, commands, repair_attempts):
         raise ValueError('Automatic repair requires non-isolated code mode')
 
 
-async def verified_run(agent, prompt, commands, repair_attempts=0, worker_first=None):
+async def verified_run(agent, prompt, commands, repair_attempts=0, worker_first=None, attachments=None):
     validate_checks(agent, commands, repair_attempts)
     if worker_first is not None:
         from .models import worker_settings
@@ -44,7 +44,7 @@ async def verified_run(agent, prompt, commands, repair_attempts=0, worker_first=
     publish()
     try:
         if worker_first is None:
-            await agent.run(prompt)
+            await agent.run(prompt, attachments=attachments) if attachments else await agent.run(prompt)
         else:
             await initial_worker(agent, prompt, worker_first, suite)
         if not commands:
@@ -136,6 +136,8 @@ async def initial_worker(agent, prompt, profile, suite):
     action = agent.store.begin(agent.state['id'], ident, 'delegate', args)
     agent.busy = True
     agent.child_calls = 0
+    agent.active_call_id = ident
+    agent.active_message_index = len(agent.state['messages']) - 1
     try:
         result = await agent.delegate(**args)
         agent.store.finish(action, result)
@@ -150,5 +152,6 @@ async def initial_worker(agent, prompt, profile, suite):
         agent.store.repair(agent.state)
         raise
     finally:
+        agent.active_call_id = agent.active_message_index = None
         agent.busy = False
         agent.store.save(agent.state)

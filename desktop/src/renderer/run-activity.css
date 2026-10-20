@@ -1,0 +1,24 @@
+/* Observable activity on the left, honest stream throughput on the right. */
+.eca-app .run-activity{margin:0 2px 10px;padding:0;border:0;border-radius:14px;background:transparent;color:var(--secondary);font-size:12px}
+.activity-row{display:flex;align-items:center;gap:10px;min-height:64px;padding:9px 8px;border-radius:14px;background:color-mix(in srgb,var(--context-surface) 42%,transparent);box-shadow:inset 0 1px 0 var(--material-rim),inset 0 -1px 0 color-mix(in srgb,var(--border) 60%,transparent);box-sizing:border-box}
+.activity-mark{flex:none;object-fit:contain;user-select:none;pointer-events:none}
+.activity-main{min-width:0;flex:1}
+.activity-heading{display:flex;align-items:center;gap:7px;min-width:0}
+.activity-title{min-width:0;font-size:12px;font-weight:600;line-height:1.6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.activity-tool-name{min-width:0;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:10px/1.5 var(--font-code);padding:1px 6px;border-radius:5px;color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.activity-subtitle{font:11px/1.7 var(--font-ui);margin-top:3px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.activity-metrics{flex:none;min-width:94px;text-align:right;padding-left:10px;border-left:1px solid color-mix(in srgb,var(--border) 70%,transparent)}
+.activity-speed{display:flex;align-items:baseline;justify-content:flex-end;gap:4px;white-space:nowrap}
+.activity-speed strong{font:600 14px/1.5 var(--font-ui);font-variant-numeric:tabular-nums;color:var(--text)}
+.activity-speed>span{font:10px/1.5 var(--font-ui);color:var(--muted)}
+.activity-timing{display:flex;justify-content:flex-end;align-items:center;gap:5px;font:10px/1.5 var(--font-ui);color:var(--muted);margin-top:3px;white-space:nowrap}
+.activity-time{flex:none;font:11px/1.5 var(--font-ui);font-variant-numeric:tabular-nums;color:var(--muted);letter-spacing:.02em}
+.eca-app .activity-disclosure{display:grid;place-items:center;width:24px;min-height:26px;flex:none;margin:0;padding:0;border:0;border-radius:8px;background:transparent;box-shadow:none;color:var(--muted)}
+.eca-app .activity-disclosure:hover{background:var(--hover);color:var(--text)}.eca-app .activity-disclosure:active{background:var(--selected)}
+.eca-app .activity-disclosure:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.activity-disclosure svg{transition:transform .16s ease}.activity-disclosure[aria-expanded=true] svg{transform:rotate(180deg)}
+.activity-detail{padding:10px 12px 4px 56px;line-height:1.7;font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.activity-detail p{margin:0 0 4px}.activity-full-target{overflow-wrap:anywhere;font-family:var(--font-code);color:var(--secondary)}
+.run-activity.is-stopping .activity-mark{opacity:.65}
+@media(max-width:600px){.activity-title{font-size:11px}.activity-row{gap:6px;padding:8px 6px}.activity-detail{padding-left:12px}.activity-mark{width:28px;height:28px}.activity-metrics{min-width:82px;padding-left:6px}.activity-tool-name{max-width:40%;padding-inline:3px}}
+@media(prefers-reduced-motion:reduce){.activity-disclosure svg{transition:none}}

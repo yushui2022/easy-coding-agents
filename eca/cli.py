@@ -173,6 +173,10 @@ class App:
             regressions = sum(bool(check.get('regression')) for row in data.get('rounds', []) for check in row.get('checks', []))
             if regressions:
                 self.console.print(f"Previously passing checks failed in {regressions} recorded check(s); inspect verification_suite.rounds.", markup=False)
+        elif (event == 'subagent_progress' and not data.get('child', {}).get('isolated')
+              and data['event'] in {'tool', 'result', 'diff', 'notice', 'error'}):
+            self.console.print(f"  Agent {data['session'][:8]}", style="dim", markup=False)
+            self.emit(data['event'], data['data'])
         elif event == 'subagent_progress' and data['event'] in {'turn', 'tool', 'error', 'status'}:
             value = data['data']
             label = value.get('name', '') if isinstance(value, dict) else str(value)

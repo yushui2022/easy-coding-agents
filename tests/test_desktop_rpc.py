@@ -91,6 +91,20 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
         historical = await self.rpc.dispatch('session.message', {'id':ident,'index':20})
         self.assertEqual(historical, single)
 
+    async def test_tool_execution_retires_saved_stream_without_losing_history(self):
+        text = '我会安排三个子任务。'
+        self.rpc.emit('text', text)
+        cursor = await self.rpc.dispatch('live', {})
+        state = self.rpc.runtime.agent.state
+        state['messages'].append({'role': 'assistant', 'content': text})
+        self.rpc.emit('tool', {'name': 'delegate_parallel', 'args': {}})
+        snapshot = await self.rpc.dispatch('snapshot', {})
+        self.assertEqual(snapshot['stream'], '')
+        self.assertEqual(snapshot['messages'][-1]['content'], text)
+        after = await self.rpc.dispatch('live', cursor)
+        self.assertEqual(after['stream'], '')
+        self.assertNotEqual(after['stream_id'], cursor['stream_id'])
+
     async def test_stream_delta_unicode_reset_stale_cursor_and_redaction(self):
         self.rpc.emit('text', '你好🌲')
         first = await self.rpc.dispatch('live', {})
@@ -124,6 +138,28 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(live['activity']['reasoning_chars'], 42)
         self.assertNotIn('private thought', str(self.rpc.snapshot()))
         self.assertNotIn('model_activity', [entry['event'] for entry in self.rpc.events])
+
+    async def test_live_tool_target_rate_reset_stale_updates_and_approval(self):
+        self.rpc.secrets.add('fixture-private-secret')
+        self.rpc.emit('request_start', {'id': 'first'})
+        self.rpc.emit('model_activity', {'request_id': 'first', 'phase': 'responding', 'tokens_per_second': 20})
+        self.rpc.emit('request_end', {'id': 'first', 'usage': {}, 'tokens_per_second': 25})
+        self.rpc.emit('tool', {'name': 'read', 'args': {'path': 'fixture-private-secret/a.py', 'content': 'not a subject'}})
+        self.rpc.emit('input_requested', {'kind': 'approval'})
+        self.rpc.emit('input_closed', {})
+        live = await self.rpc.dispatch('live', {})
+        self.assertEqual(live['activity']['target'], '[redacted]/a.py')
+        self.assertEqual(live['activity']['tool'], 'read')
+        self.assertNotIn('tokens_per_second', live['activity'])
+        self.rpc.emit('tool', {'name': 'shell', 'args': {'command': 'x'*170+'fixture-private-secret'}})
+        self.assertNotIn('fixture-pr', (await self.rpc.dispatch('live', {}))['activity']['target'])
+        self.assertEqual(live['last_request']['tokens_per_second'], 25)
+        self.rpc.emit('request_start', {'id': 'second'})
+        self.rpc.emit('model_activity', {'request_id': 'first', 'phase': 'thinking', 'tokens_per_second': 123})
+        live = await self.rpc.dispatch('live', {})
+        self.assertEqual(live['activity']['phase'], 'waiting_model')
+        self.assertNotIn('target', live['activity'])
+        self.assertNotIn('tokens_per_second', live['activity'])
 
     async def test_edit_policy_resolves_pending_edits_but_not_commands_or_questions(self):
         edit = asyncio.create_task(self.rpc.approve('Write file.txt?', 'diff'))

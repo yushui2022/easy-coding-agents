@@ -309,9 +309,6 @@ body {margin: 0; font-family: var(--font-ui);}
   .eca-app .connection-editor .form-row {grid-template-columns:1fr;gap:0;}
   .eca-app .model-field > div {flex-wrap:wrap;}
 }
-/* Live work is visible even while the model is only producing reasoning or arguments. */
-.run-activity{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:8px 2px;background:var(--surface);font-size:12px}
-.run-activity>div{display:grid;gap:5px;flex:1}.run-activity strong{font-weight:500}.run-activity small,.run-activity time{color:var(--muted)}.run-activity time{font-variant-numeric:tabular-nums}
 .eca-app .composer-options {display:flex;align-items:center;gap:8px;min-width:0;flex-shrink:0;font-size:12px;}
 .eca-app .composer-actions {display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0;max-width:100%;margin-left:auto;}
 .eca-app .permission-control {display:flex;align-items:center;gap:1px;color:var(--secondary);border-radius:6px;padding-left:6px;}

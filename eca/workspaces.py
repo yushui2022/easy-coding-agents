@@ -48,6 +48,7 @@ def workspace(store, state):
 
 async def parallel(agent, tasks):
     from .agent import Agent
+    from .child_activity import origin, progress
     if agent.child or agent.settings.mode == 'chat':
         return 'Denied: delegation unavailable.'
     remaining = agent.settings.subagent_max_calls - agent.child_calls
@@ -79,6 +80,7 @@ async def parallel(agent, tasks):
         state.update(status='preparing', title=task['task'][:80], parent_id=agent.state['id'], billing_root=agent.state.get('billing_root', agent.state['id']),
                      isolated=True, model_profile=config.model_profile, baseline={p: digest(data) for p, data in files.items()},
                      usage_tracking_complete=agent.state.get('usage_tracking_complete', True))
+        state.update(origin(agent, task['task'], config))
         agent.state.setdefault('children', []).append(state['id'])
         states.append(state)
         agent.store.save(state)
@@ -93,11 +95,12 @@ async def parallel(agent, tasks):
                 dest.write_bytes(data)
             state['status'] = 'queued'
             agent.store.save(state)
-            agent.emit('subagent_progress', dict(session=state['id'], event='status', data='queued'))
+            progress(agent, state, 'status', 'queued')
     except Exception as exc:
         for state in states:
             state.update(status='error', stop_reason=f'Snapshot preparation failed: {type(exc).__name__}')
             agent.store.save(state)
+            progress(agent, state, 'status', 'error')
         raise
     semaphore = asyncio.Semaphore(agent.settings.subagent_concurrency)
     prompt_lock = asyncio.Lock()
@@ -117,8 +120,7 @@ async def parallel(agent, tasks):
         settings = replace(config, mode=state['mode'], max_turns=min(
             agent.settings.max_turns or agent.settings.subagent_max_turns, agent.settings.subagent_max_turns))
         def emit(event, data):
-            if event != 'text':
-                agent.emit('subagent_progress', dict(session=state['id'], event=event, data=data))
+            progress(agent, state, event, data)
         async def child_approve(message, detail):
             return await approve(state['id'], message, detail)
         child = None
@@ -126,6 +128,7 @@ async def parallel(agent, tasks):
             async with semaphore:
                 child = Agent(settings, agent.store, state, child_approve, question, emit, child=True)
                 child.budget = agent.budget
+                state['status'] = 'running'
                 emit('status', 'running')
                 await asyncio.wait_for(child.run(task['task']), agent.settings.subagent_timeout)
         except TimeoutError:
@@ -165,6 +168,7 @@ async def parallel(agent, tasks):
             if state['status'] in {'queued', 'preparing'}:
                 state.update(status='interrupted', stop_reason='Batch stopped before this task started')
                 agent.store.save(state)
+                progress(agent, state, 'status', state['status'])
 
 
 async def merge(agent, session, paths):

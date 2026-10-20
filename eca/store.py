@@ -54,8 +54,9 @@ class Store:
             self.db.execute("INSERT OR REPLACE INTO sessions VALUES (?, ?, ?, ?)",
                             (state["id"], state["title"], time.time(), json.dumps(state, ensure_ascii=False)))
 
-    def list(self):
-        return self.db.execute("SELECT id, title, updated FROM sessions WHERE coalesce(json_extract(state,'$.kind'),'') != 'side_chat' ORDER BY updated DESC LIMIT 100").fetchall()
+    def list(self, top_level=False):
+        scope = " AND json_extract(state,'$.parent_id') IS NULL" if top_level else ""
+        return self.db.execute("SELECT id, title, updated FROM sessions WHERE coalesce(json_extract(state,'$.kind'),'') != 'side_chat'" + scope + " ORDER BY updated DESC LIMIT 100").fetchall()
 
     def peek(self, identifier):
         if identifier == "latest":

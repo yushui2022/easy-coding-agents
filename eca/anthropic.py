@@ -26,7 +26,10 @@ def messages_payload(messages, tools, settings):
         else:
             if role not in {"user", "assistant"}:
                 raise ValueError(f"Unsupported conversation role: {role}")
-            if content:
+            if message.get("attachments"):
+                from .attachments import content as attachment_content
+                blocks.extend(attachment_content(message, settings.root, "anthropic"))
+            elif content:
                 blocks.append({"type": "text", "text": content})
             for call in message.get("tool_calls", []):
                 blocks.append({"type": "tool_use", "id": call["id"],
@@ -87,6 +90,10 @@ class AnthropicProvider:
                 headers={"x-api-key": settings.api_key, "anthropic-version": "2023-06-01"},
                 json=messages_payload(messages, tools, settings)) as response:
             if response.status_code != 200:
+                if response.status_code in {400, 415, 422} and any(
+                        any(a.get('mime', '').startswith('image/') for a in m.get('attachments', []))
+                        for m in messages):
+                    raise ValueError('模型服务拒绝了含图片的请求，请切换到支持图片输入的模型后继续，或新建不含图片的会话。')
                 if response.status_code in {400, 413}:
                     from .errors import ContextLimitError, context_rejection
                     raw = bytearray()
@@ -127,6 +134,8 @@ class AnthropicProvider:
                         emit("text", block["text"])
                     block["partial_json"] = ""
                     blocks[index] = block
+                    if block['type'] == 'tool_use':
+                        emit('model_delta', {'tool': block.get('name', '')})
                 elif kind == "content_block_delta":
                     index, delta = event["index"], event["delta"]
                     if index not in blocks or index in closed:
@@ -137,6 +146,8 @@ class AnthropicProvider:
                         emit("text", delta["text"])
                     elif delta["type"] == "input_json_delta" and block["type"] == "tool_use":
                         block["partial_json"] += delta["partial_json"]
+                        emit('model_delta', {'tool': block.get('name', ''),
+                                            'arguments': delta['partial_json']})
                     else:
                         raise RuntimeError("Unsupported Anthropic block delta")
                 elif kind == "content_block_stop":

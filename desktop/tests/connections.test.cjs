@@ -78,3 +78,23 @@ test('invalid URLs and corrupt preferences are not silently accepted or overwrit
   for(const base_url of ['https://user:pass@example.com','https://example.com?key=secret','file:///tmp/model'])assert.throws(()=>store.save({...draft,base_url}));
   fs.writeFileSync(file,'{broken');assert.throws(()=>new Connections(file,cipher),/无法读取/);assert.equal(fs.readFileSync(file,'utf8'),'{broken');
 });
+
+test('recent models persist unique identities and default effort keeps encrypted keys intact',t=>{
+  const {file,store}=setup(t);
+  const a=store.save({...draft,model:'deepseek-flash'}).savedId;
+  const b=store.save({...draft,name:'Same model, different connection',model:'deepseek-flash'}).savedId;
+  const encrypted=JSON.parse(fs.readFileSync(file)).connections[0].encryptedKey;
+  store.used(a);store.used(b);store.used(a);store.used('missing');
+  assert.deepEqual(store.public().recentModels,[a,b]);
+  store.setEffort(a,'max');
+  const restored=new Connections(file,cipher);
+  assert.equal(restored.runtime(a).reasoning_effort,'max');
+  assert.equal(restored.runtime(a).thinking_mode,'default');
+  assert.equal(restored.runtime(b).reasoning_effort,'');
+  assert.equal(JSON.parse(fs.readFileSync(file)).connections[0].encryptedKey,encrypted);
+  restored.save({...draft,id:a,model:'deepseek-flash',thinking_mode:'default',api_key:''});
+  assert.equal(restored.runtime(a).reasoning_effort,'max');
+  restored.save({...draft,id:a,model:'other-model',thinking_mode:'default',api_key:''});
+  assert.equal(restored.runtime(a).reasoning_effort,'');
+  assert.throws(()=>restored.setEffort(a,'invalid'));
+});

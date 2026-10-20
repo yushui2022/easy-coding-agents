@@ -1,0 +1,20 @@
+{
+  "generation": "built-in image_gen",
+  "variants": [
+    {
+      "id": "clay-chalk",
+      "title": "暖白陶粉",
+      "prompt": "Use case: stylized-concept. Asset type: a seamless material texture for an actual desktop application UI, to be used subtly under live HTML text and controls.\nCreate a completely flat, straight-on macro material scan of very fine matte unglazed ceramic/clay. Fill the entire square image edge to edge with the material, no objects or symbols. Extremely fine powder-like mineral pores, understated tiny natural irregularities, tactile but refined and clean. Uniform soft diffuse lighting, uniform overall color, genuinely seamless/tileable in both axes. Subtle local grain variation only, very low contrast, suitable behind small UI text. No dramatic shadows, folds, ribbon shapes, frame, border, gradient, vignette, cracks, large flecks, stains, stones, paper fibers, letters, illustrations, labels or watermark. Do not render any actual UI. Think a quiet physical surface that can become a card or form field with CSS, not a scenic background.\nColor: very pale warm chalk/ivory ceramic, overall approximately #f0eae2, ivory and light stone undertones, matte and softly tactile. Very fine neutral beige pores, no yellow or orange cast. Low contrast, no large coarse dots."
+    },
+    {
+      "id": "clay-charcoal",
+      "title": "深色炭陶",
+      "prompt": "Use case: stylized-concept. Asset type: a seamless material texture for an actual desktop application UI, to be used subtly under live HTML text and controls.\nCreate a completely flat, straight-on macro material scan of very fine matte unglazed ceramic/clay. Fill the entire square image edge to edge with the material, no objects or symbols. Extremely fine powder-like mineral pores, understated tiny natural irregularities, tactile but refined and clean. Uniform soft diffuse lighting, uniform overall color, genuinely seamless/tileable in both axes. Subtle local grain variation only, very low contrast, suitable behind small UI text. No dramatic shadows, folds, ribbon shapes, frame, border, gradient, vignette, cracks, large flecks, stains, stones, paper fibers, letters, illustrations, labels or watermark. Do not render any actual UI. Think a quiet physical surface that can become a card or form field with CSS, not a scenic background.\nColor: dark warm charcoal/brown-grey ceramic, overall approximately #302b26, near-black grey pores with slight warm mineral speckle. Quiet low contrast and uniformly dark. No silver glitter, no bright flecks. Subtle warm dark material to support light interface text."
+    },
+    {
+      "id": "clay-rose",
+      "title": "暖陶粉",
+      "prompt": "Use case: stylized-concept. Asset type: a seamless material texture for an actual desktop application UI, to be used subtly under live HTML text and controls.\nCreate a completely flat, straight-on macro material scan of very fine matte unglazed ceramic/clay. Fill the entire square image edge to edge with the material, no objects or symbols. Extremely fine powder-like mineral pores, understated tiny natural irregularities, tactile but refined and clean. Uniform soft diffuse lighting, uniform overall color, genuinely seamless/tileable in both axes. Subtle local grain variation only, very low contrast, suitable behind small UI text. No dramatic shadows, folds, ribbon shapes, frame, border, gradient, vignette, cracks, large flecks, stains, stones, paper fibers, letters, illustrations, labels or watermark. Do not render any actual UI. Think a quiet physical surface that can become a card or form field with CSS, not a scenic background.\nColor: a muted PALE TERRACOTTA / dusty peach ceramic, approximately #ead1c1. Desaturated soft warm rose-clay, fine pores barely darker than base. This is a softly tinted accent material, not bright orange or brick red. Very low contrast and visually calm."
+    }
+  ]
+}

@@ -19,9 +19,11 @@ from .doctor import diagnose
 from .runtime import Runtime
 from .store import Store
 from .workflow import suite_status
+from . import reasoning
+from .activity import tool_target
 
 PROTOCOL = 1
-MODEL_FIELDS = {'model', 'base_url', 'api_format', 'api_key', 'thinking_mode'}
+MODEL_FIELDS = {'model', 'base_url', 'api_format', 'api_key', 'thinking_mode', 'reasoning_effort'}
 
 
 class DesktopRPC:
@@ -48,6 +50,8 @@ class DesktopRPC:
         self.approval_mode = 'ask'
         from .side_chat import SideChats
         self.side_chats = SideChats(self)
+        from .child_activity import ChildViews
+        self.child_views = ChildViews(self)
 
     def safe(self, value):
         text = json.dumps(value, ensure_ascii=False)
@@ -63,19 +67,33 @@ class DesktopRPC:
             pass
 
     def emit(self, event, data):
+        if event == 'subagent_progress':
+            self.child_views.update(data)
         self.sequence += 1
         if event == 'request_start':
-            self.activity = {'phase': 'waiting_model', 'since': time.time()}
+            self.activity = {'phase': 'waiting_model', 'since': time.time(), 'request_id': data['id']}
         elif event == 'model_activity':
+            if data.get('request_id') and data['request_id'] != self.activity.get('request_id'):
+                return
             self.activity = {**self.activity, **data}
         elif event == 'request_end':
             self.last_request = data
+            if data['id'] == self.activity.get('request_id'):
+                self.activity = {**self.activity, **{k: v for k, v in data.items()
+                    if k not in {'id', 'usage', 'status', 'elapsed_ms'}}}
         elif event == 'tool':
-            self.activity = {'phase': 'executing', 'tool': data.get('name', ''), 'since': time.time()}
+            self.activity = {'phase': 'executing', 'tool': data.get('name', ''),
+                             'target': tool_target(self.safe(data.get('args'))), 'since': time.time()}
+            # The assistant message is saved before tools run. Its live copy
+            # must disappear, including while a delegated task is still running.
+            self.stream = ''
+            self.stream_id += 1
         elif event == 'input_requested':
-            self.activity = {'phase': 'approval' if data['kind'] == 'approval' else 'question', 'since': time.time()}
+            self.activity = {**self.activity, 'phase': 'approval' if data['kind'] == 'approval' else 'question', 'since': time.time()}
         elif event == 'input_closed':
-            self.activity = {'phase': 'executing', 'since': time.time()}
+            self.activity = {**self.activity, 'phase': 'executing', 'since': time.time()}
+        elif event == 'result':
+            self.activity = {**self.activity, 'phase': 'tool_done', 'since': time.time()}
         elif event == 'verification_progress' and data.get('status') in {'running', 'repairing'}:
             self.activity = {'phase': 'repairing' if data['status'] == 'repairing' else 'verifying', 'since': time.time()}
         if event == 'turn':
@@ -83,7 +101,7 @@ class DesktopRPC:
             self.stream_id += 1
         elif event == 'text':
             self.stream += data
-        elif event != 'model_activity':
+        elif event != 'model_activity' and not (event == 'subagent_progress' and data['event'] in {'text', 'model_activity'}):
             self.events.append({'event': event, 'data': self.safe(data), 'seq': self.sequence})
         self.send({'jsonrpc': '2.0', 'method': 'event', 'params': {
             'event': event, 'data': data, 'seq': self.sequence, 'run_id': self.run_id,
@@ -123,6 +141,9 @@ class DesktopRPC:
         rows = []
         for index, message in enumerate(messages, start):
             row = {k: v for k, v in message.items() if k in {'role', 'content', 'tool_calls', 'tool_call_id'}}
+            if message.get('attachments'):
+                from .attachments import public
+                row['attachments'] = public(message['attachments'])
             if preview:
                 row['message_index'] = index
                 limit = 2000 if row.get('role') == 'tool' else 24000
@@ -204,14 +225,16 @@ class DesktopRPC:
             'messages': self.public_messages(messages[-50:], max(0,len(messages)-50), preview), 'message_total': len(messages), 'stream': self.stream,
             'events': self.event_previews() if preview else list(self.events), 'seq': self.sequence, 'tasks': state['tasks'],
             **self.live(),
-            'sessions': [{'id': i, 'title': t, 'updated': u} for i, t, u in agent.store.list()],
+            'sessions': [{'id': i, 'title': t, 'updated': u} for i, t, u in agent.store.list(top_level=True)],
             'changes': agent.changes.list(), 'usage': agent.ledger.summary(state),
+            'children': self.child_views.summaries(),
             'verification': agent.verification_status() if not self.run_id else state.get('verification', {}),
             'suite': suite_status(agent) if not self.run_id else state.get('verification_suite', {}),
             'change_impact': state.get('change_impact', []),
             'settings': {'model': agent.settings.model, 'base_url': agent.settings.base_url,
                          'api_format': agent.settings.api_format, 'source': self.source,
                          'mode': agent.settings.mode, 'thinking_mode': agent.settings.thinking_mode,
+                         'reasoning': reasoning.describe(agent.settings),
                          'credential_configured': bool(agent.settings.api_key)}})
 
     def event_previews(self):
@@ -252,6 +275,8 @@ class DesktopRPC:
             return self.snapshot(preview=params.get('preview') is True)
         if method == 'live':
             return self.live(params)
+        if method == 'subagent.snapshot':
+            return self.child_views.snapshot(params)
         if method == 'permissions.set':
             self.require()
             mode = params.get('mode')
@@ -281,6 +306,11 @@ class DesktopRPC:
                 raise ValueError('Answer must be text.')
             pair[1].set_result(value)
             return {'accepted': True}
+        if method == 'model.capabilities':
+            models = params.get('models', [])
+            if not isinstance(models, list) or len(models) > 500 or any(not isinstance(m, dict) for m in models):
+                raise ValueError('Invalid model list')
+            return [reasoning.describe(m) for m in models]
         if method in {'connection.check', 'connection.models'}:
             model = self.model(params.get('model', {}))
             root = Path(params.get('root') or (self.runtime.agent.settings.root if self.runtime else Path.cwd()))
@@ -289,7 +319,9 @@ class DesktopRPC:
         async with self.lock:
             if method.startswith('sidechat.'):
                 return await self.side_chats.dispatch(method, params)
-            if method in {'project.open', 'project.close', 'session.switch', 'model.select'}:
+            if method == 'model.select' and self.side_chats.busy:
+                raise ValueError('侧边聊天仍在运行，请先停止或等待完成。')
+            if method in {'project.open', 'project.close', 'session.switch'}:
                 if self.side_chats.busy:
                     raise ValueError('侧边聊天仍在运行，请先停止或等待完成。')
                 await self.side_chats.close()
@@ -305,7 +337,7 @@ class DesktopRPC:
                     self.runtime = None
                 store = Store(root)
                 try:
-                    rows = store.list()
+                    rows = store.list(top_level=True)
                     state = store.load(rows[0][0]) if rows else store.create(settings.mode)
                     if state.get('model_profile') and not model:
                         settings = settings.select_profile(state['model_profile'])
@@ -314,6 +346,7 @@ class DesktopRPC:
                     initial_permission = settings.permission
                     # Keep callbacks active so changing modes also affects running children.
                     settings = replace(settings, mode=state.get('mode', settings.mode), permission='ask')
+                    settings = reasoning.restore(settings, state)
                     settings.validate()
                     if settings.api_key:
                         self.secrets.add(settings.api_key)
@@ -339,6 +372,9 @@ class DesktopRPC:
                 runtime = self.idle()
                 base = replace(Settings.load(runtime.agent.settings.root, **self.model_override), permission='ask')
                 await runtime.switch(params.get('id'), base_settings=base, restore_model_profile=not self.model_override)
+                restored = reasoning.restore(runtime.agent.settings, runtime.agent.state)
+                if restored != runtime.agent.settings:
+                    await reasoning.change(runtime.agent, reasoning.describe(restored)['value'])
                 runtime.agent.settings.permission = 'ask'
                 if runtime.agent.settings.api_key:
                     self.secrets.add(runtime.agent.settings.api_key)
@@ -374,12 +410,18 @@ class DesktopRPC:
                 self.activity = {'phase': 'preparing', 'since': self.started_at}
                 self.last_request = {}
                 try:
-                    task = runtime.start(params.get('prompt'), params.get('checks', []), params.get('repair_attempts', 0))
+                    task = runtime.start(params.get('prompt'), params.get('checks', []), params.get('repair_attempts', 0), attachments=params.get('attachments', []))
                 except BaseException:
                     self.run_id = None
                     raise
                 self.finishing = asyncio.create_task(self.finish(task))
                 return {'run_id': self.run_id, 'session_id': runtime.agent.state['id']}
+            if method == 'model.reasoning':
+                agent = self.idle().agent
+                if params.get('session_id') != agent.state['id']:
+                    raise ValueError('Session changed; reopen model selection.')
+                await reasoning.change(agent, params.get('effort'))
+                return self.snapshot(preview=True)
             if method == 'model.select':
                 runtime = self.idle()
                 old = runtime.agent
@@ -388,6 +430,7 @@ class DesktopRPC:
                 # Selecting a model must not silently change the execution boundary.
                 settings = replace(settings, mode=old.settings.mode, permission=old.settings.permission,
                                    sandbox=old.settings.sandbox, sandbox_image=old.settings.sandbox_image)
+                settings = reasoning.restore(settings, old.state)
                 if settings.api_key:
                     self.secrets.add(settings.api_key)
                 await old.close()
@@ -398,6 +441,7 @@ class DesktopRPC:
                     state.pop('model_profile', None)
                 old.store.save(state)
                 runtime.agent = Agent(settings, old.store, state, self.approve, self.question, self.emit, child=old.child)
+                runtime.agent.budget = old.budget
                 self.model_override = model
                 self.source = 'desktop' if model else 'project/environment'
                 return self.snapshot(preview=params.get('preview') is True)
@@ -451,7 +495,8 @@ async def serve():
                 pass
     sys.stdin.reconfigure(encoding='utf-8')
     sys.stdout.reconfigure(encoding='utf-8')
-    server = DesktopRPC(lambda value: print(json.dumps(value, ensure_ascii=False), flush=True))
+    from .desktop_projects import DesktopProjects
+    server = DesktopProjects(lambda value: print(json.dumps(value, ensure_ascii=False), flush=True))
     threading.Thread(target=reader, daemon=True).start()
     requests = set()
     try:

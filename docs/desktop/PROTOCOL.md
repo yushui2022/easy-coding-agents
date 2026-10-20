@@ -1,10 +1,14 @@
 # Desktop stdio protocol v1
 
-0.26.0 握手附带 `capabilities: ["sidechat"]`。`live.side_busy` 表示独立侧聊仍在运行；主任务 `busy` 保持原语义。项目/会话切换需主任务与侧聊都空闲。
+0.33.0 握手附带 `capabilities: ["sidechat", "concurrent_sessions", "concurrent_projects"]`。`live.side_busy` 表示选中会话的独立侧聊仍在运行；主任务 `busy` 保持原语义。项目和会话都可以在运行中切换，关闭项目要求该项目的所有会话和侧聊空闲。
+
+`snapshot/live` 附带全局 `view_revision`（选中视图递增版本）、`projects`（已打开项目及会话摘要）、`active_sessions`（跨项目运行中会话的状态）、`any_busy` 和 `running_count`。每个项目包含 `id/path/session_id/sessions/running_count`。`project_id` 是规范化真实路径。前端拒绝旧视图响应；后台文本保留在对应运行时，结构变化发送 `sessions_changed` 刷新提示。命令携带明确的 `project_id` 和 `session_id`；取消和回答还须匹配各会话的 `run_id`，不会改变其他会话。live 的增量游标必须同时带这两个 ID，避免跨项目或会话拼接。
+
+`project.open` 对已打开路径只选择其保留的视图，不重建运行时或覆盖模型；对新路径独立加锁，失败时保留原视图。`session.switch` 可通过 `project_id` 直接选中另一已打开项目的会话；省略 `id` 在目标项目新建。`project.close` 只释放指定项目，其他项目继续运行。省略 `project_id` 时沿用当前视图，供旧版单项目调用兼容；新客户端必须显式携带范围。
 
 侧聊新增 `sidechat.open/snapshot/send/cancel/context/model`：都传当前 `session_id`，除 open 外还传分支 `id`，取消额外校验 `run_id`。open 恢复当前主会话关联的分支，不启动请求；send 立即返回运行 ID。snapshot 可传 `message_count`、`stream_run_id`、`stream_id` 和 `stream_offset`，只返回变更消息与 `stream_delta`。事件 `sidechat` 带父会话、分支与运行 ID，不混入主任务事件序列。侧聊仅可执行 read/glob/grep。
 
-桌面主进程另提供限定的 `workspace.*`、`browser.*`、`terminal.*` IPC，要求 `owner` 与当前会话一致；这些不是 Python HTTP 接口。浏览器网页没有应用 preload；终端原生模块位于单独 utility process。UI reload 读取现有资源列表，不重建重复进程。
+桌面主进程另提供限定的 `workspace.*`、`browser.*`、`terminal.*` IPC，要求 `owner` 等于快照返回的 `workspace_owner`（项目与会话组合的 opaque token），不可自行拼接；这些不是 Python HTTP 接口。浏览器网页没有应用 preload；终端原生模块位于单独 utility process。切换会话保留对应资源，后台浏览器隐藏；UI reload 读取现有资源列表，不重建重复进程。`subagent.snapshot` 的 owner 也使用该 token，由主进程转换为 Python 的项目/会话范围。
 
 `python -m eca.desktop_rpc` 或随附的 `eca-backend.exe`。
 UTF-8 JSON-RPC 2.0，每行一个对象，stdout 专用于协议，诊断不得包含凭据。
@@ -16,7 +20,7 @@ UTF-8 JSON-RPC 2.0，每行一个对象，stdout 专用于协议，诊断不得�
 | `snapshot` | 当前项目、会话、运行状态、最近 50 条消息、当前输出、待回答项目、变更、用量与验证 |
 | `project.open` | `path`，可选 `model` 覆盖；读取现有会话或创建，持有项目独占锁 |
 | `project.close` | 仅空闲时释放项目 |
-| `session.switch` | `id` 恢复指定会话；省略时新建；仅空闲时允许 |
+| `session.switch` | `id` 恢复指定会话；省略时新建；后台运行不中断，不重放任务 |
 | `session.messages` | `id`、`before` 游标，向前返回最多 50 条历史消息 |
 | `session.message` | `id`、整数 `index`，读取一条完整公开消息；可传 `message_ref`，历史变化时拒绝读取过期记录 |
 | `live` | 轻量运行状态，不读取历史/变更表；可传上次返回的 `stream_id`、`stream_offset`，返回增量或完整流 |
@@ -53,6 +57,6 @@ Electron 私有 IPC 增加 `config.models`（表单草稿或连接 ID）、`conf
 `verification_progress` 推送中间进度，`verification_suite` 保持最终结果事件，快照 `suite` 包含状态、命令、各轮记录、修复预算及停止原因。新任务先清除上一任务的验证状态；通过仅代表所选命令在记录的文件指纹上通过，后续文件变化会过期。`change_impact` 事件及快照同名字段提供 Python 文件工具编辑的语法提示（最多 20 个文件、每文件 8 个符号），不是测试结果或完整调用图；shell/MCP 编辑不在此分析范围。
 
 命令读取与长任务独立，取消和回复无需等待模型响应。EOF 取消活动任务并关闭工具与数据库。
-同时只运行一个主任务。执行会话、模型、项目切换及撤销需要空闲；历史消息允许读取。
+每个会话只能运行一个主任务，同一项目的多个会话可并发。模型切换和撤销要求目标会话空闲；项目切换可在任务运行中进行，关闭项目要求该项目的会话空闲；历史消息允许读取。EOF 取消所有项目的会话并逐一释放项目锁。
 项目已被 CLI 占用时返回错误，不接管锁、不自动结束其他进程。
 stderr 和错误输出脱敏；项目内容、命令和模型回答仍属于用户敏感数据，不上传到遥测服务。

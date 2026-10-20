@@ -1,0 +1,70 @@
+/* Side conversation uses the same local clay material as the main composer. */
+.eca-app .side-chat {
+  min-width:0;container-type:inline-size;background-color:var(--canvas);
+  background-image:linear-gradient(var(--material-ground-veil),var(--material-ground-veil)),var(--material-grain);
+  background-size:auto,var(--material-ground-size);
+}
+.eca-app .side-context {
+  display:flex;align-items:center;flex-wrap:nowrap;gap:12px;flex-shrink:0;
+  margin:16px 18px 0;padding:13px 14px;border:1px solid var(--border);border-radius:14px;
+  background:var(--surface);box-shadow:var(--material-raised);
+}
+.side-context-copy{min-width:0;flex:1}
+.side-context-copy>strong{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:12px;font-weight:500;color:var(--text)}
+.side-readonly{display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--muted);font-weight:400}
+.eca-app .side-context-copy>small{display:flex;align-items:center;flex-wrap:wrap;gap:5px;width:auto;margin-top:5px;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;line-height:1.5}
+.eca-app .side-context .side-refresh{display:flex;gap:5px;flex-shrink:0;margin:0;padding:5px 7px;min-height:30px;font-size:11px;border:0;border-radius:8px;background:transparent;box-shadow:none;color:var(--secondary)}
+.eca-app .side-messages{padding:24px 22px;min-width:0;scrollbar-width:thin;scrollbar-color:var(--control-border) transparent}
+.eca-app .side-messages.is-empty{display:flex;padding:28px 24px}
+.side-welcome{width:100%;max-width:360px;margin:auto;transform:translateY(-14px)}
+.side-welcome-mark {
+  display:flex;align-items:center;justify-content:center;width:60px;height:60px;margin-bottom:24px;color:var(--accent);
+  border:1px solid var(--control-border);border-radius:19px;background-color:var(--surface);
+  background-image:linear-gradient(var(--material-veil),var(--material-veil)),var(--material-grain);
+  background-size:auto,var(--material-surface-size);box-shadow:var(--material-raised),0 7px 16px #6946260a;
+}
+.side-welcome h2{font-size:24px;font-weight:500;letter-spacing:-.6px;line-height:1.4;margin:0 0 10px;color:var(--text);text-wrap:balance}
+.eca-app .side-welcome>p{font-size:12px;line-height:1.8;color:var(--secondary);margin:0 0 24px}
+.side-starters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+.eca-app .side-starters>button{display:flex;align-items:center;gap:6px;min-height:32px;padding:5px 9px;font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:9px;box-shadow:var(--material-raised);color:var(--secondary)}
+.side-starters svg{color:var(--muted)}.side-welcome>small{font-size:10px;color:var(--muted);line-height:1.7}
+.eca-app .side-message{max-width:64ch;margin:0 auto 24px;padding:0;border:0;font-size:13px;line-height:1.9}
+.side-speaker{display:block;font-size:10px;font-weight:500;letter-spacing:.02em;color:var(--muted);margin-bottom:10px}
+.eca-app .side-message.user{padding:12px 14px;border:1px solid var(--border);border-radius:14px;background:var(--surface);box-shadow:inset 0 1px 1px var(--material-rim)}
+.eca-app .side-message.user p{margin:0}.eca-app .side-message.assistant>.side-speaker{color:var(--accent)}
+.side-message :is(h2,h3),.side-stream :is(h2,h3){font-size:16px;font-weight:600;line-height:1.6;margin:22px 0 10px}
+.eca-app .side-chat :is(.side-message,.side-stream) :is(p,ul,ol){line-height:1.85}
+.eca-app .side-attach{min-height:28px;padding:4px 5px;margin-left:-5px;font-size:10px;border:0;background:transparent;color:var(--muted);box-shadow:none}
+.eca-app .side-stream{max-width:64ch;margin:0 auto;font:13px/1.9 var(--font-reading);white-space:normal;padding:0 0 18px;overflow-wrap:anywhere}
+.side-waiting{display:flex;align-items:center;gap:8px;color:var(--secondary);font-size:12px}
+.eca-app .side-error{display:flex;align-items:flex-start;gap:8px;flex-shrink:0;margin:0 18px 10px;padding:10px 12px;font-size:11px;line-height:1.7;overflow-wrap:anywhere;color:var(--danger);border:1px solid color-mix(in srgb,var(--danger) 25%,var(--border));background:var(--surface);border-radius:10px}
+.side-error svg{margin-top:2px}
+.side-compose-area{flex-shrink:0;min-width:0;padding:0 18px 12px}
+.eca-app .side-chat .side-composer {
+  padding:0;border:1px solid var(--control-border);border-radius:20px;background-color:var(--surface);
+  background-image:linear-gradient(var(--material-veil),var(--material-veil)),var(--material-grain);
+  background-size:auto,var(--material-surface-size);box-shadow:var(--material-raised),var(--shadow-composer);
+}
+.eca-app .side-chat .side-composer:focus-within{border-color:color-mix(in srgb,var(--accent) 40%,var(--control-border));box-shadow:var(--material-raised),var(--shadow-composer),0 0 0 1px var(--control-border)}
+.eca-app .side-chat .side-composer textarea{display:block;min-width:0;width:100%;min-height:82px;max-height:168px;border:0;border-radius:20px 20px 0 0;padding:16px 16px 8px;resize:none;background:transparent;box-shadow:none;font:13px/1.8 var(--font-reading);outline:none;scrollbar-width:thin}
+.eca-app .side-chat .side-composer-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0;padding:8px 10px 10px;border-top:1px solid color-mix(in srgb,var(--border) 65%,transparent)}
+.side-model-menu{position:relative;min-width:0;max-width:calc(100% - 88px)}
+.eca-app .side-chat .side-model-trigger{display:flex;gap:6px;max-width:100%;min-height:30px;border:0;background:transparent;box-shadow:none;padding:5px 6px;font-size:11px;color:var(--secondary)}
+.side-model-trigger>span:not(.side-model-dot){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.side-model-dot{width:5px;height:5px;flex-shrink:0;background:var(--success);border-radius:50%}
+.eca-app .side-chat .side-send{width:32px;height:32px;min-height:32px;padding:0;flex-shrink:0;border:1px solid #a85537;border-radius:11px;background:#b76240;color:#fffaf4;box-shadow:inset 0 1px 1px #ffffff54,inset 0 -2px 2px #5e2d2440,0 2px 4px #78553d20}
+.eca-app .side-chat .side-send:hover:not(:disabled){background:#a65334}.eca-app .side-chat .side-send:disabled{opacity:.42}
+.eca-app .side-chat .side-stop{flex-shrink:0;min-height:30px;padding:5px 8px;border:1px solid var(--border);border-radius:9px;background:var(--surface);font-size:11px;color:var(--danger);box-shadow:var(--material-raised)}
+.side-compose-meta{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 4px 0;font-size:9px;line-height:1.6;color:var(--muted);min-width:0}
+.side-compose-meta>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.side-compose-meta>span:last-child{flex-shrink:0}
+.side-compose-meta kbd{font:inherit}
+.eca-app .side-chat .side-model-trigger small{margin:0;flex-shrink:0;font-size:10px;white-space:nowrap;color:var(--muted)}
+.eca-app .side-chat .markdown-table table{display:table;width:100%;border-collapse:collapse;font-size:12px;line-height:1.75}
+.eca-app .side-chat .markdown-table :is(th,td){border:0;border-bottom:1px solid var(--border);padding:10px 12px;min-width:100px;vertical-align:top;text-align:left}
+.eca-app .side-chat .markdown-table :is(th,td):first-child{padding-left:0}.eca-app .side-chat .markdown-table :is(th,td):last-child{padding-right:0}
+.side-chat .side-stream pre{overflow:auto;background:var(--code);padding:12px;border-radius:8px;font:11px/1.7 var(--font-code)}
+.eca-app .workspace-tabs{min-width:0;scrollbar-width:thin;scrollbar-color:var(--control-border) transparent;overscroll-behavior-x:contain}
+.workspace-tabs::-webkit-scrollbar{height:4px}.workspace-tabs::-webkit-scrollbar-thumb{background:var(--control-border);border-radius:4px}
+@container(max-width:400px){.side-newline,.side-usage-cost{display:none}.side-welcome h2{font-size:22px}}
+@media(prefers-reduced-motion:reduce){.side-chat button{transition:none}}
+@media(forced-colors:active){.eca-app .side-chat,.eca-app .side-chat :is(.side-composer,.side-welcome-mark){background-image:none;box-shadow:none}.side-model-dot{background:CanvasText}}

@@ -1,0 +1,134 @@
+/* Scoped adaptation of deepparser/design-cursor; see docs/desktop/SETTINGS-DESIGN.md.
+   These tokens deliberately stop at the settings dialog. */
+.eca-app .eca-dialog.wide.model-settings {
+  --surface:#f7f7f4;
+  --panel:#f2f1ed;
+  --text:#26251e;
+  --secondary:#59584f;
+  --muted:#69675d;
+  --hover:#ebeae5;
+  --selected:#e6e5e0;
+  --border:oklab(0.263084 -0.00230259 0.0124794 / 0.1);
+  --control-border:oklab(0.263084 -0.00230259 0.0124794 / 0.2);
+  --danger:#cf2d56;
+  --success:#1f8a65;
+  --settings-button:#ebeae5;
+  --settings-hover-text:#a81f43;
+  width:min(1000px,calc(100vw - 48px));
+  height:min(820px,calc(100dvh - 48px));
+  background:var(--surface);
+  border-color:var(--border);
+  border-radius:14px;
+  box-shadow:0 28px 70px #00000024,0 14px 32px #0000001a;
+}
+.eca-app .eca-dialog.model-settings > header {padding:16px 24px;background:var(--panel);}
+.eca-app .model-settings > header h2 {font-size:14px;font-weight:600;letter-spacing:0;}
+.eca-app .model-settings > .dialog-body {display:flex;flex-direction:column;flex:1;min-height:0;padding:0;overflow:hidden;}
+.eca-app .model-settings .connection-layout {flex:1;min-height:0;grid-template-columns:220px minmax(0,1fr);gap:0;}
+.eca-app .model-settings .connection-sidebar {display:flex;flex-direction:column;gap:12px;min-height:0;padding:24px 14px 16px;background:var(--panel);border-right:1px solid var(--border);}
+.eca-app .model-settings .connections-label {display:flex;justify-content:space-between;align-items:center;padding:0 10px;color:var(--muted);font-size:11px;}
+.eca-app .model-settings .connections-label > span:last-child {font:11px var(--font-code);}
+.eca-app .model-settings button {font-size:12px;border-radius:8px;transition:background 150ms ease,color 150ms ease,border-color 150ms ease;}
+.eca-app .model-settings button:hover:not(:disabled) {color:var(--settings-hover-text);}
+.eca-app .model-settings .add-connection {justify-content:flex-start;flex-shrink:0;min-height:36px;margin:0;padding:8px 10px;background:var(--settings-button);border-color:transparent;}
+.eca-app .model-settings .connection-sidebar nav {display:flex;flex-direction:column;gap:4px;overflow:auto;min-height:0;scrollbar-width:thin;scrollbar-color:var(--control-border) transparent;}
+.eca-app .model-settings .connection-sidebar nav button {display:flex;flex-shrink:0;align-items:flex-start;justify-content:flex-start;gap:10px;padding:12px 10px;border:0;min-height:76px;}
+.eca-app .model-settings .connection-sidebar nav button.selected {background:var(--selected);}
+.eca-app .model-settings .connection-symbol {display:flex;align-items:center;justify-content:center;flex-shrink:0;width:30px;height:30px;margin:0;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--secondary);}
+.eca-app .model-settings .connection-item-copy {display:block;min-width:0;flex:1;margin:0;}
+.eca-app .model-settings .connection-item-copy strong {font-size:12px;line-height:1.5;font-weight:600;margin:0;}
+.eca-app .model-settings .connection-model-id {font:10px/1.6 var(--font-code);margin:3px 0 0;color:var(--secondary);}
+.eca-app .model-settings .connection-item-copy small {display:block;font-size:10px;line-height:1.5;font-weight:400;margin-top:4px;color:var(--muted);}
+.eca-app .model-settings .connections-empty {padding:24px 10px;color:var(--muted);font-size:11px;line-height:1.7;}
+.eca-app .model-settings .connections-empty p {font-size:12px;color:var(--text);margin:12px 0 6px;}
+.eca-app .model-settings .connections-note {display:flex;align-items:flex-start;gap:8px;margin-top:auto;padding:20px 10px 0;color:var(--muted);font-size:10px;}
+.eca-app .model-settings .connections-note svg {margin-top:2px;}
+.eca-app .model-settings .connections-note p {margin:0;line-height:1.8;}
+.eca-app .model-settings .connection-editor {display:flex;flex-direction:column;min-height:0;min-width:0;}
+.eca-app .model-settings .connection-scroll {flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:28px 32px 20px;scrollbar-width:thin;scrollbar-color:var(--control-border) transparent;scroll-padding-block:16px;}
+.eca-app .model-settings .connection-heading {display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:28px;}
+.eca-app .model-settings .connection-heading h3 {font-size:24px;font-weight:400;letter-spacing:-.3px;line-height:1.35;margin:0;overflow-wrap:anywhere;}
+.eca-app .model-settings .connection-heading p {margin:8px 0 0;font-size:12px;color:var(--secondary);}
+.eca-app .model-settings .connection-default-badge {display:inline-flex;align-items:center;gap:4px;flex-shrink:0;white-space:nowrap;padding:4px 8px;background:var(--selected);border-radius:9999px;color:var(--secondary);font-size:10px;}
+.eca-app .model-settings .connection-section {margin:0;padding:24px 0;border-top:1px solid var(--border);}
+.eca-app .model-settings .connection-section:first-child {padding-top:0;border:0;}
+.eca-app .model-settings .connection-section:last-child {padding-bottom:0;}
+.eca-app .model-settings .connection-section h4 {display:flex;align-items:center;gap:8px;margin:0 0 18px;font-size:12px;font-weight:600;}
+.eca-app .model-settings .connection-section h4 svg {color:var(--muted);}
+.eca-app .model-settings .field {margin-bottom:16px;}
+.eca-app .model-settings .field label {font-size:11px;font-weight:500;margin-bottom:7px;}
+.eca-app .model-settings .field label span {font-size:10px;margin-left:6px;color:var(--muted);}
+.eca-app .model-settings .field :where(input,select) {height:36px;background:transparent;font-size:12px;border-color:var(--control-border);border-radius:8px;}
+.eca-app .model-settings .field :where(input,select):focus-visible {outline:1px solid var(--text);outline-offset:2px;}
+.eca-app .model-settings .connection-identity {grid-template-columns:1fr 1fr;gap:16px;}
+.eca-app .model-settings .connection-endpoint {grid-template-columns:minmax(150px,.8fr) minmax(0,1.2fr);gap:16px;}
+.eca-app .model-settings :where(#base-url,#model-name,#available-models) {font-family:var(--font-code);font-size:11px;}
+.eca-app .model-settings .credential-field {margin-bottom:12px;}
+.eca-app .model-settings .credential-options {gap:10px 20px;margin:0;}
+.eca-app .model-settings .checkbox {font-size:11px;color:var(--secondary);line-height:1.6;}
+.eca-app .model-settings .checkbox input {width:13px;height:13px;accent-color:var(--text);}
+.eca-app .model-settings .model-field {margin-bottom:6px;}
+.eca-app .model-settings .model-field > div {gap:8px;flex-wrap:nowrap;}
+.eca-app .model-settings .model-field button {min-height:36px;padding:6px 12px;background:var(--settings-button);border-color:transparent;}
+.eca-app .model-settings .fine-print {font-size:10px;line-height:1.7;color:var(--muted);}
+.eca-app .model-settings .catalogue-status {min-height:17px;margin:6px 0 12px;}
+.eca-app .model-settings .manual-model {margin:0;}
+.eca-app .model-settings .manual-model summary {font-size:11px;color:var(--secondary);width:fit-content;line-height:1.8;}
+.eca-app .model-settings .manual-model .field {margin:12px 0 0;}
+.eca-app .model-settings .response-mode {margin:18px 0 0;}
+.eca-app .model-settings .response-mode .fine-print {margin:7px 0 0;}
+.eca-app .model-settings .connection-usage > .fine-print {margin:8px 0 0;}
+.eca-app .model-settings .connection-actions {border:0;padding:0;margin-top:16px;gap:8px;}
+.eca-app .model-settings .connection-actions button {background:var(--settings-button);border-color:transparent;font-size:11px;}
+.eca-app .model-settings .connection-actions .remove-connection {margin-left:auto;background:transparent;color:var(--muted);}
+.eca-app .model-settings .connection-actions .remove-connection:hover:not(:disabled) {color:var(--danger);background:var(--hover);}
+.eca-app .model-settings .connection-remove-confirm {margin-top:16px;padding:12px 14px;background:var(--panel);border:1px solid var(--control-border);border-radius:8px;}
+.eca-app .model-settings .connection-remove-confirm p {font-size:12px;line-height:1.7;margin:0;color:var(--secondary);}
+.eca-app .model-settings .connection-editor-footer {flex-shrink:0;border-top:1px solid var(--border);background:var(--surface);padding:14px 32px 12px;}
+.eca-app .model-settings .config-actions {margin:0;gap:8px;}
+.eca-app .model-settings .config-actions button {min-height:34px;font-size:12px;}
+.eca-app .model-settings .config-actions .primary {background:var(--text);border-color:var(--text);color:var(--surface);}
+.eca-app .model-settings .config-actions .primary:hover:not(:disabled) {filter:none;opacity:.88;}
+.eca-app .model-settings .save-state {display:flex;align-items:center;gap:6px;margin-right:auto;color:var(--muted);font-size:10px;}
+.eca-app .model-settings .save-state > span {width:4px;height:4px;border-radius:50%;background:currentColor;}
+.eca-app .model-settings .save-state.unsaved {color:var(--accent);}
+.eca-app .model-settings .connection-test-note {font-size:10px;color:var(--muted);text-align:right;margin:8px 0 0;}
+.eca-app .model-settings .config-status {padding:9px 12px;margin-bottom:12px;max-height:88px;overflow:auto;background:var(--panel);border-color:var(--border);font-size:11px;border-radius:8px;}
+.eca-app .model-settings .model-settings-footer {display:flex;align-items:center;justify-content:space-between;gap:24px;flex-shrink:0;border-top:1px solid var(--border);padding:10px 20px;background:var(--panel);}
+.eca-app .model-settings .current-model-note {display:flex;align-items:center;gap:8px;min-width:0;border:0;margin:0;padding:0;font-size:10px;color:var(--muted);white-space:nowrap;}
+.eca-app .model-settings .current-model-note strong {font-weight:400;color:var(--secondary);overflow:hidden;text-overflow:ellipsis;}
+.eca-app .model-settings .current-model-note > span {font-size:9px;border:1px solid var(--border);padding:1px 5px;border-radius:4px;}
+.eca-app .model-settings .data-location {display:flex;align-items:center;gap:6px;min-width:0;max-width:45%;font-size:9px;margin:0;color:var(--muted);}
+.eca-app .model-settings .data-location span {overflow:hidden;white-space:nowrap;text-overflow:ellipsis;direction:rtl;text-align:left;}
+@media (prefers-color-scheme:dark) {
+  .eca-app .eca-dialog.wide.model-settings {
+    --surface:#1e1d17;--panel:#1a1915;--text:#e6e5e0;
+    --secondary:#c2c0b6;--muted:#aaa79a;--hover:#2a2922;--selected:#33322a;
+    --border:rgba(230,229,224,.1);--control-border:rgba(230,229,224,.2);
+    --danger:#e04a6f;--success:#2fba8a;--settings-button:#2a2922;--settings-hover-text:#ed9dad;
+    box-shadow:0 28px 70px #0006,0 14px 32px #0005;
+  }
+}
+@media (max-width:850px) {
+  .eca-app .model-settings .connection-layout {grid-template-columns:180px minmax(0,1fr);}
+  .eca-app .model-settings .connection-scroll {padding:24px;}
+  .eca-app .model-settings .connection-editor-footer {padding-inline:24px;}
+  .eca-app .model-settings .connection-editor .form-row {grid-template-columns:1fr;gap:0;}
+  .eca-app .model-settings .connection-heading {flex-wrap:wrap;gap:10px;}
+  .eca-app .model-settings .data-location {max-width:30%;}
+}
+@media (max-width:600px) {
+  .eca-app .eca-dialog.wide.model-settings {width:calc(100vw - 24px);height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);}
+  .eca-app .model-settings .connection-layout {display:flex;flex-direction:column;}
+  .eca-app .model-settings .connection-sidebar {flex-direction:row;gap:8px;align-items:center;flex-shrink:0;padding:10px 14px;border-right:0;border-bottom:1px solid var(--border);}
+  .eca-app .model-settings :is(.connections-label,.connections-note,.connections-empty) {display:none;}
+  .eca-app .model-settings .add-connection {width:auto;}
+  .eca-app .model-settings .connection-sidebar nav {flex-direction:row;flex:1;}
+  .eca-app .model-settings .connection-sidebar nav button {min-height:36px;width:auto;max-width:180px;padding:8px 10px;align-items:center;}
+  .eca-app .model-settings .connection-item-copy :where(.connection-model-id,small),.eca-app .model-settings .connection-symbol {display:none;}
+  .eca-app .model-settings .connection-editor {flex:1;}
+  .eca-app .model-settings .connection-scroll {padding:20px;}
+  .eca-app .model-settings .connection-editor-footer {padding:12px 20px;}
+  .eca-app .model-settings .model-settings-footer {padding:8px 16px;}
+  .eca-app .model-settings .data-location {display:none;}
+}

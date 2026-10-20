@@ -1,10 +1,15 @@
+import {createContext,useContext} from 'react';
+import {AttachmentNames} from './Attachments';
+const ProjectContext=createContext<string|undefined>(undefined);
 import React, {memo, useMemo, useState} from 'react';
 import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {CaretRight, TerminalWindow, FileText, CheckCircle, WarningCircle, Code, Circle, ListChecks, MinusCircle} from '@phosphor-icons/react';
 import {transcriptNodes,resultInfo,toolArgs,toolTarget,failureHint,visibleEntries,type ToolEntry} from './transcript-model';
+import {AgentCards,agentsForCall,type ChildAgent} from './subagents/AgentCards';
 
 export const RichText=memo(function RichText({text}:{text:string}) {
-  return <Markdown skipHtml components={{img:()=>null,a:({href,children})=><button className="text-link" onClick={()=>href&&window.eca.invoke('link.open',{url:href}).catch(()=>{})}>{children}</button>}}>{text}</Markdown>;
+  return <Markdown skipHtml remarkPlugins={[remarkGfm]} components={{img:()=>null,table:({children})=><div className="markdown-table" role="region" aria-label="表格，可横向滚动" tabIndex={0}><table>{children}</table></div>,a:({href,children})=><button className="text-link" onClick={()=>href&&window.eca.invoke('link.open',{url:href}).catch(()=>{})}>{children}</button>}}>{text}</Markdown>;
 });
 
 export function LogText({text}:{text:string}) {
@@ -19,6 +24,7 @@ export function LazyDetail({title,text,className=''}:{title:React.ReactNode;text
 
 const names:Record<string,string>={read:'读取',write:'写入',edit:'修改',edit_many:'批量修改',delete:'删除',shell:'运行命令',glob:'查找文件',grep:'搜索内容',search:'搜索代码',code_search:'搜索代码',repo_map:'项目结构',code_relations:'调用关系',delegate:'子任务',delegate_parallel:'并行任务',web_fetch:'读取网页',web_search:'搜索资料',todo:'更新计划'};
 const ToolRecord=memo(function ToolRecord({entry,sessionId,root,pending,onOpen}:{entry:ToolEntry;sessionId:string;root:string;pending:boolean;onOpen:(key:string,open:boolean)=>void}) {
+  const project_id=useContext(ProjectContext);
   const {call,result,source}=entry;
   const [open,setOpen]=useState(false),[full,setFull]=useState<any>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
   const info=resultInfo(result,pending),target=toolTarget(call,root),hint=failureHint(entry);
@@ -28,8 +34,8 @@ const ToolRecord=memo(function ToolRecord({entry,sessionId,root,pending,onOpen}:
     setLoading(true);setError('');
     try {
       const [message,output]=await Promise.all([
-        source.truncated?window.eca.invoke('session.message',{id:sessionId,index:source.message_index,message_ref:source.message_ref}):Promise.resolve(source),
-        result?.truncated?window.eca.invoke('session.message',{id:sessionId,index:result.message_index,message_ref:result.message_ref}):Promise.resolve(result)]);
+        source.truncated?window.eca.invoke('session.message',{project_id,id:sessionId,index:source.message_index,message_ref:source.message_ref}):Promise.resolve(source),
+        result?.truncated?window.eca.invoke('session.message',{project_id,id:sessionId,index:result.message_index,message_ref:result.message_ref}):Promise.resolve(result)]);
       setFull({call:message.tool_calls?.find((value:any)=>value.id===call.id)||call,result:output,
         sourceRef:source.message_ref??source,resultRef:result?.message_ref??result});
     }catch(e){setError(String(e));}finally{setLoading(false);}
@@ -65,24 +71,40 @@ const ExecutionGroup=memo(function ExecutionGroup({entries,sessionId,root,pendin
   </section>;
 });
 
+// Keep child entries in conversation order without wrapping them in a tool log.
+function ExecutionEntries({entries,sessionId,root,pending,agents,onOpenAgent}:{entries:ToolEntry[];sessionId:string;root:string;pending:boolean;agents:ChildAgent[];onOpenAgent?:(agent:ChildAgent)=>void}) {
+  const parts:React.ReactNode[]=[];
+  let ordinary:ToolEntry[]=[];
+  const flush=()=>{if(ordinary.length){parts.push(<ExecutionGroup key={ordinary[0].key} entries={ordinary} sessionId={sessionId} root={root} pending={pending}/>);ordinary=[];}};
+  for(const entry of entries) {
+    const children=onOpenAgent?agentsForCall(entry,agents):[];
+    if(children.length&&onOpenAgent){flush();parts.push(<AgentCards key={entry.key} agents={children} onOpen={onOpenAgent}/>);}
+    else ordinary.push(entry);
+  }
+  flush();
+  return <>{parts}</>;
+}
+
 const Message=memo(function Message({message,sessionId}:{message:any;sessionId:string}) {
+  const project_id=useContext(ProjectContext);
   const [full,setFull]=useState<any>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
   const data=full||message;
-  const more=<>{message.truncated&&!full&&<button className="log-more" disabled={loading} onClick={async()=>{setLoading(true);try{setFull(await window.eca.invoke('session.message',{id:sessionId,index:message.message_index,message_ref:message.message_ref}));}catch(e){setError(String(e));}finally{setLoading(false);}}}>{loading?'正在加载…':'加载完整消息'}</button>}{error&&<p role="alert">{error}</p>}</>;
+  const more=<>{message.truncated&&!full&&<button className="log-more" disabled={loading} onClick={async()=>{setLoading(true);try{setFull(await window.eca.invoke('session.message',{project_id,id:sessionId,index:message.message_index,message_ref:message.message_ref}));}catch(e){setError(String(e));}finally{setLoading(false);}}}>{loading?'正在加载…':'加载完整消息'}</button>}{error&&<p role="alert">{error}</p>}</>;
   if(message.role==='system')return null;
   if(message.role==='tool')return <div className="orphan-tool"><LazyDetail title="工具结果 · 调用位于前页" text={String(data.content)}/>{more}</div>;
   const internal=message.role==='user'&&/^(User-requested verification command:|Repair the failed user-selected verification)/.test(message.content||'');
   if(internal)return <div className="runtime-note"><LazyDetail title={<><Code size={13}/>运行时检查与修复指令</>} text={data.content}/>{more}</div>;
   return <article className={'message '+message.role}><div className="message-label">{message.role==='user'?'你':'ECA'}{message.role==='assistant'&&<span>编码助手</span>}</div>
     {typeof data.content==='string'&&data.content&&<RichText text={data.content}/>}
-    {more}
+    <AttachmentNames items={data.attachments}/>{more}
   </article>;
 });
 
-export const Transcript=memo(function Transcript({messages,sessionId,root='',busy=false}:{messages:any[];sessionId:string;root?:string;busy?:boolean}) {
+const noAgents:ChildAgent[]=[];
+export const Transcript=memo(function Transcript({messages,sessionId,projectId,root='',busy=false,agents=noAgents,onOpenAgent}:{messages:any[];sessionId:string;projectId?:string;root?:string;busy?:boolean;agents?:ChildAgent[];onOpenAgent?:(agent:ChildAgent)=>void}) {
   const nodes=useMemo(()=>transcriptNodes(messages),[messages]);
-  return <>{nodes.map((node,index)=><React.Fragment key={sessionId+'-'+node.key}>
+  return <ProjectContext.Provider value={projectId}>{nodes.map((node,index)=><React.Fragment key={sessionId+'-'+node.key}>
     {node.kind==='gap'?<div className="history-gap">中间 {node.count} 条记录已收起。返回最近记录后可重新加载。</div>:
-      node.kind==='tools'?<ExecutionGroup entries={node.entries} sessionId={sessionId} root={root} pending={busy&&index===nodes.length-1}/>:
-      <Message message={node.message} sessionId={sessionId}/>}</React.Fragment>)}</>;
+      node.kind==='tools'?<ExecutionEntries entries={node.entries} sessionId={sessionId} root={root} pending={busy&&index===nodes.length-1} agents={agents} onOpenAgent={onOpenAgent}/>:
+      <Message message={node.message} sessionId={sessionId}/>}</React.Fragment>)}</ProjectContext.Provider>;
 });

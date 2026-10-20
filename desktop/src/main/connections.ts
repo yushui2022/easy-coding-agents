@@ -2,13 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 
-export type Model = {model: string; base_url: string; api_format: string; thinking_mode?: string};
+export type Model = {model: string; base_url: string; api_format: string; thinking_mode?: string; reasoning_effort?: string};
 function thinking(value:Model) {
   const supported=value.api_format==='openai'&&value.model.toLowerCase().startsWith('deepseek');
   return supported ? value.thinking_mode || 'fast' : 'default';
 }
 type Connection = Model & {id: string; name: string; no_auth: boolean; encryptedKey?: string};
-type Preferences = {schema: 2; connections: Connection[]; defaultId?: string; projects: Record<string,string>; recent: string[]};
+type Preferences = {schema: 2; connections: Connection[]; defaultId?: string; projects: Record<string,string>; recent: string[]; recentModels?: string[]};
 type Cipher = {isEncryptionAvailable(): boolean; encryptString(value:string): Buffer; decryptString(value:Buffer): string};
 
 export class Connections {
@@ -49,9 +49,9 @@ export class Connections {
   }
   public() {
     const connections=this.data.connections.map(c=>({id:c.id,name:c.name,model:c.model,base_url:c.base_url,api_format:c.api_format,
-      thinking_mode:thinking(c),no_auth:c.no_auth,credential_configured:c.no_auth||!!(this.keys.get(c.id)||c.encryptedKey),persist:!!c.encryptedKey}));
+      thinking_mode:thinking(c),reasoning_effort:c.reasoning_effort||'',no_auth:c.no_auth,credential_configured:c.no_auth||!!(this.keys.get(c.id)||c.encryptedKey),persist:!!c.encryptedKey}));
     const selected=connections.find(c=>c.id===this.data.defaultId);
-    return {connections,defaultId:this.data.defaultId,recent:this.data.recent,
+    return {connections,defaultId:this.data.defaultId,recent:this.data.recent,recentModels:(this.data.recentModels||[]).filter(id=>connections.some(c=>c.id===id)),
       model:selected,credential_configured:!!selected?.credential_configured};
   }
   // Resolve a form without writing. Existing secrets are reusable only at the same endpoint/protocol.
@@ -84,7 +84,9 @@ export class Connections {
     const name=typeof input.name==='string'&&input.name.trim()?input.name.trim():value.model;
     if(name.length>80) throw new Error('连接名称最多 80 个字符。');
     const id=input.id||randomUUID();
+    const old=input.id?this.find(input.id):undefined;
     const next:Connection={id,name,model:value.model,base_url:value.base_url,api_format:value.api_format,no_auth:value.no_auth,thinking_mode:value.thinking_mode};
+    if(old&&old.model===next.model&&old.base_url===next.base_url&&old.api_format===next.api_format&&old.thinking_mode===next.thinking_mode)next.reasoning_effort=old.reasoning_effort;
     let warning='';
     if(!value.no_auth&&input.persist!==false) {
       if(this.cipher.isEncryptionAvailable()) next.encryptedKey=this.cipher.encryptString(value.api_key).toString('base64');
@@ -101,9 +103,19 @@ export class Connections {
     const value=this.find(id);
     const api_key=value.no_auth?'eca-local':this.key(value);
     if(!api_key) throw new Error('此连接的临时密钥已失效，请在模型设置中重新输入。');
-    return {model:value.model,base_url:value.base_url,api_format:value.api_format,api_key,thinking_mode:thinking(value)};
+    return {model:value.model,base_url:value.base_url,api_format:value.api_format,api_key,thinking_mode:thinking(value),reasoning_effort:value.reasoning_effort||''};
   }
   setDefault(id:string) {this.find(id);this.write({...this.data,defaultId:id});return this.public();}
+  setEffort(id:string,effort:string) {
+    this.find(id);
+    if(!['default','none','minimal','low','medium','high','xhigh','max'].includes(effort))throw new Error('推理强度无效。');
+    this.write({...this.data,connections:this.data.connections.map(c=>c.id===id?{...c,thinking_mode:'default',reasoning_effort:effort==='default'?'':effort}:c)});
+  }
+  used(id?:string|null) {
+    if(!id||!this.data.connections.some(c=>c.id===id))return;
+    const recentModels=[id,...(this.data.recentModels||[]).filter(x=>x!==id&&this.data.connections.some(c=>c.id===x))].slice(0,6);
+    if(JSON.stringify(recentModels)!==JSON.stringify(this.data.recentModels))this.write({...this.data,recentModels});
+  }
   remove(id:string) {
     this.find(id);
     if(this.data.defaultId===id||Object.values(this.data.projects).includes(id)) throw new Error('此连接仍是默认模型或被项目使用，请先切换后再移除。');

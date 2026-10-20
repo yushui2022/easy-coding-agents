@@ -4,7 +4,7 @@
 .workspace-hidden{display:none!important}.workspace-header{height:var(--header-height);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 18px;border-bottom:1px solid var(--border)}
 .workspace-header strong{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}.workspace-header>div{display:flex;gap:2px}.eca-app .workspace-header button{border:0;min-height:30px;min-width:30px;padding:6px;background:transparent;display:flex;color:var(--secondary)}
 .workspace-tabs{display:flex;overflow:auto;flex-shrink:0;border-bottom:1px solid var(--border);padding:8px 12px;min-height:46px;gap:4px;background:var(--sidebar)}
-.workspace-tabs:has(>div:only-child){display:none}
+.workspace-tabs:empty{display:none}
 .workspace-tabs>div{display:flex;align-items:center;border-radius:6px;flex-shrink:0;color:var(--secondary)}.workspace-tabs>div.selected{background:var(--selected);box-shadow:var(--shadow-control);color:var(--text)}
 .eca-app .workspace-tabs button{border:0;min-height:28px;background:transparent;color:inherit;font-size:12px;padding:5px 8px;white-space:nowrap}
 .workspace-content{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}.workspace-content.inactive{display:none}

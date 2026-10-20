@@ -5,6 +5,7 @@ import time
 import uuid
 from dataclasses import replace
 from .agent import Agent
+from . import reasoning
 
 READ_TOOLS = {'read', 'glob', 'grep'}
 
@@ -56,7 +57,9 @@ class SideChats:
             **({'stream_delta': entry['stream'][offset:]} if delta else {'stream': entry['stream']}),
             **({} if same_messages else {'messages': self.rpc.public_messages(messages[-50:], max(0,len(messages)-50), True)}),
             'message_total': len(messages), 'context': agent.state['side_context'],
-            'model': agent.settings.model, 'usage': agent.ledger.summary(agent.state, session_only=True)})
+            'model': agent.settings.model, 'connection_id': entry.get('connection_id'),
+            'reasoning': reasoning.describe(agent.settings),
+            'usage': agent.ledger.summary(agent.state, session_only=True)})
 
     def notify(self, entry):
         self.rpc.send({'jsonrpc': '2.0', 'method': 'event', 'params': {
@@ -77,9 +80,11 @@ class SideChats:
                 state.update(kind='side_chat', parent_id=parent.state['id'], billing_root=parent.state.get('billing_root',parent.state['id']),
                              title='侧边聊天', side_context=self.context(parent, params.get('selection','')))
             settings = replace(parent.settings, mode='plan', permission='ask', project_memory=False, mcp_servers={}, lsp_servers={}, worker_profiles=[])
+            settings = reasoning.restore(settings, state)
             async def deny(*args):
                 return False
-            entry = {'task': None, 'run_id': None, 'stream': '', 'stream_id': 0, 'error': ''}
+            entry = {'task': None, 'run_id': None, 'stream': '', 'stream_id': 0, 'error': '',
+                     'connection_id': params.get('connection_id')}
             def emit(event, data):
                 if event == 'turn':
                     entry['stream'] = ''
@@ -105,20 +110,27 @@ class SideChats:
         if method == 'sidechat.context':
             agent.state['side_context'] = self.context(parent, params.get('selection',''))
             agent.store.save(agent.state)
+        elif method == 'sidechat.reasoning':
+            await reasoning.change(agent, params.get('effort'))
         elif method == 'sidechat.model':
             model = self.rpc.model(params.get('model', {}))
             settings = replace(parent.settings, **model, mode='plan', permission='ask', project_memory=False, mcp_servers={}, lsp_servers={}, worker_profiles=[])
+            settings = reasoning.restore(settings, agent.state)
             settings.validate()
             await agent.close()
             entry['agent'] = SideAgent(settings, parent.store, agent.state, agent.tools.approve, agent.tools.question, agent.emit, child=True)
             entry['agent'].budget = parent.budget
+            entry['connection_id'] = params.get('connection_id')
         elif method == 'sidechat.send':
             prompt = params.get('prompt')
-            if not isinstance(prompt,str) or not prompt.strip(): raise ValueError('Enter a question.')
+            if not isinstance(prompt,str) or (not prompt.strip() and not params.get('attachments')): raise ValueError('Enter a question.')
+            from .attachments import prepare
+            files = prepare(agent.settings.root, params.get('attachments', []))
+            prompt = prompt.strip() or '请分析这些附件。'
             entry.update(run_id=uuid.uuid4().hex, stream='', error='')
             async def run():
                 try:
-                    await agent.run(prompt)
+                    await agent.run(prompt, attachments=files) if files else await agent.run(prompt)
                 except asyncio.CancelledError:
                     agent.state['status'] = 'interrupted'
                 except Exception as exc:

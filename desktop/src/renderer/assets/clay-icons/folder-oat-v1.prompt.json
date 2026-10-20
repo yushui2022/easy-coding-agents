@@ -1,0 +1,7 @@
+{
+  "generator": "built-in image_gen",
+  "asset": "folder-oat-v1.png",
+  "reference": "folder-terracotta-v1.png",
+  "transparent_background": true,
+  "prompt": "Use case: precise-object-edit.\nEdit this clay folder icon by changing ONLY its material color. Preserve the exact open-folder silhouette, raised left tab, thick rounded edges, camera angle, proportions, position, lighting, visible granular ceramic texture, mineral specks, and transparent background.\nReplace the saturated orange terracotta with muted warm oat-grey / limestone stoneware: desaturated grey-beige midtone around #B5AA98, soft pale oatmeal highlights, slightly deeper warm taupe shading inside. This icon sits on a warm off-white desktop UI next to an orange brand mark, so it should be quiet, sophisticated and visibly neutral, NOT yellow, orange, pink, cream-white, metallic or shiny. Keep enough tonal depth for a clear 32px UI silhouette. The grain should be tactile but integrated with the neutral clay, not painted-on spots.\nGenuine transparent background, preserve alpha. Do not add a ground, shadow outside the object, symbols, papers, text, labels, new objects, border, or checkerboard. Do not change the composition or shape."
+}

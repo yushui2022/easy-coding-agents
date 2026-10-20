@@ -1,0 +1,127 @@
+/* Clay material is an accent; navigation remains a quiet, readable surface. */
+.eca-app .sidebar.clay-sidebar {
+  --clay-ground:#f3efe8;
+  --clay-raised:#fcfaf6;
+  --clay-inset:#ebe5db;
+  --clay-line:#e1d8cb;
+  --clay-text:#3c352f;
+  --clay-secondary:#655d54;
+  --clay-muted:#776d62;
+  --clay-accent:#aa4d30;
+  --clay-active:#f5e6dc;
+  --clay-highlight:#ffffffb3;
+  --clay-shadow:#69513b0d;
+  background:var(--clay-ground);
+  color:var(--clay-text);
+  border-right-color:var(--clay-line);
+  padding:0 14px;
+}
+.eca-app .clay-sidebar .clay-brand {display:flex;align-items:center;gap:10px;min-height:82px;flex-shrink:0;padding:10px 4px 14px;}
+.eca-app .clay-brand>img {flex-shrink:0;width:42px;height:42px;object-fit:contain;}
+.eca-app .clay-brand-copy {min-width:0;}
+.eca-app .clay-brand-copy>div {display:flex;align-items:baseline;gap:6px;}
+.eca-app .clay-brand-copy strong {font-size:21px;letter-spacing:-.8px;font-weight:650;line-height:1.2;}
+.eca-app .clay-brand-copy span {font-size:11px;color:var(--clay-secondary);}
+.eca-app .clay-brand-copy small {display:block;font-size:9px;letter-spacing:.4px;margin-top:5px;color:var(--clay-muted);}
+.eca-app .clay-sidebar button {color:var(--clay-text);}
+.eca-app .clay-sidebar :where(button,input):focus-visible {outline-color:var(--clay-accent);outline-offset:2px;}
+.eca-app .clay-sidebar button:hover:not(:disabled) {background:var(--clay-inset);}
+.eca-app .clay-sidebar button:active:not(:disabled) {filter:none;box-shadow:inset 0 1px 3px var(--clay-shadow);}
+.eca-app .clay-sidebar .open-project {min-height:39px;margin:0;padding:9px 11px;border:1px solid var(--clay-line);border-radius:11px;background:var(--clay-raised);box-shadow:0 2px 5px var(--clay-shadow),inset 0 1px var(--clay-highlight);font-size:12px;flex-shrink:0;}
+.eca-app .clay-folder {display:block;object-fit:contain;flex-shrink:0;pointer-events:none;user-select:none;}
+.eca-app .clay-sidebar .open-project>svg:first-child,.eca-app .clay-sidebar .recent>svg {color:var(--clay-secondary);}
+.eca-app .clay-sidebar .open-project>svg:last-child {color:var(--clay-muted);}
+.eca-app .clay-sidebar .section-heading {margin:22px 9px 9px;font-size:10px;color:var(--clay-muted);letter-spacing:.07em;}
+.eca-app .clay-sidebar .nav-count {font-size:10px;font-weight:400;font-variant-numeric:tabular-nums;letter-spacing:0;color:var(--clay-muted);}
+.eca-app .sidebar-projects {flex-shrink:0;min-height:0;}
+.eca-app .clay-sidebar .project-stack {max-height:min(230px,27dvh);overflow:auto;padding:2px 2px 6px;margin:0 -2px;scrollbar-width:thin;scrollbar-color:var(--clay-line) transparent;}
+.eca-app .clay-sidebar .project-current {min-height:64px;gap:9px;padding:11px 10px;background:var(--clay-raised);border:1px solid var(--clay-line);border-radius:12px;box-shadow:0 3px 8px var(--clay-shadow),inset 0 1px var(--clay-highlight);}
+.eca-app .clay-sidebar .project-clay-mark {width:34px;height:34px;object-fit:contain;flex-shrink:0;}
+.eca-app .clay-sidebar .project-copy {min-width:0;flex:1;}
+.eca-app .clay-sidebar .project-copy strong {display:block;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.5;}
+.eca-app .clay-sidebar .project-copy small {display:block;font-size:9px;font-weight:400;color:var(--clay-muted);margin-top:3px;}
+.eca-app .clay-sidebar .project-indicator {flex-shrink:0;width:4px;height:4px;border-radius:50%;background:var(--clay-accent);}
+.eca-app .clay-sidebar .recent {min-height:34px;border-radius:8px;margin-top:5px;font-size:11px;gap:9px;color:var(--clay-secondary);}
+.eca-app .sidebar-sessions {display:flex;flex-direction:column;min-height:90px;flex:1;}
+.eca-app .clay-sidebar .session-heading {margin-top:14px;margin-bottom:6px;flex-shrink:0;}
+.eca-app .clay-sidebar .session-heading>span {display:flex;gap:10px;align-items:center;}
+.eca-app .clay-sidebar .session-heading .icon-button {width:25px;min-width:25px;min-height:25px;padding:4px;border-radius:7px;color:var(--clay-secondary);}
+.eca-app .clay-sidebar .session-search {margin-bottom:10px;min-height:32px;flex-shrink:0;padding:0 10px;border:1px solid transparent;border-radius:9px;background:var(--clay-inset);color:var(--clay-muted);box-shadow:inset 0 1px 2px var(--clay-shadow);}
+.eca-app .clay-sidebar .session-search:focus-within {background:var(--clay-raised);border-color:var(--clay-accent);box-shadow:none;}
+.eca-app .clay-sidebar .session-search input {font-size:11px;color:var(--clay-text);}
+.eca-app .clay-sidebar .session-search input::placeholder {color:var(--clay-muted);}
+.eca-app .clay-sidebar .session-search input:focus-visible {outline:none;}
+.eca-app .clay-sidebar .session-list {padding:2px;min-height:32px;margin:0 -2px;scrollbar-color:var(--clay-line) transparent;}
+.eca-app .clay-sidebar .session-list button {position:relative;min-height:35px;gap:9px;margin:0 0 4px;padding:9px 11px;border:1px solid transparent;border-radius:9px;color:var(--clay-secondary);font-size:11px;}
+.eca-app .clay-sidebar .session-list button>svg {color:var(--clay-muted);}
+.eca-app .clay-sidebar .session-list button>span {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.eca-app .clay-sidebar .session-list button.selected {background:var(--clay-active);border-color:var(--clay-line);color:var(--clay-text);font-weight:500;box-shadow:inset 0 1px var(--clay-highlight);}
+.eca-app .clay-sidebar .session-list button.selected::before {content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:14px;border-radius:0 3px 3px 0;background:var(--clay-accent);}
+.eca-app .clay-sidebar .session-list button.selected>svg {color:var(--clay-accent);}
+.eca-app .clay-sidebar .session-running {margin-left:auto;flex-shrink:0;width:5px;height:5px;border-radius:50%;background:var(--clay-accent);}
+.eca-app .clay-sidebar .session-state {margin-left:auto;flex-shrink:0;display:flex;align-items:center;gap:4px;font-size:9px;font-weight:400;color:var(--clay-accent);}
+.eca-app .clay-sidebar .session-state i,.eca-app .clay-sidebar .session-concurrency i {width:4px;height:4px;border-radius:50%;background:currentColor;flex-shrink:0;}
+.eca-app .clay-sidebar .session-state.waiting {padding:3px 5px;border-radius:5px;background:var(--clay-raised);box-shadow:0 1px 3px var(--clay-shadow);}
+.eca-app .clay-sidebar .session-concurrency {display:flex;align-items:center;gap:5px;margin:0 9px 9px;font-size:9px;line-height:1.5;color:var(--clay-accent);}
+.eca-app .clay-sidebar .session-concurrency span {margin-left:auto;color:var(--clay-muted);}
+.eca-app .clay-sidebar .nav-empty {font-size:10px;line-height:1.9;margin:8px 9px;color:var(--clay-muted);}
+.eca-app .clay-sidebar .nav-empty .text-link {font-size:10px;color:var(--clay-accent);width:auto;padding:4px 0;}
+.eca-app .clay-sidebar .sidebar-bottom {flex-shrink:0;border-top-color:var(--clay-line);margin-top:14px;padding:12px 0 14px;}
+.eca-app .clay-sidebar .settings-button {padding:8px 6px;gap:9px;border-radius:10px;}
+.eca-app .clay-sidebar .settings-glyph {display:flex;align-items:center;justify-content:center;flex-shrink:0;width:30px;height:30px;border:1px solid var(--clay-line);border-radius:10px;background:var(--clay-raised);box-shadow:inset 0 1px var(--clay-highlight);color:var(--clay-secondary);}
+.eca-app .clay-sidebar .settings-copy {display:flex;flex-direction:column;min-width:0;text-align:left;gap:4px;}
+.eca-app .clay-sidebar .settings-copy strong {font-size:11px;font-weight:500;}
+.eca-app .clay-sidebar .settings-copy small {font-size:9px;color:var(--clay-muted);}
+.eca-app .clay-sidebar footer {font-size:9px;padding:12px 8px 0;color:var(--clay-muted);font-variant-numeric:tabular-nums;}
+.eca-app .clay-sidebar footer>span:first-child {display:flex;align-items:center;gap:5px;}
+.eca-app:is(.nav-collapsed,.workspace-full) .clay-sidebar {padding:0 8px;}
+.eca-app:is(.nav-collapsed,.workspace-full) .clay-brand {justify-content:center;padding-inline:0;}
+.eca-app:is(.nav-collapsed,.workspace-full) .clay-brand>img {width:36px;height:36px;}
+.eca-app:is(.nav-collapsed,.workspace-full) .clay-sidebar :is(.clay-brand-copy,.sidebar-projects,.sidebar-sessions,.settings-copy,.connection-dot,footer) {display:none;}
+.eca-app:is(.nav-collapsed,.workspace-full) .clay-sidebar .open-project {justify-content:center;padding:8px;}
+.eca-app:is(.nav-collapsed,.workspace-full) .clay-sidebar .open-project>span,
+.eca-app:is(.nav-collapsed,.workspace-full) .clay-sidebar .open-project>svg:last-child {display:none;}
+.eca-app:is(.nav-collapsed,.workspace-full) .clay-sidebar .sidebar-bottom {margin-top:auto;}
+.eca-app:is(.nav-collapsed,.workspace-full) .clay-sidebar .settings-button {padding:6px 0;}
+.eca-app:is(.nav-collapsed,.workspace-full) .clay-sidebar .settings-glyph {display:flex;}
+@media (prefers-color-scheme:dark) {
+  .eca-app .sidebar.clay-sidebar {--clay-ground:#211f1b;--clay-raised:#302c26;--clay-inset:#29251f;--clay-line:#423a30;--clay-text:#eee6dc;--clay-secondary:#c5b9aa;--clay-muted:#aa9c8a;--clay-accent:#eba382;--clay-active:#3a2d24;--clay-highlight:#ffffff08;--clay-shadow:#100b0633;}
+}
+@media(max-height:650px) {
+  .eca-app .clay-sidebar .clay-brand {min-height:64px;padding-block:8px;}
+  .eca-app .clay-sidebar .section-heading {margin-top:12px;}
+  .eca-app .clay-sidebar .project-current {min-height:54px;padding-block:7px;}
+  .eca-app .clay-sidebar .project-stack {max-height:20dvh;}
+  .eca-app .clay-sidebar .sidebar-bottom {padding-block:8px;margin-top:8px;}
+  .eca-app .clay-sidebar footer {padding-top:8px;}
+}
+/* Project groups replace the separated project and session lists. */
+.eca-app .project-navigation {display:flex;flex-direction:column;min-height:0;flex:1;}
+.eca-app .project-navigation>.section-heading {margin:20px 7px 9px;min-height:24px;flex-shrink:0;letter-spacing:.02em;}
+.eca-app .project-navigation>.section-heading .icon-button {width:24px;min-height:24px;padding:3px;border-radius:6px;}
+.eca-app .project-tree {min-height:0;flex:1;overflow:auto;padding:2px 2px 12px;margin:0 -2px;scrollbar-width:thin;scrollbar-color:var(--clay-line) transparent;}
+.eca-app .project-group {margin-bottom:18px;}
+.eca-app .project-group-heading {display:flex;align-items:center;min-height:32px;gap:2px;padding-right:3px;}
+.eca-app .project-group-heading button {border:0;background:none;box-shadow:none;border-radius:7px;min-height:28px;padding:5px;}
+.eca-app .project-group-heading .project-disclosure {width:17px;min-width:17px;flex-shrink:0;padding:2px;color:var(--clay-muted);}
+.eca-app .project-disclosure svg {transition:transform .15s;}
+.eca-app .project-disclosure .collapsed {transform:rotate(-90deg);}
+.eca-app .project-group-heading .project-title {display:flex;align-items:center;gap:8px;min-width:0;flex:1;width:auto;text-align:left;color:var(--clay-secondary);font-size:12px;}
+.eca-app .project-title>svg {flex-shrink:0;color:var(--clay-muted);}
+.eca-app .project-title>span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.eca-app .is-current .project-title {color:var(--clay-text);font-weight:600;}
+.eca-app .project-running {margin-left:auto;font-size:10px;font-weight:500;color:var(--clay-accent);font-variant-numeric:tabular-nums;}
+.eca-app .project-actions {display:flex;flex-shrink:0;opacity:0;transition:opacity .15s;}
+.eca-app .project-actions button {width:23px;min-height:24px;padding:4px;color:var(--clay-muted);}
+.eca-app .project-group-heading:hover .project-actions,.eca-app .project-group-heading:focus-within .project-actions {opacity:1;}
+.eca-app .clay-sidebar .project-session-list {overflow:visible;min-height:0;max-height:none;flex:none;margin:2px 0 0;padding:0;}
+.eca-app .clay-sidebar .project-session-list button {display:flex;align-items:center;width:100%;min-height:34px;padding:8px 9px 8px 40px;margin:1px 0;border:0;border-radius:9px;text-align:left;gap:6px;}
+.eca-app .clay-sidebar .project-session-list button>span {flex:1;font-size:12px;line-height:1.5;}
+.eca-app .clay-sidebar .project-session-list button.selected::before {height:13px;left:2px;width:2px;}
+.eca-app .recent-projects {border-top:1px solid var(--clay-line);padding-top:10px;margin-top:6px;}
+.eca-app .recent-label {font-size:10px;color:var(--clay-muted);margin:4px 9px 7px;}
+.eca-app .clay-sidebar .recent-projects .recent {padding-left:23px;font-size:12px;}
+.eca-app .clay-sidebar .project-navigation .session-concurrency {font-size:9px;margin:0 7px 10px;}
+.eca-app:is(.nav-collapsed,.workspace-full) .project-navigation {display:none;}
+@media (hover:none) {.eca-app .project-actions {opacity:1;}}
+@media (prefers-reduced-motion:reduce) {.eca-app .project-actions,.eca-app .project-disclosure svg {transition:none;}}

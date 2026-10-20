@@ -1,0 +1,83 @@
+{
+  "generator": "built-in image_gen",
+  "assets": [
+    {
+      "file": "circle-sage.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "bytes": 1484905,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "transparent_fraction": 0.573,
+      "sha256": "377410ecb125efb50046cd2d51cbe716aabad5658b224cea468ac17b7b2b6bcc"
+    },
+    {
+      "file": "doubleloop-coral.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "bytes": 1287203,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "transparent_fraction": 0.604,
+      "sha256": "6ac1f2d90e07391138e3c4313c8a6ff5c73623e4370cfae67032e2bcec68f5a7"
+    },
+    {
+      "file": "hexagon-honey.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "bytes": 1363005,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "transparent_fraction": 0.592,
+      "sha256": "1fa71989025332e28a857d5b98083f5bd7d35aab3b452d457ec3a5197e6a1a64"
+    },
+    {
+      "file": "quatrefoil-teal.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "bytes": 1336895,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "transparent_fraction": 0.597,
+      "sha256": "f09f17a4d360db0f46a6bb36f0566b8298ab5dfec0e684ece24a885a976c567f"
+    },
+    {
+      "file": "square-blue.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "bytes": 1549218,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "transparent_fraction": 0.519,
+      "sha256": "332bf276f6d7177c48ecbf26adba2ddf7c4b2ed4a99034b9db54730fff7a59fa"
+    },
+    {
+      "file": "triangle-lavender.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "bytes": 1489609,
+      "alpha_range": [
+        0,
+        255
+      ],
+      "transparent_fraction": 0.581,
+      "sha256": "9544e86d664cb78590ce0ff71b5bc4f3b8dee1ecc36a3061ddd0c09019223a44"
+    }
+  ]
+}

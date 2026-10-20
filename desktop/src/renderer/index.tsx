@@ -1,17 +1,23 @@
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {FolderOpen, GearSix, Plus, Stop, ArrowUp, Check, ArrowCounterClockwise, X, ArrowClockwise, FileText, ChatCircle, SidebarSimple, CaretDown, Desktop, MagnifyingGlass, ArrowDown, ListChecks, ShieldCheck} from '@phosphor-icons/react';
+import {FolderOpen, Stop, ArrowUp, Check, ArrowCounterClockwise, X, ArrowClockwise, FileText, ChatCircle, SidebarSimple, CaretDown, Desktop, ArrowDown, ListChecks, ShieldCheck} from '@phosphor-icons/react';
 import {Dialog} from './Dialog';
-import {ModelPicker, ModelSettings} from './ModelSettings';
+import {ModelSettings} from './ModelSettings';
+import {ModelMenu,effortLabels} from './ModelMenu';
+import {RunActivity} from './RunActivity';
 import {Transcript, LazyDetail, LogText} from './Transcript';
 import {Workspace} from './workspace/Workspace';
 import {EmptyState} from './ui/EmptyState';
 import {Welcome} from './Welcome';
 import {TaskVerification} from './TaskVerification';
+import {Sidebar} from './Sidebar';
+import {useAttachments} from './Attachments';
+import {AgentCards,type ChildAgent} from './subagents/AgentCards';
 import './tokens.css';
 import './style.css';
 import './workbench.css';
 import './workspace/workspace.css';
+import './clay-surfaces.css';
 
 declare global { interface Window { eca: {
   invoke: (method: string, params?: Record<string, unknown>) => Promise<any>;
@@ -23,17 +29,8 @@ const labels: Record<string,string> = {idle:'等待指令', running:'执行中',
 const label = (value: string) => labels[value] || value;
 const shorten = (text: string, count = 1600) => text.length > count ? text.slice(0,count) + '\n…' : text;
 const draftKey = 'eca.desktop.task-draft';
-const thinkingLabels:Record<string,string>={fast:'快速',balanced:'均衡',deep:'深入',default:'服务默认'};
 const permissionLabels:Record<string,string>={ask:'逐次确认','accept-edits':'自动编辑','full-access':'完全访问'};
-function Activity({state}: {state:any}) {
-  const [now,setNow]=useState(Date.now());
-  useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[]);
-  const activity=state.activity||{};
-  const phases:Record<string,string>={preparing:'正在准备任务',waiting_model:'等待模型响应',thinking:'模型正在思考',responding:'正在生成回答',tool_arguments:'正在生成工具参数',executing:'正在执行工具',verifying:'正在执行验证',repairing:'正在修复验证失败',approval:'等待你的授权',question:'等待你的回答'};
-  const elapsed=Math.max(0,Math.floor(now/1000-(state.started_at||now/1000)));
-  return <div className="run-activity" role="status"><span className="status-dot active"/><div><strong>{phases[activity.phase]||'正在处理'}{activity.tool?' · '+activity.tool:''}</strong><small>{activity.phase==='thinking'?`已接收 ${Number(activity.reasoning_chars||0).toLocaleString()} 个思考字符`:activity.phase==='tool_arguments'?`参数生成中 · ${Number(activity.tool_argument_chars||0).toLocaleString()} 字符 · 尚未执行`:activity.phase==='waiting_model'?'请求已发出，可以随时停止':'进度与已完成修改会保留'}</small></div><time>{Math.floor(elapsed/60)}:{String(elapsed%60).padStart(2,'0')}</time></div>;
-}
-function readDraft() {try {return sessionStorage.getItem(draftKey) || '';} catch {return '';}}
+function readDraft(key=draftKey) {try {return sessionStorage.getItem(key) || '';} catch {return '';}}
 function App() {
   const [state,setState] = useState<any>({project:null,busy:false,sessions:[],messages:[],events:[],pending:[],changes:[],tasks:[]});
   const [config,setConfig] = useState<any>({recent:[]});
@@ -46,11 +43,19 @@ function App() {
   const projectBusy = useRef(false);
   const [modelSelectionError,setModelSelectionError] = useState('');
   const [error,setError] = useState('');
-  const [prompt,setPrompt] = useState(readDraft);
+  const viewKey=state.workspace_owner||state.session_id;
+  const promptKey=viewKey?draftKey+'.'+viewKey:draftKey;
+  const [draft,setDraft] = useState(()=>({key:draftKey,text:readDraft()}));
+  const prompt=draft.key===promptKey?draft.text:readDraft(promptKey);
+  const setPrompt=(value:string|((old:string)=>string))=>setDraft(old=>{
+    const text=old.key===promptKey?old.text:readDraft(promptKey);
+    return {key:promptKey,text:typeof value==='function'?value(text):value};
+  });
   const [notice,setNotice] = useState('');
-  const [detailsOpen,setDetailsOpen] = useState(()=>window.innerWidth>=1180);
+  const [detailsOpen,setDetailsOpen] = useState(()=>sessionStorage.getItem('eca.workspace.open')==='true');
+  useEffect(()=>{sessionStorage.setItem('eca.workspace.open',String(detailsOpen));},[detailsOpen]);
+  const [agentView,setAgentView] = useState<{id:string;nonce:number}|null>(null);
   const [navCollapsed,setNavCollapsed] = useState(false);
-  const [sessionSearch,setSessionSearch] = useState('');
   const [following,setFollowing] = useState(true);
   const [narrow,setNarrow] = useState(() => window.innerWidth < 1180);
   const [sheetOpen,setSheetOpen] = useState(false);
@@ -69,7 +74,9 @@ function App() {
   const historyBusy=useRef(false);
   const [diagnostic,setDiagnostic] = useState<any>(null);
   const scroll = useRef<HTMLDivElement>(null);
+  const attachments=useAttachments('main.'+promptKey,sending||projectChanging);
   const promptInput = useRef<HTMLTextAreaElement>(null);
+  const modelButton = useRef<HTMLButtonElement>(null);
   const composing = useRef(false);
   const compositionEndedAt = useRef(-Infinity);
   const startBusy = useRef(false);
@@ -82,7 +89,13 @@ function App() {
   const refresh = async () => {
     if (refreshBusy.current) {refreshAgain.current = true; return;}
     refreshBusy.current = true;
-    try {const value = await invoke('snapshot',{preview:true}); if(value.backend_id!==latest.current.backend_id||value.seq>=latest.current.seq||value.session_id!==latest.current.session_id){latest.current = value; setState(value);}}
+    try {
+      const value = await invoke('snapshot',{preview:true}),old=latest.current;
+      if(value.backend_id!==old.backend_id||value.view_revision>old.view_revision||
+         (value.view_revision===old.view_revision&&value.session_id===old.session_id&&value.seq>=old.seq)){
+        latest.current=value;setState(value);
+      }
+    }
     catch (e) {setError(String(e));}
     finally {refreshBusy.current=false; if (refreshAgain.current) {refreshAgain.current=false; void refresh();}}
   };
@@ -95,8 +108,8 @@ function App() {
     liveBusy.current=true;
     try {
       const requested=latest.current;
-      const value=await invoke('live',{stream_id:requested.stream_id,stream_offset:requested.stream_offset}), old=latest.current;
-      if(value.backend_id===old.backend_id&&value.session_id===old.session_id&&value.project===old.project&&value.seq>=old.seq) {
+      const value=await invoke('live',{project_id:requested.project_id,session_id:requested.session_id,stream_id:requested.stream_id,stream_offset:requested.stream_offset}), old=latest.current;
+      if(value.backend_id===old.backend_id&&value.view_revision===old.view_revision&&value.session_id===old.session_id&&value.project===old.project&&value.seq>=old.seq) {
         if('stream_delta' in value) {
           // A concurrent full snapshot may already contain these characters.
           if(old.stream_id!==requested.stream_id||old.stream_offset!==requested.stream_offset)return;
@@ -111,34 +124,40 @@ function App() {
     let timer: ReturnType<typeof setTimeout>|undefined;
     let full=false;
     const off = window.eca.subscribe(data => {
-      if(data.event==='sidechat')return;
+      if(data.event==='config'){void loadConfig().catch(e=>setError(String(e)));return;}
+      if(data.event==='sidechat'||data.event==='subagent_live')return;
       if(!['text','model_activity'].includes(data.event||''))full=true;
       if (!timer) timer=setTimeout(() => {timer=undefined;const structural=full;full=false;void (structural?refresh():refreshLive());},80);
     });
-    const failure = window.eca.onFailure(message => {setError(message); setState((old:any) => ({...old,busy:false,status:'interrupted',pending:[],stream:''}));});
+    const failure = window.eca.onFailure(message => {setError(message); setState((old:any) => ({...old,busy:false,any_busy:false,running_count:0,status:'interrupted',pending:[],stream:'',
+      projects:[],sessions:old.sessions.map((s:any)=>({...s,busy:false,side_busy:false,pending_count:0}))}));});
     return () => {off(); failure(); clearTimeout(timer);};
   },[]);
-  useEffect(() => {try {sessionStorage.setItem(draftKey,prompt);} catch { /* storage unavailable */ }},[prompt]);
+  useEffect(() => {try {sessionStorage.setItem(draft.key,draft.text);} catch { /* storage unavailable */ }},[draft]);
   useEffect(() => {
     const query = matchMedia('(max-width: 1179px)');
     const update = () => {setNarrow(query.matches);setSheetOpen(false);};
     query.addEventListener('change',update);
     return () => query.removeEventListener('change',update);
   },[]);
-  useEffect(() => {setOlder([]);setCursor(null);setDiff(null);bottom.current=true;setFollowing(true);},[state.session_id]);
-  useEffect(()=>{setSessionSearch('');},[state.project]);
+  useEffect(() => {
+    setOlder([]);setCursor(null);setDiff(null);setAgentView(null);bottom.current=true;setFollowing(true);
+    setStopping(false);setAnswer('');setAnswered(null);setError('');setNotice('');
+    setModelPickerOpen(false);setConfirmFull(false);setCheckOptionsOpen(false);setDiagnostic(null);
+    reportedError.current=0;
+  },[viewKey]);
   const messages=useMemo(()=>[...older,...state.messages],[older,state.messages]);
   useEffect(() => {
     if(!state.project)return;
     try {
-      const saved=JSON.parse(sessionStorage.getItem('eca.verification.'+state.project)||'null');
+      const saved=JSON.parse(sessionStorage.getItem('eca.verification.'+viewKey)||'null');
       setChecks(typeof saved?.checks==='string'?saved.checks:'');
       setRepairAttempts(Number.isInteger(saved?.repairAttempts)&&saved.repairAttempts>=0&&saved.repairAttempts<=3?saved.repairAttempts:1);
     } catch {setChecks('');setRepairAttempts(1);}
-  },[state.project]);
+  },[viewKey]);
   const verificationDraft = (text:string, attempts:number) => {
     setChecks(text);setRepairAttempts(attempts);
-    if(state.project)try {sessionStorage.setItem('eca.verification.'+state.project,JSON.stringify({checks:text,repairAttempts:attempts}));} catch { /* optional draft storage */ }
+    if(state.session_id)try {sessionStorage.setItem('eca.verification.'+viewKey,JSON.stringify({checks:text,repairAttempts:attempts}));} catch { /* optional draft storage */ }
   };
   useEffect(() => {if (!state.busy) setStopping(false);},[state.busy]);
   useEffect(() => {
@@ -148,12 +167,24 @@ function App() {
   },[state.events,state.seq]);
   useEffect(() => {if (bottom.current && scroll.current) scroll.current.scrollTop=scroll.current.scrollHeight;},[state.messages,state.stream,state.pending]);
   const perform = async (method:string, params:Record<string,unknown>={}) => {
-    const projectOperation=['project.pick','project.recent','project.close'].includes(method);
+    const projectOperation=['project.pick','project.recent','project.close','session.switch'].includes(method);
     if(projectOperation&&projectBusy.current)return null;
     if(projectOperation){projectBusy.current=true;setProjectChanging(true);}
     setError('');
     if(method==='session.switch') setNotice('');
-    try {const result=await invoke(method,{preview:true,...params}); await refresh(); return result;}
+    try {
+      const result=await invoke(method,{preview:true,project_id:state.project_id,session_id:state.session_id,...params});
+      if(!state.project&&result?.session_id&&prompt){
+        sessionStorage.setItem(draftKey+'.'+(result.workspace_owner||result.session_id),prompt);
+      }
+      // Commit the selected view before re-enabling its composer. A snapshot
+      // already in flight may still belong to the session we just left.
+      if(projectOperation&&result?.backend_id&&
+         (result.backend_id!==latest.current.backend_id||result.view_revision>=latest.current.view_revision)){
+        latest.current=result;setState(result);
+      }
+      await refresh(); return result;
+    }
     catch(e) {setError(String(e)); return null;}
     finally {if(projectOperation){projectBusy.current=false;setProjectChanging(false);}}
   };
@@ -165,26 +196,36 @@ function App() {
     return result;
   };
   const start = async () => {
-    if (!prompt.trim() || startBusy.current || state.busy || modelChanging || projectBusy.current) return;
+    if ((!prompt.trim()&&!attachments.items.length) || attachments.busy || startBusy.current || state.busy || modelChanging || projectBusy.current) return;
     startBusy.current=true;setSending(true);bottom.current=true;setNotice('');
     try {
       // Choosing a directory never implicitly runs a draft against that project.
-      if (!state.project) {await pick();return;}
+      if (!state.project) {const picked=await pick();if(picked&&attachments.items.length)await attachments.moveTo('main.'+draftKey+'.'+(picked.workspace_owner||picked.session_id));return;}
       const submitted=prompt;
       const commands=checks.split('\n').map(x=>x.trim()).filter(Boolean);
       setCheckOptionsOpen(false);
-      const result=await perform('task.start',{prompt:submitted,checks:commands,repair_attempts:commands.length&&state.settings?.mode==='code'?repairAttempts:0});
-      if(result) setPrompt(current=>current===submitted?'':current);
+      const result=await perform('task.start',{prompt:submitted,attachments:attachments.items,checks:commands,repair_attempts:commands.length&&state.settings?.mode==='code'?repairAttempts:0});
+      if(result) {setPrompt(current=>current===submitted?'':current);await attachments.clear();}
     } finally {startBusy.current=false;setSending(false);}
   };
-  const chooseModel = async (choice:string) => {
+  const chooseModel = async (choice:string,keepOpen=false) => {
     if(modelChanging||state.busy||projectBusy.current)return false;
     setModelChanging(true);setModelSelectionError('');
     try {
-      if(state.project) {await invoke('model.use',{choice});await refresh();}
+      if(state.project) {await invoke('model.use',{choice,project_id:state.project_id,session_id:state.session_id});await refresh();}
       else {setConfig(await invoke('config.default',{id:choice}));}
-      setModelPickerOpen(false);setSettingsOpen(false);setNotice('模型已切换。');return true;
+      if(!keepOpen)setModelPickerOpen(false);setSettingsOpen(false);setNotice('模型已切换。');return true;
     } catch(e) {setModelSelectionError(String(e));return false;}
+    finally{setModelChanging(false);}
+  };
+  const chooseEffort=async(effort:string)=>{
+    if(modelChanging||state.busy||projectBusy.current)return;
+    setModelChanging(true);setModelSelectionError('');
+    try {
+      if(state.project){await invoke('model.reasoning',{effort,project_id:state.project_id,session_id:state.session_id});await refresh();}
+      else setConfig(await invoke('config.reasoning',{id:config.defaultId,effort}));
+      return true;
+    }catch(e){setModelSelectionError(String(e));return false;}
     finally{setModelChanging(false);}
   };
   const choosePermission = async (mode:string) => {
@@ -199,7 +240,7 @@ function App() {
     const session=state.session_id,project=state.project,backend=state.backend_id;
     historyBusy.current=true;setHistoryLoading(true);
     try {
-      const result=await invoke('session.messages',{id:session,before,preview:true});
+      const result=await invoke('session.messages',{id:session,before,preview:true,project_id:state.project_id,session_id:session});
       if(latest.current.session_id!==session||latest.current.project!==project||latest.current.backend_id!==backend)return;
       bottom.current=false;setFollowing(false);setOlder(old=>[...result.messages,...old].slice(0,150));setCursor(result.before);
     } catch(e){if(latest.current.session_id===session)setError(String(e));}
@@ -225,7 +266,7 @@ function App() {
     window.addEventListener('resize',fit);
     return()=>window.removeEventListener('resize',fit);
   },[prompt,empty,navCollapsed,detailsOpen]);
-  const permissionHint=state.approval_mode==='full-access'?'完全访问仅对本次打开的项目生效':state.approval_mode==='accept-edits'?'自动批准文件修改，命令仍需确认':'需要授权的操作逐次确认';
+  const permissionHint=state.approval_mode==='full-access'?'完全访问仅对当前会话生效':state.approval_mode==='accept-edits'?'自动批准文件修改，命令仍需确认':'需要授权的操作逐次确认';
   const modelSource = state.project
     ? (state.settings?.source==='desktop'
       ? (state.model_selection?.choice==='default'?'桌面默认':'项目指定连接')+' · '+(state.model_selection?.name||'')
@@ -234,12 +275,11 @@ function App() {
   const projectName = state.project?.split(/[\\/]/).pop();
   const activeSession=state.sessions.find((session:any)=>session.id===state.session_id);
   const sessionTitle=activeSession?.title&&activeSession.title!=='New session'?activeSession.title:'新任务';
-  const filteredSessions=state.sessions.filter((session:any)=>(session.title==='New session'?'新会话':session.title).toLowerCase().includes(sessionSearch.toLowerCase()));
   const verificationStatus=state.suite?.status||state.verification?.status||'not_run';
   const stopReasons:Record<string,string>={repair_budget_exhausted:'已达到本次自动修复次数，失败记录已保留。',repeated_failure_same_source:'相同代码再次出现相同失败，已停止重复尝试。',unsafe_to_retry:'执行结果不确定或未获授权，未自动重试。'};
   const inspector = <>
     <div className="tabs" role="tablist" aria-label="任务详情">
-      {[['changes','修改'],['checks','验证'],['tasks','进度'],['usage','用量']].map(([id,text]) =>
+      {[['changes','文件修改'],['checks','检查结果']].map(([id,text]) =>
         <button key={id} id={'tab-'+id} role="tab" aria-selected={sideTab===id} aria-controls={'panel-'+id}
           className={sideTab===id?'active':''} onClick={()=>setSideTab(id)}>{text}{id==='changes'&&state.changes.length>0&&<span className="count">{state.changes.length}</span>}</button>)}
     </div>
@@ -269,45 +309,27 @@ function App() {
         </div>
         {!!state.change_impact?.length&&<details className="impact-review"><summary>回归检查建议 · {state.change_impact.length} 个文件</summary><p className="fine-print">根据 Python 代码变化生成的线索；不代表已经验证，也不覆盖所有调用关系。</p>{state.change_impact.slice(-6).map((item:any)=><div key={item.path}><strong>{item.path}</strong><p>{item.risks.includes('transaction_mode')?'事务设置发生变化：检查调用方的提交、回滚及拒绝操作后数据是否保持不变。':'公共代码发生变化：检查调用方、异常行为和相关回归测试。'}{item.symbols.length>0&&` 涉及：${item.symbols.join('、')}`}</p></div>)}</details>}
       </>}
-      {sideTab==='tasks'&&<>
+      <details className="review-extra"><summary>任务与活动</summary>
         <div className="panel-label">任务清单</div>
         {!state.tasks.length&&<EmptyState icon={<ListChecks size={25} weight="light"/>} title="等待任务计划">ECA 制定计划后，可以在这里跟踪进度。</EmptyState>}
         {state.tasks.map((t:any,i:number)=><div className="task-row" key={i}><span>{t.status==='completed'?'✓':'·'}</span><span>{t.content}</span><small>{({completed:'已完成',in_progress:'进行中',pending:'待处理'} as Record<string,string>)[t.status]||t.status}</small></div>)}
         <div className="panel-label verification-label">执行活动</div>
         {state.events.filter((event:any)=>!['text','usage','model_activity'].includes(event.event)).slice(-30).reverse().map((event:any)=><LazyDetail className="activity" key={event.seq} title={event.event==='subagent_progress'?'子 Agent 活动':({tool:'工具调用',result:'工具返回',request_start:'模型请求',request_end:'请求结束',notice:'运行提示',verification_suite:'验证结果',verification_progress:'验证进度',turn:'新一轮处理'} as Record<string,string>)[event.event]||event.event} text={shorten(typeof event.data==='string'?event.data:JSON.stringify(event.data,null,2),10000)}/>)}
-      </>}
-      {sideTab==='usage'&&<>
+      </details>
+      <details className="review-extra"><summary>用量</summary>
         <div className="panel-label">当前会话、子任务与侧聊</div>
         <div className="metric"><span>模型请求</span><strong>{usage.requests||0}</strong></div>
         <div className="metric"><span>已报告 tokens</span><strong>{tokens.toLocaleString()}</strong></div>
         <div className="metric"><span>费用</span><strong>{!prices.length?'未知':prices.map(([currency,value])=>currency+' '+value).join(' / ')}</strong></div>
         {usage.incomplete_cost_requests>0&&<p className="muted">{usage.incomplete_cost_requests} 次请求缺少完整计价依据，已知金额仅为小计。</p>}
         <p className="fine-print">费用基于服务商用量与项目定价配置，不是账单。</p>
-      </>}
+      </details>
     </div>
     <button className="diagnose" onClick={async()=>{const result=await perform('diagnostics');if(result)setDiagnostic(result);}} disabled={!state.project}><ArrowClockwise size={15}/>检查项目环境</button>
   </>;
   return <div className={'eca-app workspace'+(state.project&&detailsOpen?' with-inspector':'')+(navCollapsed?' nav-collapsed':'')}>
-    <aside className="sidebar">
-      <div className="brand"><img src="./logo.png" alt="ECA"/><strong>ECA</strong><span>Desktop</span><span className="preview">预览</span></div>
-      <button className="open-project" onClick={pick} disabled={state.busy||sending||projectChanging}><FolderOpen size={18}/>打开项目<Plus size={15}/></button>
-      <div className="section-heading">项目</div>
-      {state.project&&<div className="project-current" title={state.project}><FolderOpen size={16}/><span>{projectName}</span></div>}
-      {!state.project&&!config.recent.length&&<p className="nav-empty">打开一个文件夹，<br/>从你的代码开始。</p>}
-      {config.recent.filter((p:string)=>p!==state.project).slice(0,4).map((p:string)=>
-        <button className="recent" key={p} title={p} disabled={state.busy||sending||projectChanging} onClick={()=>perform('project.recent',{index:config.recent.indexOf(p)})}><FolderOpen size={15}/><span>{p.split(/[\\/]/).pop()}</span></button>)}
-      <div className="section-heading session-heading">会话<button className="icon-button" aria-label="新建会话" title="新建会话" disabled={!state.project||state.busy||sending||projectChanging} onClick={()=>perform('session.switch')}><Plus size={17}/></button></div>
-      <label className="session-search"><MagnifyingGlass size={14}/><input aria-label="搜索会话" placeholder="搜索会话" value={sessionSearch} onChange={e=>setSessionSearch(e.target.value)}/>{sessionSearch&&<button className="icon-button" aria-label="清除会话搜索" onClick={()=>setSessionSearch('')}><X size={12}/></button>}</label>
-      <nav className="session-list" aria-label="历史会话">
-        {!state.sessions.length&&<p className="nav-empty">任务记录会保存在项目中，<br/>下次可以继续。</p>}
-        {sessionSearch&&!filteredSessions.length&&<p className="nav-empty">没有匹配的会话<br/><button className="text-link" onClick={()=>setSessionSearch('')}>清除搜索</button></p>}
-        {filteredSessions.map((s:any)=><button key={s.id} title={s.title} className={s.id===state.session_id?'selected':''} aria-current={s.id===state.session_id?'page':undefined} disabled={state.busy||sending||projectChanging} onClick={()=>perform('session.switch',{id:s.id})}><ChatCircle size={16}/><span>{s.title==='New session'?'新会话':s.title}</span></button>)}
-      </nav>
-      <div className="sidebar-bottom">
-        <button className="settings-button" onClick={()=>setSettingsOpen(true)}><GearSix size={18}/><span>模型与设置</span>{config.credential_configured&&<span className="connection-dot" title="已配置密钥"/>}</button>
-        <footer><span>本地工作空间</span><span>{config.version||'预览版'}</span></footer>
-      </div>
-    </aside>
+    <Sidebar state={state} config={config} blocked={sending||projectChanging||modelChanging||permissionChanging}
+      onPick={pick} onRecent={index=>void perform('project.recent',{index})} onSession={(id,project_id)=>void perform('session.switch',{id,project_id:project_id||state.project_id})} onClose={project_id=>void perform('project.close',{project_id})} onSettings={()=>setSettingsOpen(true)}/>
     <main className="conversation">
       <header className="conversation-header">
         <button className="icon-button nav-toggle" aria-label={navCollapsed?'展开导航':'收起导航'} aria-expanded={!navCollapsed} onClick={()=>setNavCollapsed(!navCollapsed)}><SidebarSimple size={18}/></button>
@@ -323,14 +345,15 @@ function App() {
           {empty?<Welcome project={projectName} choosing={projectChanging||sending} onProject={pick} onDraft={value=>{setPrompt(value);promptInput.current?.focus();}}/>:<div className="messages">
             {(cursor??state.message_total-50)>0&&<button className="load-older" disabled={historyLoading} onClick={loadOlder}>{historyLoading?'正在加载…':'加载更早的消息'}</button>}
             {older.length>=150&&<p className="fine-print">历史记录分段显示；继续加载查看更早内容。</p>}
-            <Transcript messages={messages} sessionId={state.session_id} root={state.project||''} busy={state.busy}/>
+            <Transcript key={viewKey} projectId={state.project_id} messages={messages} sessionId={state.session_id} root={state.project||''} busy={state.busy} agents={state.children} onOpenAgent={agent=>{setDetailsOpen(true);setAgentView(old=>({id:agent.id,nonce:(old?.nonce||0)+1}));}}/>
+            {(state.children||[]).some((agent:ChildAgent)=>!agent.parent_call_id)&&<section aria-label="历史子任务"><p className="fine-print">其他子任务记录</p><AgentCards agents={state.children.filter((agent:ChildAgent)=>!agent.parent_call_id)} onOpen={agent=>{setDetailsOpen(true);setAgentView(old=>({id:agent.id,nonce:(old?.nonce||0)+1}));}}/></section>}
             {older.length>0&&<button className="log-more" onClick={()=>{setOlder([]);setCursor(null);bottom.current=true;setFollowing(true);if(scroll.current)scroll.current.scrollTop=scroll.current.scrollHeight;}}>返回最近记录</button>}
           </div>}
           {state.stream&&<article className="message assistant live"><div className="message-label">ECA <span>正在输出</span></div><div className="stream-text">{state.stream}</div></article>}
         </div>
         <div className="composer-wrap">
           {!following&&!empty&&<div className="scroll-return"><button className="jump-latest" onClick={()=>{bottom.current=true;setFollowing(true);scroll.current?.scrollTo({top:scroll.current.scrollHeight});}}><ArrowDown size={14}/>回到最新</button></div>}
-          {state.busy&&!waiting&&<Activity state={state}/>}
+          {state.busy&&!waiting&&<RunActivity state={state} stopping={stopping}/>}
           {waiting&&<section className="approval" role="region" aria-label="等待确认">
             <div className="eyebrow">{waiting.kind==='approval'?'需要你的授权':'ECA 有一个问题'}</div><h3>{waiting.message}</h3>
             {waiting.detail&&<div className="approval-detail"><LogText text={waiting.detail}/></div>}
@@ -338,8 +361,8 @@ function App() {
               :<form onSubmit={e=>{e.preventDefault();void reply(answer);setAnswer('');}}><input aria-label="回答" value={answer} onChange={e=>setAnswer(e.target.value)}/><button className="primary" type="submit" disabled={answered===waiting.id}>发送回答</button></form>}
           </section>}
           {empty&&<div className="composer-context"><button onClick={pick} disabled={projectChanging||sending} title={state.project||'选择项目文件夹'} aria-label="选择任务项目"><FolderOpen size={15}/><span>{projectName||'选择项目'}</span><CaretDown size={11}/></button><span className="local-context"><Desktop size={14}/>本地工作区</span></div>}
-          <div className="composer">
-            <textarea rows={3} ref={promptInput} id="prompt" aria-label="任务指令" placeholder={state.project?'描述你想完成的事…':'写下想法，稍后选择项目…'} value={prompt} onChange={e=>setPrompt(e.target.value)}
+          <div className="composer" {...attachments.events}>{attachments.preview}
+            <textarea rows={3} ref={promptInput} id="prompt" aria-label="任务指令" disabled={projectChanging} placeholder={state.project?'描述你想完成的事…':'写下想法，稍后选择项目…'} value={prompt} onChange={e=>setPrompt(e.target.value)}
               onCompositionStart={()=>{composing.current=true;}}
               onCompositionEnd={()=>{composing.current=false;compositionEndedAt.current=performance.now();}}
               onKeyDown={e=>{
@@ -349,14 +372,14 @@ function App() {
                 if(!e.repeat)void start();
               }}/>
             <div className="composer-toolbar">
-              <div className="composer-options">
+              <div className="composer-options">{attachments.button}
               <TaskVerification open={checkOptionsOpen} onOpenChange={setCheckOptionsOpen} checks={checks} attempts={repairAttempts} busy={state.busy} codeMode={state.settings?.mode==='code'} onChange={verificationDraft}/>
               {state.project&&<div className={'permission-control '+(state.approval_mode==='full-access'?'full-access':'')}><ShieldCheck size={14}/><select className={'permission-picker '+(state.approval_mode==='full-access'?'full-access':'')} aria-label="审批模式" title={permissionHint} value={state.approval_mode||'ask'} disabled={permissionChanging||projectChanging} onChange={e=>e.target.value==='full-access'?setConfirmFull(true):void choosePermission(e.target.value)}>{Object.entries(permissionLabels).map(([value,text])=><option key={value} value={value}>{text}</option>)}</select></div>}
               </div>
               <div className="composer-actions">
-              <button className="model-chip" title={modelSource} disabled={state.busy||sending||modelChanging||projectChanging} onClick={()=>{setModelSelectionError('');setModelPickerOpen(true);}}><span className={model?'connection-dot':'status-dot'}/><span>{model||'配置模型'}</span>{model?.toLowerCase().startsWith('deepseek')&&<span className="thinking-badge">{thinkingLabels[(state.project?state.settings?.thinking_mode:config.model?.thinking_mode)||'default']}</span>}<CaretDown size={13}/></button>
+              <button ref={modelButton} className="model-chip" aria-label="主对话模型" aria-haspopup="dialog" aria-expanded={modelPickerOpen} title={modelSource} disabled={state.busy||sending||projectChanging} onClick={()=>{setModelSelectionError('');setModelPickerOpen(v=>!v);}}><span className={model?'connection-dot':'status-dot'}/><span>{model||'配置模型'}</span>{model&&<span className="thinking-badge">{effortLabels[(state.project?state.settings?.reasoning:config.model?.reasoning)?.value]||'默认'}</span>}<CaretDown size={13}/></button>
               {state.busy?<button className="stop-button" disabled={stopping} onClick={()=>{setStopping(true);void perform('task.cancel',{run_id:state.run_id}).then(result=>{if(!result)setStopping(false);});}}><Stop size={13} weight="fill"/>{stopping?'正在停止':'停止'}</button>
-                :<button className="send-button" aria-label="发送任务" title={state.project?'发送任务 · Enter':'选择项目后确认发送'} disabled={!prompt.trim()||sending||modelChanging||projectChanging} onClick={start}>{!state.project&&<span>{sending?'正在打开…':'选择项目并继续'}</span>}<ArrowUp size={17}/></button>}
+                :<button className="send-button" aria-label="发送任务" title={state.project?'发送任务 · Enter':'选择项目后确认发送'} disabled={(!prompt.trim()&&!attachments.items.length)||attachments.busy||sending||modelChanging||projectChanging} onClick={start}>{!state.project&&<span>{sending?'正在打开…':'选择项目并继续'}</span>}<ArrowUp size={17}/></button>}
               </div>
             </div>
           </div>
@@ -365,10 +388,10 @@ function App() {
         </div>
       </div>
     </main>
-    {state.project&&<Workspace key={state.session_id} state={state} config={config} review={inspector} open={detailsOpen} onOpen={setDetailsOpen} narrow={narrow} blocked={!!(settingsOpen||modelPickerOpen||confirmFull||diff||diagnostic||waiting||checkOptionsOpen)} onDraft={(text:string)=>{setPrompt(p=>p?p+'\n\n'+text:text);setNotice('已放入主对话草稿，确认后发送。');promptInput.current?.focus();}}/>}
-    {modelPickerOpen&&<ModelPicker config={config} state={state} busy={state.busy||modelChanging} error={modelSelectionError} onClose={()=>setModelPickerOpen(false)} onChoose={chooseModel} onManage={()=>{setModelPickerOpen(false);setSettingsOpen(true);}}/>}
+    {state.project&&<Workspace key={viewKey} agentView={agentView} state={state} config={config} review={inspector} open={detailsOpen} onOpen={setDetailsOpen} narrow={narrow} blocked={!!(settingsOpen||modelPickerOpen||confirmFull||diff||diagnostic||waiting||checkOptionsOpen)} onDraft={(text:string)=>{setPrompt(p=>p?p+'\n\n'+text:text);setNotice('已放入主对话草稿，确认后发送。');promptInput.current?.focus();}}/>}
+    {modelPickerOpen&&<ModelMenu anchor={modelButton} label="选择模型" connections={config.connections||[]} recent={config.recentModels||[]} selectedId={state.project?state.model_selection?.connection_id:config.defaultId} reasoning={state.project?state.settings?.reasoning:config.model?.reasoning} busy={state.busy||modelChanging} error={modelSelectionError} onClose={()=>setModelPickerOpen(false)} onChoose={id=>chooseModel(id,true)} onEffort={chooseEffort} onManage={()=>{setModelPickerOpen(false);setSettingsOpen(true);}} special={state.project?[{id:'default',label:'跟随桌面默认',selected:state.model_selection?.choice==='default',disabled:!config.defaultId},{id:'project',label:'沿用项目配置',selected:state.model_selection?.choice==='project'}]:[]}/>}
     <ModelSettings open={settingsOpen} config={config} state={state} onConfig={setConfig} onClose={()=>setSettingsOpen(false)} onUse={chooseModel}/>
-    {confirmFull&&<Dialog title="开启完全访问" closeLabel="取消完全访问" onClose={()=>setConfirmFull(false)}><p>在当前项目中自动批准文件修改、命令、联网及外部工具操作，也会放行正在等待的授权。</p><p>命令按当前系统账户权限执行，可能访问项目外文件和网络；不会获得管理员权限。文件工具仍保留路径和冲突检查，已有沙箱及只读模式继续生效。</p><p className="fine-print">仅本次打开项目有效，重新打开后恢复项目审批设置。随时可切回逐次确认；已执行的操作不会因此撤销。</p><div className="actions"><button onClick={()=>setConfirmFull(false)}>取消</button><button className="primary" disabled={permissionChanging} onClick={()=>choosePermission('full-access')}>开启完全访问</button></div></Dialog>}
+    {confirmFull&&<Dialog title="开启完全访问" closeLabel="取消完全访问" onClose={()=>setConfirmFull(false)}><p>在当前会话中自动批准文件修改、命令、联网及外部工具操作，也会放行本会话正在等待的授权。</p><p>命令按当前系统账户权限执行，可能访问项目外文件和网络；不会获得管理员权限。文件工具仍保留路径和冲突检查，已有沙箱及只读模式继续生效。</p><p className="fine-print">不会改变其他会话的审批模式。重新打开项目后恢复项目审批设置；已执行的操作不会因切回逐次确认而撤销。</p><div className="actions"><button onClick={()=>setConfirmFull(false)}>取消</button><button className="primary" disabled={permissionChanging} onClick={()=>choosePermission('full-access')}>开启完全访问</button></div></Dialog>}
     {diff&&<Dialog title={diff.path} name="文件差异" closeLabel="关闭差异" wide onClose={()=>setDiff(null)}><pre className="diff">{diff.diff.split('\n').map((line:string,i:number)=><span key={i} className={line.startsWith('+')?'added':line.startsWith('-')?'removed':''}>{line}{'\n'}</span>)}</pre></Dialog>}
     {diagnostic&&<Dialog title="项目环境" name="环境检查" closeLabel="关闭环境检查" onClose={()=>setDiagnostic(null)}>{diagnostic.checks.map((item:any,i:number)=><div className="diagnostic" key={i}><strong>{item.name} · {item.status}</strong><p>{item.message}</p></div>)}</Dialog>}
   </div>;

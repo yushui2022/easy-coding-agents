@@ -206,7 +206,7 @@ async function launch(){
   await capture('desktop-model-connections.png');
   await page.getByRole('button',{name:'用于当前项目',exact:true}).click();
   await expect(page.locator('.model-chip')).toContainText('fixture-secondary');
-  await page.getByRole('button',{name:'新建会话'}).click();
+  await page.getByRole('button',{name:'新建会话',exact:true}).click();
   await expect(page.locator('.model-chip')).toContainText('fixture-secondary');
   await page.reload();
   await expect(page.locator('.model-chip')).toContainText('fixture-secondary');
@@ -216,11 +216,12 @@ async function launch(){
   await page.locator('.model-chip').click();
   await page.getByRole('button',{name:'沿用项目配置',exact:false}).click();
   await expect(page.locator('.model-chip')).toContainText('Qwen/old-project-model');
-  await page.getByRole('button',{name:'新建会话'}).click();
+  await page.getByRole('button',{name:'新建会话',exact:true}).click();
   await expect(page.locator('.model-chip')).toContainText('Qwen/old-project-model');
   await page.locator('.model-chip').click();
   await page.getByRole('button',{name:'跟随桌面默认',exact:false}).click();
-  await expect(page.locator('.model-chip')).toHaveText('fixture');
+  await expect(page.locator('.model-chip')).toContainText('fixture');
+  await page.keyboard.press('Escape');
   await page.locator('.model-chip').click();
   await capture('desktop-model-picker.png');
   await page.keyboard.press('Escape');
@@ -229,13 +230,15 @@ async function launch(){
   report.multiple_connections_and_project_pin='passed';
   report.explicit_project_configuration='passed';
   report.model_catalogue_requests=catalogueRequests;
+  await page.getByRole('button',{name:'任务详情',exact:true}).click();
+  await page.getByRole('button',{name:'审查',exact:true}).click();
   // The narrow workspace replaces the main pane; Escape returns to the chat.
   await application.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setSize(900,680));
   await expect(page.locator('.workspace-panel')).toBeVisible();
   await expect(page.locator('.conversation')).toBeHidden();
-  await page.getByRole('tab',{name:'用量',exact:true}).click();
+  await page.locator('.review-extra summary').filter({hasText:'用量'}).click();
   await expect(page.locator('.metric').last()).toContainText('未知');
-  await page.getByRole('tab',{name:'修改',exact:true}).click();
+  await page.getByRole('tab',{name:'文件修改',exact:true}).click();
   await capture('desktop-narrow-details.png');
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button',{name:'任务详情',exact:true})).toBeFocused();
@@ -341,13 +344,15 @@ async function launch(){
   page=await launch();
   await page.getByRole('button',{name:'打开项目',exact:false}).first().click();
   await expect(page.locator('.messages')).toContainText('创建 hello.txt');
+  await page.getByRole('button',{name:'任务详情',exact:true}).click();
+  await page.getByRole('button',{name:'审查',exact:true}).click();
   await expect(page.locator('.change-bottom')).toContainText('已审查');
   report.resume='passed';
   await expect(page.getByLabel('审批模式')).toHaveValue('ask');
   report.full_access_resets_on_reopen='passed';
   // A real failed shell check triggers one model repair and a complete rerun.
   repairFixture=true;
-  await page.getByRole('button',{name:'新建会话'}).click();
+  await page.getByRole('button',{name:'新建会话',exact:true}).click();
   await page.getByLabel('审批模式').selectOption('full-access');
   await page.getByRole('button',{name:'开启完全访问',exact:true}).click();
   await page.locator('.checks>summary').click();
@@ -358,10 +363,11 @@ async function launch(){
   await page.locator('.checks>summary').click();
   await expect(page.getByLabel('验证命令')).toHaveValue(repairCheck);
   await expect(page.getByLabel('自动修复次数')).toHaveValue('1');
+  await page.getByRole('button',{name:'审查',exact:true}).click();
   await page.getByLabel('任务指令').fill('创建 repair.txt，内容为 fixed，并执行所选检查。');
   await page.getByRole('button',{name:'发送任务'}).click();
   await expect(page.locator('.verification>.passed')).toHaveText('所选检查通过',{timeout:30000});
-  await page.getByRole('tab',{name:'验证',exact:true}).click();
+  await page.getByRole('tab',{name:'检查结果',exact:true}).click();
   await expect(page.locator('.verification')).toContainText('第 1 轮 · 失败');
   await expect(page.locator('.verification')).toContainText('第 2 轮 · 通过');
   assert.equal(fs.readFileSync(path.join(project,'repair.txt'),'utf8'),'fixed');
@@ -381,6 +387,8 @@ async function launch(){
   while(requests.length===priorRequests && Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,20));
   assert(requests.length>priorRequests,'The request must reach the server before testing cancellation');
   await expect(page.locator('.run-activity')).toContainText('等待模型响应');
+  await page.locator('.activity-mark').evaluate(image=>image.decode());
+  await capture('desktop-activity-waiting.png');
   report.waiting_model_feedback='passed';
   const cancelStart=Date.now();
   await page.getByRole('button',{name:'停止',exact:true}).click();
@@ -393,7 +401,7 @@ async function launch(){
   await expect(page.getByRole('alert')).toContainText('401');
   report.model_error='passed';
   modelError=false;targetFile='denied.txt';
-  await page.getByRole('button',{name:'新建会话'}).click();
+  await page.getByRole('button',{name:'新建会话',exact:true}).click();
   await page.getByLabel('任务指令').fill('创建 denied.txt，内容为 hello。');
   await page.getByRole('button',{name:'发送任务'}).click();
   await expect(page.getByRole('button',{name:'本次允许'})).toBeVisible();

@@ -92,7 +92,7 @@ async function capture(name,selector) {
   await expect(page.locator('.welcome h1')).toBeVisible();
   await page.locator('.welcome-art').evaluate(image=>image.decode());
   await expect(page.getByRole('button',{name:'切换工作项目'})).toHaveText('场景 工作区');
-  await expect(page.locator('.model-chip')).toContainText('快速');
+  await expect(page.locator('.model-chip')).toContainText('关闭');
   await page.getByRole('button',{name:'了解项目',exact:true}).click();
   await expect(page.getByLabel('任务指令')).toHaveValue('梳理项目结构、运行方式和核心模块，先不要修改代码。');
   await expect(page.getByLabel('任务指令')).toBeFocused();

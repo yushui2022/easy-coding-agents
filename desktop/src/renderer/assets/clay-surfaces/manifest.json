@@ -1,0 +1,29 @@
+{
+  "generator": "built-in image_gen",
+  "textures": [
+    {
+      "file": "clay-chalk.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGB",
+      "bytes": 2911068,
+      "sha256": "c62d72db15768a483ad8bea4b56b0162339f2a03c53252a1ba7b92b1c9667daf"
+    },
+    {
+      "file": "clay-charcoal.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGB",
+      "bytes": 3172888,
+      "sha256": "6083e865e9a8d9f654bf8a0c394534bc05d6ef9d0db7ccab64fa7e91da47ef24"
+    },
+    {
+      "file": "clay-rose.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGB",
+      "bytes": 2980863,
+      "sha256": "9df87fcba77f7fb922e93644fbcf5e2dc600c5ee10990eb42cb5a1687605ea7e"
+    }
+  ]
+}

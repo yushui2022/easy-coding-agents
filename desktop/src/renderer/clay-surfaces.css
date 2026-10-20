@@ -1,0 +1,110 @@
+/* Material surfaces: static local grain, raised rims and recessed input wells.
+   Text and interaction stay native HTML. No animated texture, filters or blur. */
+:root {
+  --surface:#faf7f2;--canvas:#f8f5f0;--context-surface:#ebe3d8;
+  --action:#40372f;--on-action:#fffaf4;--panel:#f2ece3;
+  --text:#3c352f;--secondary:#665c51;--muted:#766a5e;
+  --border:#e3d9cd;--control-border:#cfc1af;--hover:#ede4d8;
+  --selected:#f5e5d9;--accent:#a94c2e;--accent-soft:#f5e2d5;--code:#efe9e1;
+  --shadow-control:0 2px 4px #5f493810;
+  --shadow-composer:0 10px 28px #6e4d3012,0 2px 5px #6e4d300a;
+  --shadow-dialog:0 24px 80px #3d2c2038;
+  --material-grain:url('./assets/clay-surfaces/clay-chalk.png');
+  --material-accent-grain:url('./assets/clay-surfaces/clay-rose.png');
+  /* Preserve visible clay pores instead of shrinking them into fine screen noise. */
+  --material-ground-size:1880px;--material-surface-size:1680px;
+  --material-accent-size:1470px;--material-field-size:1350px;
+  --material-veil:#faf6efb8;--material-ground-veil:#f3eee6bd;
+  --material-accent-veil:#efd4c263;--material-field-veil:#f7f1e7d4;
+  --material-rim:#ffffffa6;--material-bottom:#97735418;
+  --material-inset:inset 0 2px 4px #76563818,inset 0 -1px 1px #ffffffa6;
+  --material-raised:inset 0 1px 1px var(--material-rim),inset 0 -2px 3px var(--material-bottom),0 3px 8px #6246290d;
+}
+.eca-app .sidebar.clay-sidebar {
+  background-image:linear-gradient(var(--material-ground-veil),var(--material-ground-veil)),var(--material-grain);
+  background-size:auto,var(--material-ground-size);
+}
+.eca-app :is(.composer,.check-settings,.approval),
+.eca-app .clay-sidebar :is(.open-project,.project-current,.settings-glyph) {
+  background-color:var(--surface);
+  background-image:linear-gradient(var(--material-veil),var(--material-veil)),var(--material-grain);
+  background-size:auto,var(--material-surface-size);
+  box-shadow:var(--material-raised);
+}
+.eca-app .clay-sidebar .project-current {border-radius:14px;}
+.eca-app .clay-sidebar .session-list button.selected {
+  background-image:linear-gradient(var(--material-accent-veil),var(--material-accent-veil)),var(--material-accent-grain);
+  background-size:auto,var(--material-accent-size);
+  box-shadow:inset 0 1px 1px var(--material-rim),inset 0 -1px 2px var(--material-bottom);
+}
+.eca-app .clay-sidebar .session-search {box-shadow:var(--material-inset);border-color:var(--clay-line);}
+.eca-app .composer {border-color:var(--control-border);border-radius:24px;box-shadow:var(--material-raised),var(--shadow-composer);}
+.eca-app .composer:focus-within {box-shadow:var(--material-raised),var(--shadow-composer),0 0 0 1px var(--control-border);}
+.eca-app .composer textarea {padding:17px 18px 10px;background:#ffffff18;}
+.eca-app .composer-toolbar {padding-top:10px;border-top:1px solid color-mix(in srgb,var(--border) 70%,transparent);}
+.eca-app .composer-context {border:1px solid var(--border);box-shadow:var(--material-inset);}
+.eca-app .composer .send-button {background:#b76240;box-shadow:inset 0 1px 1px #ffffff54,inset 0 -2px 2px #5e2d2440,0 2px 4px #78553d20;}
+.eca-app .check-settings {border-radius:16px;box-shadow:var(--material-raised),var(--shadow-dialog);}
+.eca-app :is(.check-settings,.side-composer,.approval) :is(input,textarea,select) {
+  background:var(--surface);border-color:var(--control-border);border-radius:9px;box-shadow:var(--material-inset);
+}
+.eca-app .approval {border-radius:14px;}
+.eca-app .eca-dialog {border-color:var(--control-border);border-radius:18px;box-shadow:var(--material-raised),var(--shadow-dialog);}
+.eca-app .eca-dialog::backdrop {background:#33291f66;}
+.eca-app .eca-dialog.wide.model-settings {
+  --surface:#f8f4ed;--panel:#ede6db;--text:#3c352f;--secondary:#655b50;--muted:#63574b;
+  --hover:#e8dfd2;--selected:#e9dece;--border:#dfd3c3;--control-border:#c8b8a3;
+  --settings-button:#e9dfd1;
+  background-image:linear-gradient(var(--material-veil),var(--material-veil)),var(--material-grain);
+  background-size:auto,var(--material-surface-size);
+  border-radius:18px;box-shadow:var(--material-raised),var(--shadow-dialog);
+}
+.eca-app .eca-dialog.model-settings > header,
+.eca-app .eca-dialog.model-settings :is(.connection-sidebar,.model-settings-footer) {
+  background-color:var(--panel);
+  background-image:linear-gradient(var(--material-ground-veil),var(--material-ground-veil)),var(--material-grain);
+  background-size:auto,var(--material-surface-size);
+}
+.eca-app .eca-dialog.model-settings .connection-editor-footer {background:var(--surface);box-shadow:0 -1px 0 var(--material-rim);}
+.eca-app .eca-dialog.model-settings .field :is(input,select) {
+  background-color:var(--surface);
+  background-image:linear-gradient(var(--material-field-veil),var(--material-field-veil)),var(--material-grain);
+  background-size:auto,var(--material-field-size);
+  border-radius:9px;box-shadow:var(--material-inset);
+}
+.eca-app .eca-dialog.model-settings .connection-sidebar nav button.selected {
+  background-color:var(--selected);
+  background-image:linear-gradient(var(--material-accent-veil),var(--material-accent-veil)),var(--material-accent-grain);
+  background-size:auto,var(--material-accent-size);
+  border:1px solid var(--control-border);box-shadow:var(--material-raised);border-radius:11px;
+}
+.eca-app .eca-dialog.model-settings :is(.add-connection,.connection-actions button,.model-field button,.config-actions button) {border:1px solid var(--control-border);box-shadow:var(--material-raised);border-radius:9px;}
+.eca-app .eca-dialog.model-settings .config-actions .primary {background:#a55235;color:#fffaf3;border-color:#93482e;box-shadow:inset 0 1px 1px #ffffff40,inset 0 -2px 2px #5e2d2440,0 2px 4px #78553d20;}
+.eca-app .eca-dialog.model-settings .config-actions .primary:hover:not(:disabled) {opacity:1;background:#93482e;}
+.eca-app .eca-dialog.model-settings .connection-remove-confirm {box-shadow:var(--material-inset);}
+@media(prefers-color-scheme:dark) {
+  :root {
+    --surface:#2b2722;--canvas:#221f1b;--context-surface:#322b24;--action:#eee5d9;--on-action:#30251c;
+    --panel:#29241f;--text:#eee6dc;--secondary:#c9bcae;--muted:#b3a28f;--border:#443b31;
+    --control-border:#62513e;--hover:#3b3128;--selected:#48362b;--accent:#efa17e;--accent-soft:#443027;--code:#211d19;
+    --material-grain:url('./assets/clay-surfaces/clay-charcoal.png');
+    --material-accent-grain:var(--material-grain);
+    --material-veil:#302a23b8;--material-ground-veil:#211c17d1;
+    --material-accent-veil:#693d28ad;--material-field-veil:#1d1914cc;
+    --material-rim:#d9b58c14;--material-bottom:#0806034d;
+    --material-inset:inset 0 2px 4px #08060366,inset 0 -1px 1px #c9a58017;
+    --shadow-control:0 2px 4px #08060333;--shadow-composer:0 10px 28px #08060333,0 2px 5px #08060329;
+    --shadow-dialog:0 24px 80px #08060380;
+  }
+  .eca-app .composer textarea {background:#00000008;}
+  .eca-app .composer .send-button {background:#b76240;color:#fffaf3;}
+  .eca-app .eca-dialog.wide.model-settings {
+    --surface:#2c2721;--panel:#231e19;--text:#eee6dc;--secondary:#c9bcae;--muted:#b3a28f;
+    --hover:#3a3026;--selected:#463427;--border:#463b2d;--control-border:#62513e;--settings-button:#3b3025;
+  }
+}
+@media(forced-colors:active) {
+  .eca-app :is(.clay-sidebar,.composer,.check-settings,.approval,.eca-dialog),
+  .eca-app .clay-sidebar :is(button,.project-current,.settings-glyph),
+  .eca-app .eca-dialog.model-settings :is(.connection-sidebar,header,.model-settings-footer,button,input,select) {background-image:none;box-shadow:none;}
+}

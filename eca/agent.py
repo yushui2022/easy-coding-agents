@@ -103,27 +103,36 @@ class Agent:
         state = self.store.create(mode)
         state.update(model_profile=settings.model_profile, parent_id=self.state['id'], billing_root=self.state.get('billing_root',self.state['id']),
                      usage_tracking_complete=self.state.get('usage_tracking_complete',True))
+        from .child_activity import origin, progress
+        state.update(origin(self, task, settings), status='running')
         self.store.save(state)
         self.state.setdefault('children',[]).append(state['id'])
         self.store.save(self.state)
         self.emit('subagent', {'id':state['id'],'mode':mode,'status':'running'})
+        progress(self, state, 'status', 'running')
         def child_emit(event,data):
-            if event in {'notice','error','tool','result','diff','usage'}:
-                self.emit(event,data)
-        child = Agent(settings,self.store,state,self.tools.approve,self.tools.question,child_emit,child=True)
-        child.budget = self.budget
+            progress(self, state, event, data)
+        child = None
         try:
+            child = Agent(settings,self.store,state,self.tools.approve,self.tools.question,child_emit,child=True)
+            child.budget = self.budget
             await asyncio.wait_for(child.run(task),timeout=self.settings.subagent_timeout)
         except TimeoutError:
             state['status']='timeout'
             state['stop_reason']='Subagent time limit reached; inspect changes before continuing.'
         except asyncio.CancelledError:
+            state.update(status='interrupted', stop_reason='Parent cancelled; child stopped')
             raise
         except Exception as exc:
+            state['status'] = 'error'
             state['stop_reason']=f'Subagent failed: {type(exc).__name__}'
         finally:
-            await child.close()
-            self.store.save(state)
+            try:
+                if child is not None:
+                    await child.close()
+            finally:
+                self.store.save(state)
+                progress(self, state, 'status', state['status'])
         summary = next((m.get('content') or '' for m in reversed(state['messages']) if m['role']=='assistant' and not m.get('tool_calls')), '')
         result = dict(session=state['id'],status=state['status'],model_profile=settings.model_profile,summary=summary[:self.settings.output_limit//2],
                       stop_reason=state.get('stop_reason'),notice='Child report is not independently verified. Review child session changes before accepting.')
@@ -232,7 +241,7 @@ If execution was interrupted, inspect the actual state before repeating mutation
             self.emit("notice", f"Context window omitted {trimmed} old messages; full history remains on disk. Use /compact for a summary.")
         return [{"role": "system", "content": system}, *messages]
 
-    async def run(self, prompt):
+    async def run(self, prompt, attachments=None):
         if self.busy:
             raise RuntimeError("A turn is already running")
         if self.resume_pending or self.state.get('status') in {'interrupted', 'error', 'limit', 'timeout'}:
@@ -245,7 +254,7 @@ If execution was interrupted, inspect the actual state before repeating mutation
         self.child_calls = 0
         self.tools.guidance_seen.clear()
         self.tools.guidance_pending.clear()
-        self.state["messages"].append({"role": "user", "content": prompt})
+        self.state["messages"].append({"role": "user", "content": prompt, **({"attachments": attachments} if attachments else {})})
         if self.state["title"] == "New session":
             self.state["title"] = prompt[:80].replace("\n", " ")
         self.state["status"] = "running"
@@ -320,6 +329,11 @@ If execution was interrupted, inspect the actual state before repeating mutation
                         self.emit("tool", {"name": name, "args": args})
                         action_id = self.store.begin(self.state["id"], tc["id"], name, args)
                         fingerprint = self.memory().fingerprint() if name == "shell" and self.settings.project_memory else None
+                        self.active_call_id = tc['id']
+                        self.active_message_index = len(self.state['messages']) - 1
+                        # Earlier calls in the same assistant message may already have results.
+                        while self.active_message_index >= 0 and self.state['messages'][self.active_message_index]['role'] == 'tool':
+                            self.active_message_index -= 1
                         try:
                             result = await self.tools.execute(name, args)
                         except asyncio.CancelledError:
@@ -327,6 +341,8 @@ If execution was interrupted, inspect the actual state before repeating mutation
                             raise
                         except Exception as exc:
                             result = f"Tool failed: {type(exc).__name__}: {exc}"
+                        finally:
+                            self.active_call_id = self.active_message_index = None
                         self.store.finish(action_id, result)
                         if name == "shell" and self.settings.project_memory:
                             self.memory().record_test(args.get("command", ""), result, self.state["id"], action_id, fingerprint)

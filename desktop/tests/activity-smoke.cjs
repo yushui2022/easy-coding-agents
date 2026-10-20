@@ -1,0 +1,50 @@
+// Actual installed/packaged app, isolated project and local model. No user window/API.
+const {_electron:electron,expect}=require('@playwright/test');
+const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');
+process.chdir(path.resolve(__dirname,'..'));
+const base='G:/DevCache/Temp/easy-coding-agents',home=fs.mkdtempSync(path.join(base,'activity-smoke-'));
+const project=path.join(home,'运行状态 项目');fs.mkdirSync(project);
+fs.writeFileSync(path.join(project,'eca.toml'),'[agent]\nproject_memory=false\nauto_compact=false\nnetwork_retries=0\n');
+const output=path.resolve('../output/playwright/activity');fs.mkdirSync(output,{recursive:true});
+let app,requests=0;const sockets=new Set(),errors=[];
+const server=http.createServer(async req=>{for await(const _ of req){}requests++;});
+server.on('connection',s=>{sockets.add(s);s.on('close',()=>sockets.delete(s));});
+(async()=>{
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));
+  const env={...process.env};
+  for(const name of Object.keys(env))if(name.startsWith('ECA_')||/API_KEY|API_BASE|BASE_URL|MODEL_NAME|PYTHONHOME|PYTHONPATH/.test(name))delete env[name];
+  Object.assign(env,{TEMP:base,TMP:base,ECA_DESKTOP_TEST_HIDDEN:'1',ECA_DESKTOP_DATA_HOME:path.join(home,'app'),ECA_PYTHON:path.resolve('.venv/Scripts/python.exe'),NO_PROXY:'127.0.0.1,localhost',no_proxy:'127.0.0.1,localhost'});
+  delete env.ELECTRON_RUN_AS_NODE;
+  app=await electron.launch(process.env.ECA_TEST_EXE?{executablePath:process.env.ECA_TEST_EXE,args:[],env}:{args:['.'],env});
+  const page=await app.firstWindow();page.on('pageerror',e=>errors.push(String(e)));
+  await app.evaluate(({BrowserWindow,dialog},folder)=>{const w=BrowserWindow.getAllWindows()[0];w.setContentSize(1280,880);w.webContents.setBackgroundThrottling(false);dialog.showOpenDialog=async()=>({canceled:false,filePaths:[folder]});},project);
+  const invoke=(method,params={})=>page.evaluate(([method,params])=>window.eca.invoke(method,params),[method,params]);
+  const saved=await invoke('config.save',{model:'deepseek-flash',name:'本地测试',api_format:'openai',base_url:`http://127.0.0.1:${server.address().port}/v1`,no_auth:true});
+  await invoke('config.default',{id:saved.savedId});await page.getByRole('button',{name:'打开项目',exact:true}).click();
+  await expect.poll(async()=>(await invoke('snapshot')).project).toBe(project);
+  await page.getByLabel('任务指令').fill('检查运行状态与停止反馈');
+  await expect(page.getByRole('button',{name:'发送任务',exact:true})).toBeEnabled();
+  await page.getByLabel('任务指令').press('Enter');
+  await expect.poll(()=>requests).toBe(1);
+  await expect(page.locator('.activity-title')).toHaveText('等待模型响应');
+  const dimensions=await page.locator('.activity-mark').evaluate(async image=>{await image.decode();return [image.naturalWidth,image.naturalHeight];});
+  assert.deepEqual(dimensions,[1254,1254]);
+  await page.getByRole('button',{name:'展开运行详情'}).focus();await page.keyboard.press('Enter');
+  await expect(page.locator('.activity-detail')).toContainText('请求已发出');
+  await page.getByRole('button',{name:'收起运行详情'}).click();
+  const mode=process.env.ECA_TEST_MODE||(process.env.ECA_TEST_EXE?'packaged':'development');
+  const png=await app.evaluate(async({BrowserWindow})=>{
+    const wc=BrowserWindow.getAllWindows()[0].webContents;
+    await wc.capturePage(undefined,{stayHidden:true,stayAwake:true});await new Promise(r=>setTimeout(r,220));
+    return (await wc.capturePage(undefined,{stayHidden:true,stayAwake:true})).toPNG().toString('base64');
+  });
+  fs.writeFileSync(path.join(output,`app-${mode}.png`),Buffer.from(png,'base64'));
+  const start=Date.now();await page.getByRole('button',{name:'停止',exact:true}).click();
+  await expect(page.locator('.status')).toContainText('已停止',{timeout:5000});
+  await expect(page.locator('.run-activity')).toHaveCount(0);
+  const cancel_ms=Date.now()-start;
+  await page.reload();await expect(page.getByLabel('任务指令')).toBeVisible();assert.equal(requests,1);assert.deepEqual(errors,[]);
+  const report={version:await app.evaluate(({app})=>app.getVersion()),mode,paid_api_calls:0,requests,cancel_ms,renderer_errors:errors,
+    checks:['real HTTP wait shows status','bundled clay asset decodes','keyboard disclosure','actual task cancellation','reload without replay']};
+  fs.writeFileSync(path.join(output,`smoke-${mode}.json`),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+})().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{if(app){await app.evaluate(({app})=>app.exit(0)).catch(()=>{});await app.close().catch(()=>{});}for(const s of sockets)s.destroy();server.close();});

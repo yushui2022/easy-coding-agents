@@ -7,9 +7,10 @@ from .workflow import verified_run, validate_checks
 
 
 class Runtime:
-    def __init__(self, agent):
+    def __init__(self, agent, *, owns_store=True):
         self.agent = agent
         self.task = None
+        self.owns_store = owns_store
 
     @property
     def busy(self):
@@ -19,12 +20,15 @@ class Runtime:
         if self.busy or self.agent.busy:
             raise ValueError('A task is running; stop it before switching or modifying this session.')
 
-    def start(self, prompt, commands=(), repair_attempts=0, worker_first=None):
+    def start(self, prompt, commands=(), repair_attempts=0, worker_first=None, attachments=None):
         self.idle()
-        if not isinstance(prompt, str) or not prompt.strip():
+        if not isinstance(prompt, str) or (not prompt.strip() and not attachments):
             raise ValueError('Enter a nonempty task.')
+        from .attachments import prepare
+        files = prepare(self.agent.settings.root, attachments or [])
+        prompt = prompt.strip() or "请分析这些附件。"
         validate_checks(self.agent, commands, repair_attempts)
-        self.task = asyncio.create_task(verified_run(self.agent, prompt, list(commands), repair_attempts, worker_first))
+        self.task = asyncio.create_task(verified_run(self.agent, prompt, list(commands), repair_attempts, worker_first, attachments=files))
         return self.task
 
     def cancel(self):
@@ -58,4 +62,5 @@ class Runtime:
         try:
             await self.agent.close()
         finally:
-            self.agent.store.close()
+            if self.owns_store:
+                self.agent.store.close()

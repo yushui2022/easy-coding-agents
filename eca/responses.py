@@ -4,7 +4,7 @@ import hashlib
 from .errors import OutputLimitError
 
 
-def input_items(messages, scope=None):
+def input_items(messages, scope=None, root=None):
     items = []
     for message in messages:
         role = message['role']
@@ -13,7 +13,10 @@ def input_items(messages, scope=None):
         elif role == 'assistant' and message.get('response_items') and (scope is None or message.get('response_scope') == scope):
             items.extend(message['response_items'])
         else:
-            if message.get('content'):
+            if message.get('attachments'):
+                from .attachments import content
+                items.append(dict(role=role, content=content(message, root, 'responses')))
+            elif message.get('content'):
                 items.append(dict(role=role, content=message['content']))
             for call in message.get('tool_calls', []):
                 items.append(dict(type='function_call', call_id=call['id'], **call['function']))
@@ -22,7 +25,7 @@ def input_items(messages, scope=None):
 
 async def complete(client, settings, messages, tools, emit, usage_callback):
     scope = hashlib.sha256((settings.base_url+'\0'+settings.model).encode()).hexdigest()
-    kwargs = dict(model=settings.model, input=input_items(messages, scope), store=False, stream=True,
+    kwargs = dict(model=settings.model, input=input_items(messages, scope, settings.root), store=False, stream=True,
                   max_output_tokens=settings.max_output_tokens, include=['reasoning.encrypted_content'])
     if tools:
         kwargs['tools'] = [dict(type='function', **t['function'], strict=False) for t in tools]
@@ -30,16 +33,27 @@ async def complete(client, settings, messages, tools, emit, usage_callback):
         kwargs['reasoning'] = dict(effort=settings.reasoning_effort)
     stream = await client.responses.create(**kwargs)
     response = None
+    names = {}
     try:
         async for event in stream:
             if event.type == 'response.output_text.delta':
                 emit('text', event.delta)
+            elif event.type == 'response.output_item.added':
+                if event.item.type == 'function_call':
+                    names[event.output_index] = event.item.name
+                    emit('model_delta', {'tool': event.item.name, 'phase': 'tool_arguments'})
+                elif event.item.type == 'reasoning':
+                    emit('model_delta', {'phase': 'thinking'})
+            elif event.type == 'response.function_call_arguments.delta':
+                emit('model_delta', {'tool': names.get(event.output_index, ''),
+                                    'arguments': event.delta, 'phase': 'tool_arguments'})
             if event.type in {'response.completed', 'response.incomplete', 'response.failed'}:
                 response = event.response
                 if response.usage:
                     u = response.usage.model_dump()
                     usage_callback(dict(prompt_tokens=u['input_tokens'], completion_tokens=u['output_tokens'],
-                                        prompt_tokens_details=u.get('input_tokens_details', {})))
+                                        prompt_tokens_details=u.get('input_tokens_details', {}),
+                                        completion_tokens_details=u.get('output_tokens_details', {})))
     finally:
         await stream.close()
     if (response is not None and response.status == 'incomplete' and
@@ -69,5 +83,6 @@ async def complete(client, settings, messages, tools, emit, usage_callback):
         message['tool_calls'] = calls
     u = response.usage.model_dump() if response.usage else {}
     usage = dict(prompt_tokens=u['input_tokens'], completion_tokens=u['output_tokens'],
-                 prompt_tokens_details=u.get('input_tokens_details', {})) if u else {}
+                 prompt_tokens_details=u.get('input_tokens_details', {}),
+                 completion_tokens_details=u.get('output_tokens_details', {})) if u else {}
     return message, usage

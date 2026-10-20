@@ -153,7 +153,7 @@ class Settings:
         validate_lsp(self.lsp_servers)
         if self.thinking_mode not in {'default', 'fast', 'balanced', 'deep'}:
             raise ValueError('Invalid thinking_mode')
-        if self.reasoning_effort not in {"", "none", "minimal", "low", "medium", "high", "xhigh"}:
+        if self.reasoning_effort not in {"", "none", "minimal", "low", "medium", "high", "xhigh", "max"}:
             raise ValueError("Invalid reasoning_effort")
         if self.api_format not in {"openai", "anthropic", "responses"}:
             raise ValueError("api_format must be openai, responses or anthropic")
