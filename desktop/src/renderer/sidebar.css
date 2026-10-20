@@ -106,7 +106,7 @@
 .eca-app .project-group-heading .project-disclosure {width:17px;min-width:17px;flex-shrink:0;padding:2px;color:var(--clay-muted);}
 .eca-app .project-disclosure svg {transition:transform .15s;}
 .eca-app .project-disclosure .collapsed {transform:rotate(-90deg);}
-.eca-app .project-group-heading .project-title {display:flex;align-items:center;gap:8px;min-width:0;flex:1;width:auto;text-align:left;color:var(--clay-secondary);font-size:12px;}
+.eca-app .project-group-heading .project-title {display:flex;align-items:center;justify-content:flex-start;gap:8px;min-width:0;flex:1;width:auto;text-align:left;color:var(--clay-secondary);font-size:12px;}
 .eca-app .project-title>svg {flex-shrink:0;color:var(--clay-muted);}
 .eca-app .project-title>span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .eca-app .is-current .project-title {color:var(--clay-text);font-weight:600;}

@@ -51,6 +51,17 @@ async function capture(name,selector) {
   expect(copied).toContain('先检查场景文件和本地运行环境，再执行页面检查。');
   await capture('message-copy');
   await app.evaluate(({clipboard},text)=>clipboard.writeText(text),savedClipboard);
+  // Sidebar project rows read from the left edge; the base button rule centres content.
+  const rowAlign=await page.locator('.project-group-heading').first().evaluate(el=>{
+    const head=el.getBoundingClientRect(),caret=el.querySelector('.project-disclosure').getBoundingClientRect();
+    const title=el.querySelector('.project-title'),titleBox=title.getBoundingClientRect();
+    const icon=title.querySelector('svg').getBoundingClientRect();
+    return {justify:getComputedStyle(title).justifyContent,offset:Math.round(titleBox.left-head.left),iconGap:Math.round(icon.left-caret.right)};
+  });
+  expect(rowAlign.justify).toBe('flex-start');
+  expect(rowAlign.offset).toBeLessThan(24);
+  expect(rowAlign.iconGap).toBeLessThan(16);
+  report.project_row_alignment=rowAlign;
   report.compact_height=await group.evaluate(el=>Math.round(el.getBoundingClientRect().height));
   await capture('execution-compact');
   const cdp=await page.context().newCDPSession(page);
