@@ -373,6 +373,57 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.rpc.snapshot()['suite']['rounds'][0]['status'], 'failed')
         self.assertFalse(self.rpc.pending)
 
+    async def test_queued_messages_wait_for_the_active_task_then_run_in_order(self):
+        release, entered = asyncio.Event(), asyncio.Event()
+        class Gate(FakeProvider):
+            def __init__(self, responses):
+                super().__init__(responses)
+                self.first = True
+            async def complete(self, messages, tools, emit):
+                if self.first:
+                    self.first = False
+                    entered.set()
+                    await release.wait()
+                return await super().complete(messages, tools, emit)
+        self.rpc.runtime.agent.provider = Gate([{'role': 'assistant', 'content': 'first'},
+                                                {'role': 'assistant', 'content': 'second'}])
+        await self.rpc.dispatch('task.start', {'prompt': 'first task'})
+        await asyncio.wait_for(entered.wait(), 3)
+        alpha = (await self.rpc.dispatch('queue.add', {'prompt': 'alpha'}))['queue']
+        self.assertEqual([row['prompt'] for row in alpha], ['alpha'])
+        both = (await self.rpc.dispatch('queue.add', {'prompt': 'beta'}))['queue']
+        self.assertEqual([row['prompt'] for row in both], ['alpha', 'beta'])
+        moved = (await self.rpc.dispatch('queue.move', {'id': both[0]['id'], 'offset': 1}))['queue']
+        self.assertEqual([row['prompt'] for row in moved], ['beta', 'alpha'])
+        ahead = (await self.rpc.dispatch('queue.priority', {'id': both[0]['id']}))['queue']
+        self.assertEqual([row['prompt'] for row in ahead], ['alpha', 'beta'])
+        left = (await self.rpc.dispatch('queue.remove', {'id': both[1]['id']}))['queue']
+        self.assertEqual([row['prompt'] for row in left], ['alpha'])
+        release.set()
+        await asyncio.wait_for(self.rpc.finishing, 5)
+        await asyncio.wait_for(self.rpc.finishing, 5)
+        state = self.rpc.runtime.agent.state
+        prompts = [m['content'] for m in state['messages'] if m.get('role') == 'user']
+        self.assertEqual(prompts, ['first task', 'alpha'])
+        self.assertEqual(self.rpc.snapshot()['queue'], [])
+        self.assertEqual(state['status'], 'idle')
+        self.assertEqual(self.rpc.runtime.agent.store.load(state['id'])['queue'], [])
+
+    async def test_queue_rejects_empty_unknown_and_bad_moves(self):
+        with self.assertRaises(ValueError):
+            await self.rpc.dispatch('queue.add', {'prompt': '   '})
+        entry = (await self.rpc.dispatch('queue.add', {'prompt': 'alpha'}))['queue'][0]
+        with self.assertRaises(ValueError):
+            await self.rpc.dispatch('queue.move', {'id': entry['id'], 'offset': 0})
+        with self.assertRaises(ValueError):
+            await self.rpc.dispatch('queue.move', {'id': 'missing', 'offset': 1})
+        with self.assertRaises(ValueError):
+            await self.rpc.dispatch('queue.remove', {'id': 'missing'})
+        with self.assertRaises(ValueError):
+            await self.rpc.dispatch('queue.update', {'id': entry['id'], 'prompt': ''})
+        updated = (await self.rpc.dispatch('queue.update', {'id': entry['id'], 'prompt': 'alpha edited'}))['queue']
+        self.assertEqual([row['prompt'] for row in updated], ['alpha edited'])
+
     async def test_question_and_redaction(self):
         self.rpc.secrets.add('private-test-key')
         task = asyncio.create_task(self.rpc.question('Question private-test-key'))

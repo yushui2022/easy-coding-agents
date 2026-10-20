@@ -233,6 +233,7 @@ class DesktopRPC:
             'activity': self.activity, 'last_request': self.last_request,
             'started_at': self.started_at, 'approval_mode': self.approval_mode,
                  'context': self.context_usage(),
+            'queue': self.queue_view() if self.runtime else [],
             'side_busy': self.side_chats.busy,
             'pending': [entry for entry, future in self.pending.values() if not future.done()], 'seq': self.sequence}
         params = params or {}
@@ -349,6 +350,57 @@ class DesktopRPC:
                     raise
                 except Exception:
                     pass
+            if self.runtime.agent.state.get('status') == 'idle':
+                # A queued message continues the same session without a stop/start round trip.
+                try:
+                    await self.start_queued()
+                except Exception as exc:
+                    self.emit('error', f'Queued message could not start: {exc}')
+
+    def queue_entries(self):
+        return self.runtime.agent.state.setdefault('queue', [])
+
+    def queue_view(self):
+        return [{'id': entry['id'], 'prompt': entry['prompt'],
+                 'attachments': len(entry.get('attachments') or []),
+                 'created': entry.get('created')} for entry in self.queue_entries()]
+
+    def queue_changed(self):
+        self.runtime.agent.store.save(self.runtime.agent.state)
+        self.emit('queue', {'queue': self.queue_view()})
+
+    def queue_find(self, ident):
+        for index, entry in enumerate(self.queue_entries()):
+            if entry['id'] == ident:
+                return index
+        raise ValueError('That queued message is no longer in the queue.')
+
+    async def begin_run(self, prompt, checks=(), repair_attempts=0, attachments=None):
+        runtime = self.idle()
+        task = runtime.start(prompt, checks, repair_attempts, attachments=attachments or [])
+        self.run_id = uuid.uuid4().hex
+        self.events.clear()
+        self.stream = ''
+        self.stream_id += 1
+        self.started_at = time.time()
+        self.activity = {'phase': 'preparing', 'since': self.started_at}
+        self.last_request = {}
+        self.finishing = asyncio.create_task(self.finish(task))
+        return {'run_id': self.run_id, 'session_id': runtime.agent.state['id']}
+
+    async def start_queued(self):
+        """Start the first queued message once the session is idle again."""
+        entries = self.queue_entries()
+        if not entries or self.runtime is None or self.run_id is not None:
+            return None
+        entry = entries.pop(0)
+        self.queue_changed()
+        try:
+            return await self.begin_run(entry['prompt'], attachments=entry.get('attachments') or [])
+        except BaseException:
+            entries.insert(0, entry)
+            self.queue_changed()
+            raise
 
     async def dispatch(self, method, params):
         if method == 'initialize':
@@ -492,21 +544,60 @@ class DesktopRPC:
                 before = min(before, len(state['messages']))
                 return self.safe({'messages': self.public_messages(state['messages'][max(0, before-50):before], max(0,before-50), params.get('preview') is True), 'before': max(0, before-50)})
             if method == 'task.start':
-                runtime = self.idle()
-                self.run_id = uuid.uuid4().hex
-                self.events.clear()
-                self.stream = ''
-                self.stream_id += 1
-                self.started_at = time.time()
-                self.activity = {'phase': 'preparing', 'since': self.started_at}
-                self.last_request = {}
-                try:
-                    task = runtime.start(params.get('prompt'), params.get('checks', []), params.get('repair_attempts', 0), attachments=params.get('attachments', []))
-                except BaseException:
-                    self.run_id = None
-                    raise
-                self.finishing = asyncio.create_task(self.finish(task))
-                return {'run_id': self.run_id, 'session_id': runtime.agent.state['id']}
+                return await self.begin_run(params.get('prompt'), params.get('checks', []),
+                                            params.get('repair_attempts', 0),
+                                            attachments=params.get('attachments', []))
+            if method == 'queue.add':
+                self.require()
+                prompt = params.get('prompt')
+                attachments = params.get('attachments') or []
+                if not isinstance(prompt, str) or not isinstance(attachments, list):
+                    raise ValueError('Invalid queued message')
+                if not prompt.strip() and not attachments:
+                    raise ValueError('Enter a nonempty message.')
+                if len(prompt) > 20000:
+                    raise ValueError('Queued message is too long.')
+                if len(self.queue_entries()) >= 20:
+                    raise ValueError('The queue already holds 20 messages; send or remove one first.')
+                self.queue_entries().append({'id': uuid.uuid4().hex, 'prompt': prompt.strip(),
+                                             'attachments': attachments, 'created': time.time()})
+                self.queue_changed()
+                return {'queue': self.queue_view()}
+            if method == 'queue.update':
+                self.require()
+                prompt = params.get('prompt')
+                if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 20000:
+                    raise ValueError('Invalid queued message')
+                self.queue_entries()[self.queue_find(params.get('id'))]['prompt'] = prompt.strip()
+                self.queue_changed()
+                return {'queue': self.queue_view()}
+            if method == 'queue.move':
+                self.require()
+                offset = params.get('offset')
+                if offset not in (-1, 1):
+                    raise ValueError('Invalid queue move')
+                entries = self.queue_entries()
+                index = self.queue_find(params.get('id'))
+                target = index + offset
+                if 0 <= target < len(entries):
+                    entries[index], entries[target] = entries[target], entries[index]
+                    self.queue_changed()
+                return {'queue': self.queue_view()}
+            if method == 'queue.priority':
+                self.require()
+                entries = self.queue_entries()
+                index = self.queue_find(params.get('id'))
+                if index:
+                    entries.insert(0, entries.pop(index))
+                    self.queue_changed()
+                if self.run_id is None:
+                    await self.start_queued()
+                return {'queue': self.queue_view()}
+            if method == 'queue.remove':
+                self.require()
+                self.queue_entries().pop(self.queue_find(params.get('id')))
+                self.queue_changed()
+                return {'queue': self.queue_view()}
             if method == 'model.reasoning':
                 agent = self.idle().agent
                 if params.get('session_id') != agent.state['id']:

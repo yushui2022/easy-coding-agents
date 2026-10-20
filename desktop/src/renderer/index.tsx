@@ -1,6 +1,6 @@
 import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {FolderOpen, Stop, ArrowUp, Check, ArrowCounterClockwise, X, ArrowClockwise, FileText, ChatCircle, SidebarSimple, CaretDown, Desktop, ArrowDown, ListChecks, ShieldCheck, Sparkle} from '@phosphor-icons/react';
+import {FolderOpen, Stop, ArrowUp, Check, ArrowCounterClockwise, X, ArrowClockwise, FileText, ChatCircle, SidebarSimple, CaretDown, Desktop, ArrowDown, ListChecks, ShieldCheck, Sparkle, PencilSimple} from '@phosphor-icons/react';
 import {Dialog} from './Dialog';
 import {ModelSettings} from './ModelSettings';
 import {ModelMenu,effortLabels} from './ModelMenu';
@@ -49,6 +49,7 @@ function App() {
   const [projectChanging,setProjectChanging] = useState(false);
   const projectBusy = useRef(false);
   const [modelSelectionError,setModelSelectionError] = useState('');
+  const [queueEdit,setQueueEdit] = useState<{id:string;text:string}|null>(null);
   const [error,setError] = useState('');
   const viewKey=state.workspace_owner||state.session_id;
   const promptKey=viewKey?draftKey+'.'+viewKey:draftKey;
@@ -198,15 +199,24 @@ function App() {
     return result;
   };
   const start = async () => {
-    if ((!prompt.trim()&&!attachments.items.length) || attachments.busy || startBusy.current || state.busy || modelChanging || projectBusy.current) return;
+    if ((!prompt.trim()&&!attachments.items.length) || attachments.busy || startBusy.current || modelChanging || projectBusy.current) return;
     startBusy.current=true;setSending(true);bottom.current=true;setNotice('');
     try {
       // Choosing a directory never implicitly runs a draft against that project.
       if (!state.project) {const picked=await pick();if(picked&&attachments.items.length)await attachments.moveTo('main.'+draftKey+'.'+(picked.workspace_owner||picked.session_id));return;}
-      const submitted=prompt;
-      const result=await perform('task.start',{prompt:submitted,attachments:attachments.items});
-      if(result) {setPrompt(current=>current===submitted?'':current);await attachments.clear();}
+      const submitted=prompt, queued=!!state.busy;
+      const result=await perform(queued?'queue.add':'task.start',{prompt:submitted,attachments:attachments.items});
+      if(result) {
+        setPrompt(current=>current===submitted?'':current);
+        await attachments.clear();
+        if(queued)setNotice('已排队；当前任务结束后按顺序发送。');
+      }
     } finally {startBusy.current=false;setSending(false);}
+  };
+  const saveQueued = async () => {
+    if(!queueEdit||!queueEdit.text.trim())return;
+    const result=await perform('queue.update',{id:queueEdit.id,prompt:queueEdit.text});
+    if(result)setQueueEdit(null);
   };
   const chooseModel = async (choice:string,keepOpen=false) => {
     if(modelChanging||state.busy||projectBusy.current)return false;
@@ -366,6 +376,27 @@ function App() {
               :<form onSubmit={e=>{e.preventDefault();void reply(answer);setAnswer('');}}><input aria-label="回答" value={answer} onChange={e=>setAnswer(e.target.value)}/><button className="primary" type="submit" disabled={answered===waiting.id}>发送回答</button></form>}
           </section>}
           {empty&&<div className="composer-context"><button onClick={pick} disabled={projectChanging||sending} title={state.project||'选择项目文件夹'} aria-label="选择任务项目"><FolderOpen size={15}/><span>{projectName||'选择项目'}</span><CaretDown size={11}/></button><span className="local-context"><Desktop size={14}/>本地工作区</span></div>}
+          {!!(state.queue||[]).length&&<div className="queue-strip" role="group" aria-label="排队中的消息">
+            <div className="queue-label">排队中 · {state.queue.length} 条，当前任务结束后按顺序发送</div>
+            {(state.queue||[]).map((item:any,index:number)=>
+              <div className="queue-row" key={item.id} data-queue-id={item.id}>
+                <span className="queue-order" aria-hidden="true">{index+1}</span>
+                {queueEdit?.id===item.id
+                  ?<form className="queue-edit" onSubmit={e=>{e.preventDefault();void saveQueued();}}>
+                     <input autoFocus aria-label="编辑排队消息" value={queueEdit?.text??''} onChange={e=>setQueueEdit({id:item.id,text:e.target.value})}
+                       onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();setQueueEdit(null);}}}/>
+                   </form>
+                  :<span className="queue-text" title={item.prompt}>{item.prompt}</span>}
+                {item.attachments>0&&<span className="queue-files" title={item.attachments+' 个附件'}>{item.attachments} 附件</span>}
+                <span className="queue-actions">
+                  <button aria-label="上移这条排队消息" title="上移" disabled={index===0||sending} onClick={()=>{void perform('queue.move',{id:item.id,offset:-1});}}><ArrowUp size={14}/></button>
+                  <button aria-label="下移这条排队消息" title="下移" disabled={index===state.queue.length-1||sending} onClick={()=>{void perform('queue.move',{id:item.id,offset:1});}}><ArrowDown size={14}/></button>
+                  <button className="queue-send" title="排到队首；没有任务在跑时立即发送" disabled={sending} onClick={()=>{void perform('queue.priority',{id:item.id});}}>立即发送</button>
+                  <button aria-label="编辑这条排队消息" title="编辑" disabled={sending} onClick={()=>setQueueEdit({id:item.id,text:item.prompt})}><PencilSimple size={14}/></button>
+                  <button aria-label="取消这条排队消息" title="取消排队" disabled={sending} onClick={()=>{void perform('queue.remove',{id:item.id});}}><X size={14}/></button>
+                </span>
+              </div>)}
+          </div>}
           <div className="composer" {...attachments.events}>{attachments.preview}
             <textarea rows={3} ref={promptInput} id="prompt" aria-label="任务指令" disabled={projectChanging} placeholder={state.project?'描述你想完成的事…':'写下想法，稍后选择项目…'} value={prompt} onChange={e=>setPrompt(e.target.value)}
               onCompositionStart={()=>{composing.current=true;}}
@@ -383,13 +414,15 @@ function App() {
               <div className="composer-actions">
               <ContextMeter context={state.context} busy={state.busy} onCompact={async()=>{const result=await perform('context.compact'); if(result)setNotice('上下文已压缩，原始历史仍保留。');}}/>
               <button ref={modelButton} className="model-chip" aria-label="主对话模型" aria-haspopup="dialog" aria-expanded={modelPickerOpen} title={modelSource} disabled={state.busy||sending||projectChanging} onClick={()=>{setModelSelectionError('');setModelPickerOpen(v=>!v);}}><span className={model?'connection-dot':'status-dot'}/><span>{model||'配置模型'}</span>{model&&<span className="thinking-badge">{effortLabels[(state.project?state.settings?.reasoning:config.model?.reasoning)?.value]||'默认'}</span>}<CaretDown size={13}/></button>
-              {state.busy?<button className="stop-button" disabled={stopping} onClick={()=>{setStopping(true);void perform('task.cancel',{run_id:state.run_id}).then(result=>{if(!result)setStopping(false);});}}><Stop size={13} weight="fill"/>{stopping?'正在停止':'停止'}</button>
-                :<button className="send-button" aria-label="发送任务" title={state.project?'发送任务 · Enter':'选择项目后确认发送'} disabled={(!prompt.trim()&&!attachments.items.length)||attachments.busy||sending||modelChanging||projectChanging} onClick={start}>{!state.project&&<span>{sending?'正在打开…':'选择项目并继续'}</span>}<ArrowUp size={17}/></button>}
+              {state.busy?<>
+                <button className="queue-button" aria-label="排队发送" title="当前任务结束后按顺序发送这条消息" disabled={(!prompt.trim()&&!attachments.items.length)||attachments.busy||sending||projectChanging} onClick={start}><ArrowUp size={15}/><span>排队</span></button>
+                <button className="stop-button" disabled={stopping} onClick={()=>{setStopping(true);void perform('task.cancel',{run_id:state.run_id}).then(result=>{if(!result)setStopping(false);});}}><Stop size={13} weight="fill"/>{stopping?'正在停止':'停止'}</button>
+              </>:<button className="send-button" aria-label="发送任务" title={state.project?'发送任务 · Enter':'选择项目后确认发送'} disabled={(!prompt.trim()&&!attachments.items.length)||attachments.busy||sending||modelChanging||projectChanging} onClick={start}>{!state.project&&<span>{sending?'正在打开…':'选择项目并继续'}</span>}<ArrowUp size={17}/></button>}
               </div>
             </div>
           </div>
           {notice&&<div className="composer-notice" role="status"><Check size={15}/>{notice}</div>}
-          <div className="composer-meta"><span className="keyboard-hint" aria-label="Enter 发送，Shift 加 Enter 换行"><span><kbd>↵</kbd>发送</span><span><kbd>Shift ↵</kbd>换行</span></span></div>
+          <div className="composer-meta"><span className="keyboard-hint" aria-label={state.busy?'Enter 排队，Shift 加 Enter 换行':'Enter 发送，Shift 加 Enter 换行'}><span><kbd>↵</kbd>{state.busy?'排队':'发送'}</span><span><kbd>Shift ↵</kbd>换行</span></span></div>
         </div>
       </div>
     </main>

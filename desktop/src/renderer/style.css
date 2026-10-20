@@ -363,3 +363,21 @@ body {margin: 0; font-family: var(--font-ui);}
 .eca-app .permission-picker {max-width:120px;font:12px/1.4 var(--font-ui);padding:5px 6px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--secondary);}
 .eca-app .permission-picker:hover:not(:disabled) {background:var(--hover);}
 .eca-app .permission-picker.full-access {color:var(--accent);}
+
+/* Queued messages: a compact stack above the composer, same clay surfaces. */
+.eca-app .queue-strip {display:flex;flex-direction:column;gap:6px;margin-bottom:8px;}
+.eca-app .queue-label {font-size:11px;color:var(--muted);padding:0 4px;}
+.eca-app .queue-row {display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:16px;background:var(--surface);box-shadow:var(--material-inset);}
+.eca-app .queue-order {display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:9px;background:var(--accent-soft);color:var(--accent);font-size:11px;font-weight:600;flex-shrink:0;}
+.eca-app .queue-text {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--text);}
+.eca-app .queue-edit {flex:1;min-width:0;display:flex;}
+.eca-app .queue-edit input {width:100%;height:28px;padding:0 8px;border-radius:8px;}
+.eca-app .queue-files {font-size:11px;color:var(--muted);white-space:nowrap;flex-shrink:0;}
+.eca-app .queue-actions {display:inline-flex;align-items:center;gap:2px;margin-left:auto;flex-shrink:0;}
+.eca-app .queue-actions button {display:inline-flex;align-items:center;justify-content:center;height:26px;min-width:26px;padding:0 6px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--muted);font-size:12px;}
+.eca-app .queue-actions button:hover:not(:disabled) {background:var(--accent-soft);color:var(--accent);}
+.eca-app .queue-actions button:disabled {opacity:.4;}
+.eca-app .queue-actions .queue-send {padding:0 10px;border-color:var(--border);color:var(--accent);}
+.eca-app .queue-button {display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:1px solid var(--border);border-radius:16px;background:var(--surface);color:var(--text);font-size:12px;}
+.eca-app .queue-button:hover:not(:disabled) {background:var(--hover);}
+.eca-app .queue-button:disabled {opacity:.45;}
