@@ -12,6 +12,8 @@ import {Welcome} from './Welcome';
 import {Sidebar} from './Sidebar';
 import {ContextMeter} from './ContextMeter';
 import {PermissionControl,permissionLabels} from './PermissionMenu';
+import {ModeControl} from './ModeMenu';
+import {GoalBar,GoalChip,GoalDialog} from './GoalBar';
 import {TitleBar} from './TitleBar';
 import {useAttachments} from './Attachments';
 import {AgentCards,type ChildAgent} from './subagents/AgentCards';
@@ -44,6 +46,8 @@ function App() {
   const [settingsOpen,setSettingsOpen] = useState(false);
   const [confirmFull,setConfirmFull] = useState(false);
   const [permissionChanging,setPermissionChanging] = useState(false);
+  const [modeChanging,setModeChanging] = useState(false);
+  const [goalOpen,setGoalOpen] = useState(false);
   const [modelPickerOpen,setModelPickerOpen] = useState(false);
   const [modelChanging,setModelChanging] = useState(false);
   const [projectChanging,setProjectChanging] = useState(false);
@@ -244,6 +248,29 @@ function App() {
     try {await perform('permissions.set',{mode});setConfirmFull(false);}
     finally {setPermissionChanging(false);}
   };
+  const chooseMode = async (next:string) => {
+    if(modeChanging||state.busy)return;
+    setModeChanging(true);
+    try {
+      const result=await perform('mode.set',{mode:next});
+      if(result&&next!=='plan')setNotice('');
+    } finally {setModeChanging(false);}
+  };
+  const saveGoal = async (text:string,criteria:string[]) => {
+    const result=await perform('goal.set',{goal:{text,criteria}});
+    if(result)setNotice('目标已更新；模型会用 goal_update 逐条标记进度。');
+    return !!result;
+  };
+  const clearGoal = async () => {
+    if(await perform('goal.set',{goal:null}))setNotice('目标已清除。');
+  };
+  const runPlan = async () => {
+    if(sending||state.busy)return;
+    const switched=await perform('mode.set',{mode:'code'});
+    if(!switched)return;
+    const result=await perform('task.start',{prompt:'按上面的计划开始执行。先简述接下来几步，然后动手；计划需要调整时说明原因。',attachments:[]});
+    if(result)setNotice('已切回编码模式，按计划开始执行。');
+  };
   const loadOlder = async () => {
     if(historyBusy.current)return;
     const before=cursor ?? Math.max(0,state.message_total-50);
@@ -396,6 +423,7 @@ function App() {
                 </span>
               </div>)}
           </div>}
+          {state.project&&<GoalBar goal={state.goal||null} onEdit={()=>setGoalOpen(true)} onClear={()=>void clearGoal()}/>}
           <div className="composer" {...attachments.events}>{attachments.preview}
             <textarea rows={3} ref={promptInput} id="prompt" aria-label="任务指令" disabled={projectChanging} placeholder={state.project?'描述你想完成的事…':'写下想法，稍后选择项目…'} value={prompt} onChange={e=>setPrompt(e.target.value)}
               onCompositionStart={()=>{composing.current=true;}}
@@ -409,6 +437,8 @@ function App() {
             <div className="composer-toolbar">
               <div className="composer-options">{attachments.button}
               {state.project&&<PermissionControl mode={state.approval_mode||'ask'} busy={permissionChanging||projectChanging} onChange={mode=>mode==='full-access'?setConfirmFull(true):void choosePermission(mode)}/>}
+              {state.project&&<ModeControl mode={state.settings?.mode||'code'} busy={modeChanging||state.busy||projectChanging} onChange={mode=>void chooseMode(mode)}/>}
+              {state.project&&<GoalChip active={!!state.goal} disabled={projectChanging} onClick={()=>setGoalOpen(true)}/>}
               </div>
               <div className="composer-actions">
               <ContextMeter context={state.context} busy={state.busy} onCompact={async()=>{const result=await perform('context.compact'); if(result)setNotice('上下文已压缩，原始历史仍保留。');}}/>
@@ -421,6 +451,8 @@ function App() {
             </div>
           </div>
           {notice&&<div className="composer-notice" role="status"><Check size={15}/>{notice}</div>}
+          {state.project&&!state.busy&&state.settings?.mode==='plan'&&(state.messages||[]).some((m:any)=>m.role==='assistant')&&
+            <div className="plan-next"><button className="primary" disabled={sending||modeChanging} onClick={()=>void runPlan()}>按此计划执行</button><span>切回编码模式，把上面的计划发给模型</span></div>}
           <div className="composer-meta"><span className="keyboard-hint" aria-label={state.busy?'Enter 排队，Shift 加 Enter 换行':'Enter 发送，Shift 加 Enter 换行'}><span><kbd>↵</kbd>{state.busy?'排队':'发送'}</span><span><kbd>Shift ↵</kbd>换行</span></span></div>
         </div>
       </div>
@@ -429,6 +461,7 @@ function App() {
     {modelPickerOpen&&<ModelMenu anchor={modelButton} label="选择模型" connections={config.connections||[]} recent={config.recentModels||[]} selectedId={state.project?state.model_selection?.connection_id:config.defaultId} reasoning={state.project?state.settings?.reasoning:config.model?.reasoning} busy={state.busy||modelChanging} error={modelSelectionError} onClose={()=>setModelPickerOpen(false)} onChoose={id=>chooseModel(id,true)} onEffort={chooseEffort} onManage={()=>{setModelPickerOpen(false);setSettingsOpen(true);}} special={state.project?[{id:'default',label:'跟随桌面默认',selected:state.model_selection?.choice==='default',disabled:!config.defaultId},{id:'project',label:'沿用项目配置',selected:state.model_selection?.choice==='project'}]:[]}/>}
     <ModelSettings open={settingsOpen} config={config} state={state} onConfig={setConfig} onClose={()=>setSettingsOpen(false)} onUse={chooseModel}/>
     {confirmFull&&<Dialog title="开启完全访问" closeLabel="取消完全访问" onClose={()=>setConfirmFull(false)}><p>在当前会话中自动批准文件修改、命令、联网及外部工具操作，也会放行本会话正在等待的授权。</p><p>命令按当前系统账户权限执行，可能访问项目外文件和网络；不会获得管理员权限。文件工具仍保留路径和冲突检查，已有沙箱及只读模式继续生效。</p><p className="fine-print">不会改变其他会话的审批模式。重新打开项目后恢复项目审批设置；已执行的操作不会因切回逐次确认而撤销。</p><div className="actions"><button onClick={()=>setConfirmFull(false)}>取消</button><button className="primary" disabled={permissionChanging} onClick={()=>choosePermission('full-access')}>开启完全访问</button></div></Dialog>}
+    {goalOpen&&state.project&&<GoalDialog goal={state.goal||null} onClose={()=>setGoalOpen(false)} onSave={saveGoal}/>}
     {diff&&<Dialog title={diff.path} name="文件差异" closeLabel="关闭差异" wide onClose={()=>setDiff(null)}><pre className="diff">{diff.diff.split('\n').map((line:string,i:number)=><span key={i} className={line.startsWith('+')?'added':line.startsWith('-')?'removed':''}>{line}{'\n'}</span>)}</pre></Dialog>}
     {diagnostic&&<Dialog title="项目环境" name="环境检查" closeLabel="关闭环境检查" onClose={()=>setDiagnostic(null)}>{diagnostic.checks.map((item:any,i:number)=><div className="diagnostic" key={i}><strong>{item.name} · {item.status}</strong><p>{item.message}</p></div>)}</Dialog>}
   </div>;

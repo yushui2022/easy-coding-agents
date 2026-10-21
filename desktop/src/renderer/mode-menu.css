@@ -1,0 +1,5 @@
+.eca-app .permission-chip.mode-chip {padding-left:7px;}
+.eca-app .permission-chip.is-plan {color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,transparent);background:var(--accent-soft);}
+.eca-app .permission-chip.is-plan svg {color:var(--accent);}
+.eca-app .mode-mark {display:flex;width:18px;flex:none;justify-content:center;color:var(--muted);}
+.eca-app .permission-row.is-current .mode-mark {color:var(--accent);}

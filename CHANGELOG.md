@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.0 — 工作模式与目标
+
+后端一直有 `mode=code|plan|chat`（计划模式只给只读工具，对话模式不给工具），CLI 能用 Shift+Tab 切，桌面端却完全没暴露；目标跟踪则从来没有。这版补上。
+
+- 工作模式：输入区新增模式芯片（编码 / 计划 / 对话），按会话保存，切走再切回或重开项目都保留；运行中禁止切换。模式只是工具集选择，不改变审批档位，也不放宽任何检查。
+- 计划模式：只有 read/glob/grep/code_search/repo_map/code_relations/skills/lsp_rename/web_*/todo/ask/delegate/lsp，write/edit/delete/shell 一律返回 `Denied: … unavailable in plan mode`，也不进入验证与自动修复链。一轮结束后输入区下方出现「按此计划执行」，切回编码模式并把计划作为新指令发出。
+- 目标：输入区「目标」可写一句话目标 + 每行一条验收标准（最多 20 条），存进会话状态。目标存在时 system prompt 追加目标与编号标准，要求持续做到全部满足；模型用新工具 `goal_update` 逐条勾选，越界索引、非布尔值、多余字段都会被拒。
+- 目标条：输入区上方显示 `目标文本 · 3/5`，展开看逐条标准，可编辑或清除；全部勾选后转绿并停止注入提示词。界面明确标注：勾选是模型的判断，不是验证。
+- 协议：新增 `mode.set`、`goal.set`；`live()`/`snapshot()` 增加 `goal` 字段；事件 `mode_changed`、`goal_changed`、`goal`。
+- 验证：`tests/test_goal.py` 13 项通过；定向 Python 回归 103 项通过、1 跳过；TypeScript 构建与桌面单测 15 项通过；隐藏窗口端到端（本地模拟模型、0 次付费调用）验证模式切换、工具表差异、目标进入模型请求、按计划执行、刷新保留与清除。
+- 限制：真实服务商下计划输出质量、长任务里 `goal_update` 的勾选准确度、macOS/Linux 均未验证。详见 `docs/desktop/MODES-1.1.0.md`。
+
 ## 1.0.0 — 首个公开版本
 
 桌面版从 0.34 一路打磨到这里，正式对外发布：Windows x64 安装包自带运行时，装上填一个模型密钥就能用。

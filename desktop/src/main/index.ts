@@ -148,7 +148,7 @@ async function openProject(folder: string) {
     return decorate(result);
   } finally {opening = false;}
 }
-const allowed = new Set(['snapshot', 'live', 'permissions.set', 'project.close', 'session.switch', 'session.messages', 'session.message', 'sessions.name-missing', 'session.regenerate', 'queue.add', 'queue.update', 'queue.move', 'queue.priority', 'queue.send-now', 'queue.remove', 'subagent.snapshot', 'task.start', 'task.cancel', 'input.reply', 'changes.diff', 'changes.accept', 'changes.undo', 'diagnostics']);
+const allowed = new Set(['snapshot', 'live', 'permissions.set', 'mode.set', 'goal.set', 'project.close', 'session.switch', 'session.messages', 'session.message', 'sessions.name-missing', 'session.regenerate', 'queue.add', 'queue.update', 'queue.move', 'queue.priority', 'queue.send-now', 'queue.remove', 'subagent.snapshot', 'task.start', 'task.cancel', 'input.reply', 'changes.diff', 'changes.accept', 'changes.undo', 'diagnostics']);
 function trusted(event: Electron.IpcMainInvokeEvent) {
   try {return event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && path.resolve(fileURLToPath(event.senderFrame.url)) === html;}
   catch {return false;}

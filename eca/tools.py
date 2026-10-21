@@ -49,6 +49,7 @@ SCHEMAS = [
     schema("delete", "Delete one UTF-8 text file with diff approval and recoverable journal. No directories or binary files.", {"path": STR}, ["path"]),
     schema("shell", "Run the configured shell with approval: host PowerShell/sh, or /bin/sh in disposable Docker mode. Docker writes are discarded. Includes exit code.", {"command": STR, "timeout": INT}, ["command"]),
     schema("todo", "Replace task plan. Completion is a planning label, not proof tests passed.", {"items": {"type": "array", "items": {"type": "object", "properties": {"content": STR, "status": {"type": "string", "enum": ["pending", "in_progress", "completed"]}}, "required": ["content", "status"], "additionalProperties": False}}}, ["items"]),
+    schema("goal_update", "Mark session-goal acceptance criteria done or open (1-based index as listed). A done label is a claim, not proof tests passed.", {"updates": {"type": "array", "items": {"type": "object", "properties": {"index": INT, "done": {"type": "boolean"}}, "required": ["index", "done"], "additionalProperties": False}}, "status": {"type": "string", "enum": ["active", "done", "abandoned"]}}, ["updates"]),
     schema("ask", "Ask for missing requirements; use only when needed.", {"question": STR}, ["question"]),
     schema("delegate", "Delegate a bounded subtask to an independent child agent. It shares files, not conversation. No recursive delegation. Default plan is read-only.",
            {"task":STR,"mode":{"type":"string","enum":["plan","code"]}, 'verify_commands': {'type': 'array', 'items': STR}}, ["task"]),
@@ -68,8 +69,14 @@ SCHEMAS = [
 ]
 
 
+READ_ONLY = {"skills", "lsp_rename", "web_fetch", "web_search", "read", "glob", "grep", "code_search",
+             "repo_map", "code_relations", "todo", "ask", "delegate", "delegate_parallel", "lsp", "goal_update"}
+
+
 def allowed(mode):
-    return {"skills", "lsp_rename", "web_fetch", "web_search", "read", "glob", "grep", "code_search", "repo_map", "code_relations", "todo", "ask", "delegate", "delegate_parallel", "lsp"} if mode == "plan" else (set() if mode == "chat" else {s["function"]["name"] for s in SCHEMAS})
+    # Modes restrict the tool set, never the approval requirements: the permission
+    # layer still asks for every write, command and network call it normally would.
+    return READ_ONLY if mode == "plan" else (set() if mode == "chat" else {s["function"]["name"] for s in SCHEMAS})
 
 
 def atomic_write(path, content):
@@ -232,7 +239,7 @@ class Tools:
                 raise ValueError("Unexpected or missing tool arguments")
             for key, value in args.items():
                 kind = spec["properties"][key]["type"]
-                if (kind == "string" and not isinstance(value, str)) or (kind == "integer" and type(value) is not int) or (kind == "array" and not isinstance(value, list)) or (kind == 'object' and not isinstance(value,dict)):
+                if (kind == "string" and not isinstance(value, str)) or (kind == "integer" and type(value) is not int) or (kind == "array" and not isinstance(value, list)) or (kind == 'object' and not isinstance(value,dict)) or (kind == "boolean" and type(value) is not bool):
                     raise ValueError(f"Invalid type for {key}")
             result = await getattr(self, name)(**args)
             if name == "shell" or name.startswith('process_'):
@@ -521,6 +528,16 @@ class Tools:
         self.state["tasks"] = items
         self.emit("tasks", items)
         return "Task plan updated."
+
+    async def goal_update(self, updates, status=None):
+        from . import goal as goals
+        goal = self.state.get("goal")
+        goals.update(goal, updates, status)
+        done, total = goals.progress(goal)
+        self.emit("goal", goals.public(goal))
+        return json.dumps({"status": goal.get("status"), "done": done, "total": total,
+                           "note": "Criterion labels are planning state, not proof of completion."},
+                          ensure_ascii=False)
 
     async def ask(self, question):
         # Instance callback is stored separately to avoid shadowing this tool method.

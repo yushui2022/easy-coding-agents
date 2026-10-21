@@ -1,0 +1,38 @@
+.eca-app .goal-chip.is-active {color:var(--accent);border-color:color-mix(in srgb,var(--accent) 28%,transparent);background:var(--accent-soft);}
+.eca-app .goal-chip.is-active svg {color:var(--accent);}
+
+/* Sits under the composer's rounded top edge, like the project context strip. */
+.eca-app .goal-bar {position:relative;display:flex;align-items:center;gap:6px;margin:0 14px -14px;padding:6px 8px 20px;
+  border-radius:16px 16px 0 0;background:var(--context-surface);color:var(--secondary);font-size:11.5px;}
+.eca-app .goal-bar.is-done {background:color-mix(in srgb,var(--success) 12%,var(--context-surface));}
+.eca-app .goal-summary {display:flex;align-items:center;gap:7px;min-width:0;flex:1;border:0;background:transparent;
+  padding:2px 4px;min-height:24px;border-radius:8px;color:inherit;font:inherit;text-align:left;}
+.eca-app .goal-summary:hover {background:var(--hover);}
+.eca-app .goal-summary:focus-visible {outline:2px solid var(--accent);outline-offset:-2px;}
+.eca-app .goal-summary svg {flex:none;color:var(--accent);}
+.eca-app .goal-bar.is-done .goal-summary svg {color:var(--success);}
+.eca-app .goal-text {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;color:var(--text);}
+.eca-app .goal-progress {flex:none;color:var(--muted);font-variant-numeric:tabular-nums;}
+.eca-app .goal-caret {transition:transform 120ms ease;}
+.eca-app .goal-summary[aria-expanded=true] .goal-caret {transform:rotate(180deg);}
+.eca-app .goal-actions {display:flex;gap:2px;flex:none;}
+.eca-app .goal-actions button {border:0;background:transparent;padding:3px;min-height:24px;min-width:24px;border-radius:7px;color:var(--muted);}
+.eca-app .goal-actions button:hover {background:var(--hover);color:var(--text);}
+.eca-app .goal-criteria {position:absolute;left:0;right:0;bottom:100%;z-index:20;list-style:none;margin:0 0 6px;padding:8px 12px;
+  border:1px solid var(--control-border);border-radius:12px;background:var(--surface);box-shadow:var(--material-raised),var(--shadow-dialog);
+  font-size:11.5px;max-height:40vh;overflow:auto;}
+.eca-app .goal-criteria li {display:flex;gap:7px;align-items:flex-start;padding:3px 0;color:var(--secondary);}
+.eca-app .goal-criteria li svg {flex:none;margin-top:1px;color:var(--muted);}
+.eca-app .goal-criteria li.is-done svg {color:var(--success);}
+.eca-app .goal-criteria li.is-done span {color:var(--muted);text-decoration:line-through;}
+.eca-app .goal-criteria .goal-note {display:block;margin-top:4px;padding-top:6px;border-top:1px solid var(--border);
+  color:var(--muted);font-size:10.5px;}
+
+.eca-app .goal-dialog .goal-field {display:flex;flex-direction:column;gap:5px;margin-bottom:12px;}
+.eca-app .goal-dialog .goal-field span {font-size:11.5px;color:var(--muted);}
+.eca-app .goal-dialog .goal-field textarea {width:100%;resize:vertical;border:1px solid var(--border);border-radius:10px;
+  background:var(--field);padding:8px 10px;font:13px/1.7 var(--font-reading);color:var(--text);}
+.eca-app .goal-dialog .goal-field textarea:focus-visible {outline:2px solid var(--accent);outline-offset:-1px;}
+
+.eca-app .plan-next {display:flex;align-items:center;gap:10px;margin-top:10px;padding:0 2px;}
+.eca-app .plan-next span {color:var(--muted);font-size:11px;}

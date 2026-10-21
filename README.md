@@ -58,6 +58,8 @@ ECA（Easy Coding Agent）是一个可自行配置模型的编程助手，提供
 | 能力 | 实际行为 |
 | --- | --- |
 | **终端编码** | 流式输出；读取、搜索、编辑文件；执行需要确认的 Shell 命令。 |
+| **工作模式** | 编码 / 计划 / 对话三档。计划模式只给只读工具（read、搜索、代码索引、子 Agent），不写文件、不跑验证；对话模式不给工具。按会话保存，运行中不可切换。模式不是权限，审批档位照旧。[说明](docs/desktop/MODES-1.1.0.md)。 |
+| **目标与验收标准** | 输入区可写一句话目标加逐条验收标准，进入 system prompt 后模型持续做到全部满足，并用 `goal_update` 逐条标记。勾选是模型的判断，不等于测试通过。[说明](docs/desktop/MODES-1.1.0.md)。 |
 | **本地 Skills（源码新增）** | 项目/用户 SKILL.md，`/skills`、`/skill` 显式调用；技能不绕过授权。[说明](docs/SKILLS_REFACTOR_COLLABORATION.md)。 |
 | **LSP 重命名（源码新增）** | 跨文件预览、冲突检查、审批和修改后诊断；逐文件记录撤销。[边界](docs/SKILLS_REFACTOR_COLLABORATION.md)。 |
 | **协作验收与额度（源码新增）** | 主子 Agent 共享请求次数上限，子任务可指定验收命令，提供单模型/Worker-first 对照评测入口。[配置](docs/SKILLS_REFACTOR_COLLABORATION.md)。 |

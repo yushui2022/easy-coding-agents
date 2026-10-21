@@ -19,6 +19,7 @@ from .doctor import diagnose
 from .runtime import Runtime
 from .store import Store
 from .workflow import suite_status
+from . import goal as goals
 from . import reasoning
 from .activity import tool_target
 
@@ -238,6 +239,7 @@ class DesktopRPC:
                  'context': self.context_usage(),
             'queue': self.queue_view() if self.runtime else [],
             'side_busy': self.side_chats.busy,
+            'goal': goals.public(agent.state.get('goal')) if agent else None,
             'pending': [entry for entry, future in self.pending.values() if not future.done()], 'seq': self.sequence}
         params = params or {}
         offset = params.get('stream_offset')
@@ -500,6 +502,33 @@ class DesktopRPC:
                 if self.side_chats.busy:
                     raise ValueError('侧边聊天仍在运行，请先停止或等待完成。')
                 await self.side_chats.close()
+            if method == 'mode.set':
+                # Modes are a workflow choice, not a permission: switching never
+                # approves anything, and a new session starts in the project mode.
+                agent = self.require().agent
+                mode = params.get('mode')
+                if mode not in {'code', 'plan', 'chat'}:
+                    raise ValueError('无效的工作模式。')
+                if self.run_id is not None:
+                    raise ValueError('请先停止或等待当前任务结束，再切换工作模式。')
+                agent.settings.mode = mode
+                agent.state['mode'] = mode
+                agent.store.save(agent.state)
+                self._context_usage = None
+                self.emit('mode_changed', {'mode': mode})
+                return self.live()
+            if method == 'goal.set':
+                agent = self.require().agent
+                value = params.get('goal')
+                if value is None:
+                    agent.state.pop('goal', None)
+                elif isinstance(value, dict):
+                    agent.state['goal'] = goals.clean(value.get('text'), value.get('criteria'))
+                else:
+                    raise ValueError('无效的目标。')
+                agent.store.save(agent.state)
+                self.emit('goal_changed', {'goal': goals.public(agent.state.get('goal'))})
+                return self.live()
             if method == 'project.open':
                 if self.runtime:
                     self.idle()

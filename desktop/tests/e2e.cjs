@@ -214,15 +214,8 @@ async function launch(){
   await expect(page.locator('.model-chip')).toContainText('fixture-secondary');
   await page.getByRole('button',{name:'打开项目',exact:true}).click();
   await expect(page.locator('.model-chip')).toContainText('fixture-secondary');
-  // Project config remains available explicitly; changing it never edits the .env.
-  await page.locator('.model-chip').click();
-  await page.getByRole('button',{name:'沿用项目配置',exact:false}).click();
-  await expect(page.locator('.model-chip')).toContainText('Qwen/old-project-model');
-  await page.getByRole('button',{name:'新建会话',exact:true}).click();
-  await expect(page.locator('.model-chip')).toContainText('Qwen/old-project-model');
-  await page.locator('.model-chip').click();
-  await page.getByRole('button',{name:'跟随桌面默认',exact:false}).click();
-  await expect(page.locator('.model-chip')).toContainText('fixture');
+  // The model picker no longer carries an explicit 「跟随桌面默认 / 沿用项目配置」 row
+  // (simplified on request); pinning is exercised above through 用于当前项目.
   await page.keyboard.press('Escape');
   await page.locator('.model-chip').click();
   await capture('desktop-model-picker.png');
