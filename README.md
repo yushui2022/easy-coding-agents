@@ -17,6 +17,7 @@
   <a href="#快速开始">快速开始</a> ·
   <a href="docs/CLI_GUIDE.md">使用手册</a> ·
   <a href="CHANGELOG.md">更新记录</a> ·
+  <a href="CONTRIBUTING.md">贡献指南</a> ·
   <a href="docs/UPGRADE-v0.18.md">验证记录</a>
 </p>
 
