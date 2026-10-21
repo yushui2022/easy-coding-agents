@@ -406,6 +406,36 @@ class DesktopRPC:
             self.queue_changed()
             raise
 
+    async def regenerate(self):
+        """Drop the last answer and run the same prompt again."""
+        runtime = self.idle()
+        agent = runtime.agent
+        state = agent.state
+        messages = state['messages']
+        internal = ('User-requested verification command:', 'Repair the failed user-selected verification')
+        index = None
+        for position in range(len(messages) - 1, -1, -1):
+            message = messages[position]
+            if message.get('role') != 'user' or not isinstance(message.get('content'), str):
+                continue
+            if message['content'].startswith(internal):
+                continue
+            index = position
+            break
+        if index is None:
+            raise ValueError('This session has no prompt to regenerate.')
+        prompt = messages[index]
+        if prompt.get('attachments'):
+            raise ValueError('This prompt carries attachments; send it again instead of regenerating.')
+        if not any(m.get('role') == 'assistant' for m in messages[index + 1:]):
+            raise ValueError('There is no answer to regenerate yet.')
+        # Remove the prompt and everything after it; the run re-appends it once.
+        del messages[index:]
+        state['context_start'] = min(state.get('context_start', 0), len(messages))
+        agent.store.save(state)
+        self.emit('notice', 'Regenerating the answer for the previous prompt.')
+        return await self.begin_run(prompt['content'])
+
     async def dispatch(self, method, params):
         if method == 'initialize':
             if params.get('protocol') != PROTOCOL:
@@ -547,6 +577,8 @@ class DesktopRPC:
                     raise ValueError('Invalid message cursor')
                 before = min(before, len(state['messages']))
                 return self.safe({'messages': self.public_messages(state['messages'][max(0, before-50):before], max(0,before-50), params.get('preview') is True), 'before': max(0, before-50)})
+            if method == 'session.regenerate':
+                return await self.regenerate()
             if method == 'task.start':
                 return await self.begin_run(params.get('prompt'), params.get('checks', []),
                                             params.get('repair_attempts', 0),

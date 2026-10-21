@@ -455,6 +455,33 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([m['content'] for m in state['messages'] if m.get('role') == 'user'], ['go'])
         self.assertEqual(self.rpc.snapshot()['queue'], [])
 
+    async def test_regenerate_drops_the_answer_and_reruns_the_same_prompt(self):
+        await self.fake([{'role': 'assistant', 'content': 'first answer'},
+                         {'role': 'assistant', 'content': 'regenerated answer'}])
+        await self.rpc.dispatch('task.start', {'prompt': 'do the thing'})
+        await asyncio.wait_for(self.rpc.finishing, 5)
+        state = self.rpc.runtime.agent.state
+        await self.rpc.dispatch('session.regenerate', {})
+        await asyncio.wait_for(self.rpc.finishing, 5)
+        exchange = [(m['role'], m.get('content')) for m in state['messages'] if m['role'] in {'user', 'assistant'}]
+        self.assertEqual(exchange, [('user', 'do the thing'), ('assistant', 'regenerated answer')])
+        self.assertEqual(state['status'], 'idle')
+
+    async def test_regenerate_needs_a_prompt_and_an_answer(self):
+        with self.assertRaises(ValueError):
+            await self.rpc.dispatch('session.regenerate', {})
+        self.rpc.runtime.agent.state['messages'].append({'role': 'user', 'content': 'lonely prompt'})
+        with self.assertRaises(ValueError):
+            await self.rpc.dispatch('session.regenerate', {})
+
+    async def test_regenerate_refuses_a_prompt_with_attachments(self):
+        state = self.rpc.runtime.agent.state
+        state['messages'].extend([
+            {'role': 'user', 'content': 'look at this', 'attachments': [{'path': 'a.png'}]},
+            {'role': 'assistant', 'content': 'seen'}])
+        with self.assertRaises(ValueError):
+            await self.rpc.dispatch('session.regenerate', {})
+
     async def test_question_and_redaction(self):
         self.rpc.secrets.add('private-test-key')
         task = asyncio.create_task(self.rpc.question('Question private-test-key'))

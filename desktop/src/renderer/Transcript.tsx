@@ -4,7 +4,7 @@ const ProjectContext=createContext<string|undefined>(undefined);
 import React, {memo, useEffect, useMemo, useRef, useState} from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import {CaretRight, TerminalWindow, FileText, CheckCircle, WarningCircle, Code, Circle, ListChecks, MinusCircle, Copy, Check, Sparkle} from '@phosphor-icons/react';
+import {CaretRight, TerminalWindow, FileText, CheckCircle, WarningCircle, Code, Circle, ListChecks, MinusCircle, Copy, Check, Sparkle, ArrowsClockwise} from '@phosphor-icons/react';
 import {transcriptNodes,resultInfo,toolArgs,toolTarget,failureHint,visibleEntries,type ToolEntry} from './transcript-model';
 import {AgentCards,agentsForCall,type ChildAgent} from './subagents/AgentCards';
 
@@ -114,15 +114,19 @@ const CopyButton=memo(function CopyButton({text}:{text:string}) {
     timer.current=window.setTimeout(()=>setState('idle'),1600);
   };
   const label=state==='done'?'已复制':state==='error'?'复制失败':'复制';
-  return <div className="message-actions">
-    <button type="button" className={'message-copy '+state} onClick={copy} aria-label={label+'这条消息'}
+  return <button type="button" className={'message-copy '+state} onClick={copy} aria-label={label+'这条消息'}
       title={state==='done'?'原文已放入剪贴板':'复制这条消息的原文'}>
       {state==='done'?<Check size={13}/>:state==='error'?<WarningCircle size={13}/>:<Copy size={13}/>}
       <span>{label}</span>
-    </button>
-  </div>;
+    </button>;
 });
-const Message=memo(function Message({message,sessionId}:{message:any;sessionId:string}) {
+const RegenerateButton=memo(function RegenerateButton({onRegenerate}:{onRegenerate?:()=>void}) {
+  return <button type="button" className="message-regenerate" onClick={()=>onRegenerate?.()}
+      aria-label="重新生成这条回答" title="用同一条指令重新生成回答">
+      <ArrowsClockwise size={13}/><span>重新生成</span>
+    </button>;
+});
+const Message=memo(function Message({message,sessionId,regenerate,onRegenerate}:{message:any;sessionId:string;regenerate?:boolean;onRegenerate?:()=>void}) {
   const project_id=useContext(ProjectContext);
   const [full,setFull]=useState<any>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
   const data=full||message;
@@ -136,16 +140,21 @@ const Message=memo(function Message({message,sessionId}:{message:any;sessionId:s
     {reasoning&&<details className="message-reasoning"><summary><Sparkle size={13}/><span>思考</span><i>{reasoning.length.toLocaleString()} 字符</i></summary><div className="message-reasoning-text">{reasoning}</div></details>}
     {typeof data.content==='string'&&data.content&&<RichText text={data.content}/>}
     <AttachmentNames items={data.attachments}/>{more}
-    {typeof data.content==='string'&&data.content.trim()&&<CopyButton text={data.content}/>}
+    {(typeof data.content==='string'&&data.content.trim()||regenerate)&&<div className="message-actions">
+      {typeof data.content==='string'&&data.content.trim()&&<CopyButton text={data.content}/>}
+      {regenerate&&<RegenerateButton onRegenerate={onRegenerate}/>}
+    </div>}
   </article>;
 });
 
 const noAgents:ChildAgent[]=[];
 const noChanges:any[]=[];
-export const Transcript=memo(function Transcript({messages,sessionId,projectId,root='',busy=false,agents=noAgents,onOpenAgent,changes=noChanges}:{messages:any[];sessionId:string;projectId?:string;root?:string;busy?:boolean;agents?:ChildAgent[];onOpenAgent?:(agent:ChildAgent)=>void;changes?:any[]}) {
+export const Transcript=memo(function Transcript({messages,sessionId,projectId,root='',busy=false,agents=noAgents,onOpenAgent,changes=noChanges,onRegenerate}:{messages:any[];sessionId:string;projectId?:string;root?:string;busy?:boolean;agents?:ChildAgent[];onOpenAgent?:(agent:ChildAgent)=>void;changes?:any[];onRegenerate?:()=>void}) {
   const nodes=useMemo(()=>transcriptNodes(messages),[messages]);
+  // Regenerating only makes sense for the newest answer.
+  const lastAnswer=useMemo(()=>messages.reduce((found:any,message:any)=>message?.role==='assistant'?message:found,null),[messages]);
   return <ProjectContext.Provider value={projectId}>{nodes.map((node,index)=><React.Fragment key={sessionId+'-'+node.key}>
     {node.kind==='gap'?<div className="history-gap">中间 {node.count} 条记录已收起。返回最近记录后可重新加载。</div>:
       node.kind==='tools'?<ExecutionEntries entries={node.entries} sessionId={sessionId} root={root} pending={busy&&index===nodes.length-1} agents={agents} onOpenAgent={onOpenAgent} changes={changes}/>:
-      <Message message={node.message} sessionId={sessionId}/>}</React.Fragment>)}</ProjectContext.Provider>;
+      <Message message={node.message} sessionId={sessionId} regenerate={!busy&&node.message===lastAnswer} onRegenerate={onRegenerate}/>}</React.Fragment>)}</ProjectContext.Provider>;
 });
