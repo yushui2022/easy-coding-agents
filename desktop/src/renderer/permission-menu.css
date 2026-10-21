@@ -1,0 +1,22 @@
+.eca-app .permission-chip {display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 8px;border:1px solid transparent;border-radius:8px;background:transparent;box-shadow:none;color:var(--secondary);font:500 12px/1 var(--font-ui);}
+.eca-app .permission-chip:hover:not(:disabled) {background:var(--hover);border-color:var(--control-border);color:var(--text);}
+.eca-app .permission-chip:focus-visible {outline:2px solid var(--accent);outline-offset:1px;}
+.eca-app .permission-chip:disabled {opacity:.5;}
+.eca-app .permission-chip svg {flex:none;color:var(--muted);}
+.eca-app .permission-chip .permission-caret {margin-left:1px;transition:transform 120ms ease;}
+.eca-app .permission-chip[aria-expanded=true] .permission-caret {transform:rotate(180deg);}
+.eca-app .permission-chip.is-full {color:var(--accent);border-color:color-mix(in srgb,var(--accent) 32%,transparent);background:var(--accent-soft);}
+.eca-app .permission-chip.is-full svg {color:var(--accent);}
+
+.eca-app .permission-menu {position:fixed;z-index:32;padding:6px;border:1px solid var(--control-border);border-radius:14px;background:var(--surface);box-shadow:var(--material-raised),var(--shadow-dialog);font-size:12px;}
+.eca-app .permission-menu-head {display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:4px 8px 6px;color:var(--muted);font-size:10px;}
+.eca-app .permission-menu-head small {font-size:10px;color:var(--muted);opacity:.8;}
+.eca-app .permission-row {display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:7px 8px;border:0;border-radius:9px;background:transparent;box-shadow:none;text-align:left;}
+.eca-app .permission-row:hover {background:var(--hover);}
+.eca-app .permission-row:focus-visible {outline:2px solid var(--accent);outline-offset:-2px;}
+.eca-app .permission-row.is-current {background:var(--selected);box-shadow:inset 0 1px 1px var(--material-rim);}
+.eca-app .permission-row-text {min-width:0;flex:1;display:flex;flex-direction:column;gap:2px;}
+.eca-app .permission-row-text strong {font-weight:500;font-size:12.5px;color:var(--text);}
+.eca-app .permission-row-text small {font-size:10.5px;line-height:1.4;color:var(--muted);}
+.eca-app .permission-row.is-full .permission-row-text strong {color:var(--accent);}
+.eca-app .permission-row-check {width:16px;flex:none;display:flex;justify-content:center;color:var(--accent);}

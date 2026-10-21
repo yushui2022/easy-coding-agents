@@ -359,13 +359,8 @@ body {margin: 0; font-family: var(--font-ui);}
 }
 .eca-app .composer-options {display:flex;align-items:center;gap:8px;min-width:0;flex-shrink:0;font-size:12px;}
 .eca-app .composer-actions {display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0;max-width:100%;margin-left:auto;}
-.eca-app .permission-control {display:flex;align-items:center;gap:1px;color:var(--secondary);border-radius:6px;padding-left:6px;}
-.eca-app .permission-control.full-access {color:var(--accent);}
 .eca-app .thinking-badge {flex-shrink:0;font-size:11px;color:var(--muted);padding-left:2px;}
 .eca-app .thinking-badge::before {content:"·";margin-right:6px;}
-.eca-app .permission-picker {max-width:120px;font:12px/1.4 var(--font-ui);padding:5px 6px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--secondary);}
-.eca-app .permission-picker:hover:not(:disabled) {background:var(--hover);}
-.eca-app .permission-picker.full-access {color:var(--accent);}
 
 /* Queued messages: a compact stack above the composer, same clay surfaces. */
 .eca-app .queue-strip {display:flex;flex-direction:column;gap:6px;margin-bottom:8px;}

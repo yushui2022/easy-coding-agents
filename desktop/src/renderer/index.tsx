@@ -11,6 +11,7 @@ import {EmptyState} from './ui/EmptyState';
 import {Welcome} from './Welcome';
 import {Sidebar} from './Sidebar';
 import {ContextMeter} from './ContextMeter';
+import {PermissionControl,permissionLabels} from './PermissionMenu';
 import {TitleBar} from './TitleBar';
 import {useAttachments} from './Attachments';
 import {AgentCards,type ChildAgent} from './subagents/AgentCards';
@@ -36,7 +37,6 @@ const labels: Record<string,string> = {idle:'等待指令', running:'执行中',
 const label = (value: string) => labels[value] || value;
 const shorten = (text: string, count = 1600) => text.length > count ? text.slice(0,count) + '\n…' : text;
 const draftKey = 'eca.desktop.task-draft';
-const permissionLabels:Record<string,string>={ask:'逐次确认','accept-edits':'自动编辑','full-access':'完全访问'};
 function readDraft(key=draftKey) {try {return sessionStorage.getItem(key) || '';} catch {return '';}}
 function App() {
   const [state,setState] = useState<any>({project:null,busy:false,sessions:[],messages:[],events:[],pending:[],changes:[],tasks:[]});
@@ -276,7 +276,6 @@ function App() {
     window.addEventListener('resize',fit);
     return()=>window.removeEventListener('resize',fit);
   },[prompt,empty,navCollapsed,detailsOpen]);
-  const permissionHint=state.approval_mode==='full-access'?'完全访问仅对当前会话生效':state.approval_mode==='accept-edits'?'自动批准文件修改，命令仍需确认':'需要授权的操作逐次确认';
   const modelSource = state.project
     ? (state.settings?.source==='desktop'
       ? (state.model_selection?.choice==='default'?'桌面默认':'项目指定连接')+' · '+(state.model_selection?.name||'')
@@ -409,7 +408,7 @@ function App() {
               }}/>
             <div className="composer-toolbar">
               <div className="composer-options">{attachments.button}
-              {state.project&&<div className={'permission-control '+(state.approval_mode==='full-access'?'full-access':'')}><ShieldCheck size={14}/><select className={'permission-picker '+(state.approval_mode==='full-access'?'full-access':'')} aria-label="审批模式" title={permissionHint} value={state.approval_mode||'ask'} disabled={permissionChanging||projectChanging} onChange={e=>e.target.value==='full-access'?setConfirmFull(true):void choosePermission(e.target.value)}>{Object.entries(permissionLabels).map(([value,text])=><option key={value} value={value}>{text}</option>)}</select></div>}
+              {state.project&&<PermissionControl mode={state.approval_mode||'ask'} busy={permissionChanging||projectChanging} onChange={mode=>mode==='full-access'?setConfirmFull(true):void choosePermission(mode)}/>}
               </div>
               <div className="composer-actions">
               <ContextMeter context={state.context} busy={state.busy} onCompact={async()=>{const result=await perform('context.compact'); if(result)setNotice('上下文已压缩，原始历史仍保留。');}}/>
