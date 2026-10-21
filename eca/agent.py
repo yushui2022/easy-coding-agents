@@ -223,6 +223,12 @@ If execution was interrupted, inspect the actual state before repeating mutation
                 prompt += f"\n{label} ({name}):\n{path.read_text('utf-8', errors='replace')}\n"
         if self.state.get("profile"):
             prompt += f"\nUser-selected agent instructions:\n{self.state['profile']}\n"
+        if self.settings.mode == "plan":
+            prompt += ("\nPlan mode: the user approves the plan itself, so record it with the todo tool as you finish "
+                       "investigating — one pending item per executable step, in order, at most 50 — then summarise it "
+                       "briefly in prose. That list is the plan they approve and what you will be held to while "
+                       "executing: no invented steps, nothing marked completed while merely planning, and no claim "
+                       "that work was done. A plan without the todo list gives the user nothing to approve.\n")
         if self.state["tasks"]:
             prompt += "\nCurrent task plan:\n" + json.dumps(self.state["tasks"], ensure_ascii=False)
         from . import goal as goals

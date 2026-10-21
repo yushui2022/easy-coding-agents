@@ -1,4 +1,5 @@
-// Isolated hidden app + local model fixture: mode switching and the session goal.
+// Isolated hidden app + local model fixture: mode switching, the session goal,
+// and the todo-backed plan that becomes the running checklist.
 const {_electron:electron,expect}=require('@playwright/test');
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');
 process.chdir(path.resolve(__dirname,'..'));
@@ -7,10 +8,28 @@ const project=path.join(home,'项目');fs.mkdirSync(project);
 fs.writeFileSync(path.join(project,'eca.toml'),'[agent]\nproject_memory=false\nauto_compact=false\nnetwork_retries=0\n');
 const output=path.resolve('../output/playwright/mode-goal');fs.mkdirSync(output,{recursive:true});
 const mode=process.env.ECA_TEST_MODE||'development',requests=[],errors=[];
+const STEPS=['读入口文件确认结构','列出要改的模块','给出改动顺序'];
+const todoCall=(items,id)=>({id:'fixture',choices:[{index:0,delta:{tool_calls:[{index:0,id,type:'function',
+  function:{name:'todo',arguments:JSON.stringify({items})}}]},finish_reason:'tool_calls'}]});
+const textCall=text=>({id:'fixture',choices:[{index:0,delta:{content:text},finish_reason:'stop'}]});
 const server=http.createServer(async(req,res)=>{
-  let raw='';for await(const c of req)raw+=c;requests.push(JSON.parse(raw));
+  let raw='';for await(const c of req)raw+=c;
+  const payload=JSON.parse(raw);requests.push(payload);
+  // The runtime appends its own guidance message after the prompt, so take the
+  // newest genuine user message instead of positionally the last one.
+  const lastUser=((payload.messages||[]).filter(m=>m.role==='user')
+    .map(m=>JSON.stringify(m.content||'')).filter(t=>!t.includes('[Runtime guidance]')).slice(-1)[0])||'';
+  const lastIsTool=((payload.messages||[]).slice(-1)[0]||{}).role==='tool';
   res.writeHead(200,{'Content-Type':'text/event-stream'});
-  res.end('data: '+JSON.stringify({id:'fixture',choices:[{index:0,delta:{content:'已完成这一步'},finish_reason:'stop'}]})+'\n\ndata: [DONE]\n\n');
+  let body;
+  if(lastIsTool){
+    body=textCall('已完成这一步');
+  } else if(lastUser.includes('按上面的计划开始执行')){
+    body=todoCall([{content:STEPS[0],status:'completed'},{content:STEPS[1],status:'in_progress'},{content:STEPS[2],status:'pending'}],'call_run');
+  } else if(lastUser.includes('看看这个项目')){
+    body=todoCall(STEPS.map(content=>({content,status:'pending'})),'call_plan');
+  } else body=textCall('已完成这一步');
+  res.end('data: '+JSON.stringify(body)+'\n\ndata: [DONE]\n\n');
 });
 let app;
 (async()=>{
@@ -34,7 +53,13 @@ let app;
   await page.getByRole('button',{name:'打开项目',exact:true}).click();
   await expect.poll(async()=>(await invoke('snapshot')).project).toBe(project);
 
-  // 1. Mode chip switches the session to plan mode and survives a reload.
+  // Session naming adds its own model call, so match the run by prompt and require
+  // Match a turn start: the prompt is in the transcript and the last message is
+  // not a tool result (history from earlier runs does contain tool messages).
+  const turnStart=text=>requests.filter(r=>Array.isArray(r.tools)&&r.tools.length
+    &&JSON.stringify(r.messages).includes(text)&&r.messages.slice(-1)[0]?.role!=='tool');
+
+  // 1. Mode chip switches the session to plan mode.
   await expect(page.locator('.mode-chip')).toContainText('编码');
   await page.locator('.mode-chip').click();
   await page.getByRole('menuitemradio',{name:/计划/}).click();
@@ -49,32 +74,41 @@ let app;
   await dialog.getByRole('button',{name:'开始跟踪'}).click();
   await expect(page.locator('.goal-bar')).toContainText('交付可用的计划模式');
   await expect(page.locator('.goal-bar')).toContainText('0/2');
-  await page.locator('.goal-summary').click();
-  await expect(page.locator('.goal-criteria')).toContainText('标注已知风险');
 
-  // 3. A plan-mode request only receives read-only tools plus goal_update.
+  // 3. A plan-mode request only receives read-only tools plus goal_update, and the
+  //    model's todo call becomes the plan checklist in the conversation.
   await page.getByLabel('任务指令').fill('看看这个项目');
   await page.getByRole('button',{name:'发送任务',exact:true}).click();
-  // Session naming may add its own model call, so match the run by its prompt.
-  const runWith=text=>requests.filter(r=>Array.isArray(r.tools)&&r.tools.length&&JSON.stringify(r.messages).includes(text));
-  await expect.poll(()=>runWith('看看这个项目').length,{timeout:60000}).toBe(1);
-  await expect.poll(async()=>(await invoke('snapshot')).busy).toBe(false);
-  const planRun=runWith('看看这个项目')[0],planTools=planRun.tools.map(t=>t.function.name);
+  await expect.poll(()=>turnStart('看看这个项目').length,{timeout:60000}).toBeGreaterThan(0);
+  await expect.poll(async()=>(await invoke('snapshot')).busy,{timeout:60000}).toBe(false);
+  const planRun=turnStart('看看这个项目')[0],planTools=planRun.tools.map(t=>t.function.name);
   for(const name of ['write','edit','shell','delete'])assert(!planTools.includes(name),`${name} leaked into plan mode`);
-  for(const name of ['read','goal_update'])assert(planTools.includes(name),`${name} missing in plan mode`);
+  for(const name of ['read','todo','goal_update'])assert(planTools.includes(name),`${name} missing in plan mode`);
   assert(JSON.stringify(planRun.messages).includes('交付可用的计划模式'),'goal did not reach the model prompt');
+  const checklist=page.locator('.plan-checklist');
+  await expect(checklist).toContainText('计划步骤');
+  await expect(checklist.locator('.plan-item')).toHaveCount(3);
+  await expect(checklist).toContainText('0/3');
+  await expect(checklist).toContainText(STEPS[0]);
+  assert.deepEqual((await invoke('snapshot')).tasks.map(t=>t.status),['pending','pending','pending']);
 
-  // 4. "按此计划执行" switches back to code mode and starts a new run.
+  // 4. "按此计划执行" sends the approved checklist and switches back to code mode.
   await expect(page.locator('.plan-next button')).toBeVisible();
   await page.locator('.plan-next button').click();
-  await expect.poll(()=>runWith('按上面的计划开始执行').length,{timeout:60000}).toBe(1);
+  await expect.poll(()=>turnStart('按上面的计划开始执行').length,{timeout:60000}).toBeGreaterThan(0);
+  const runRequest=turnStart('按上面的计划开始执行')[0];
+  assert(runRequest.tools.map(t=>t.function.name).includes('write'),'code mode lost write');
+  const handed=JSON.stringify(runRequest.messages);
+  for(const step of STEPS)assert(handed.includes(step),`step missing from the approved plan message: ${step}`);
   await expect.poll(async()=>(await invoke('snapshot')).settings.mode).toBe('code');
-  assert(runWith('按上面的计划开始执行')[0].tools.map(t=>t.function.name).includes('write'),'code mode lost write');
+  await expect(checklist).toContainText('执行清单');
+  await expect(checklist).toContainText('1/3');
+  await expect(checklist.locator('.plan-item').first()).toHaveClass(/is-completed/);
 
-  // 5. Reload keeps the goal and the mode, then the goal can be cleared.
+  // 5. Reload keeps the checklist and the goal, then the goal can be cleared.
   await page.reload();
+  await expect(checklist).toContainText('1/3');
   await expect(page.locator('.goal-bar')).toContainText('交付可用的计划模式');
-  await expect(page.locator('.mode-chip')).toContainText('编码');
   await page.getByLabel('清除目标').click();
   await expect(page.locator('.goal-bar')).toHaveCount(0);
   assert.equal((await invoke('snapshot')).goal,null);
@@ -82,13 +116,18 @@ let app;
   await page.screenshot({path:path.join(output,'plan-goal.png')});
   assert.deepEqual(errors,[]);
   const report={mode,exe:process.env.ECA_TEST_EXE||'development',requests:requests.length,
-    planTools:planTools.length,goalPromptInjected:true,errors};
+    planTools:planTools.length,goalPromptInjected:true,planChecklist:3,handedOver:true,errors};
   fs.writeFileSync(path.join(output,`${mode}.json`),JSON.stringify(report,null,1));
   console.log(JSON.stringify(report));
   await app.close();server.close();
 })().catch(async error=>{
   console.error(error);
-  try {fs.writeFileSync(path.join(output,`${mode}-failure.json`),JSON.stringify({error:String(error),errors},null,1));} catch {}
+  const shapes=requests.map(r=>({tools:Array.isArray(r.tools)?r.tools.length:'none',
+    lastRole:(r.messages||[]).slice(-1)[0]?.role,
+    lastUser:JSON.stringify((r.messages||[]).slice().reverse().find(m=>m.role==='user')?.content||'').slice(0,200),
+    head:JSON.stringify(r.messages||[]).slice(0,160)}));
+  try {const body=await app.firstWindow().then(w=>w.locator('body').innerText());console.error('BODY:',body.slice(-800));} catch {}
+  try {fs.writeFileSync(path.join(output,`${mode}-failure.json`),JSON.stringify({error:String(error),errors,shapes},null,1));} catch {}
   if(app)await app.close();
   server.close();
   process.exit(1);

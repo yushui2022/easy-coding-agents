@@ -1,0 +1,24 @@
+.eca-app .plan-checklist {margin:14px 0 0;padding:10px 12px;border:1px solid var(--border);border-radius:14px;
+  background:var(--surface);box-shadow:var(--material-raised);font-size:12.5px;}
+.eca-app .plan-checklist.is-plan {border-color:color-mix(in srgb,var(--accent) 26%,var(--border));}
+.eca-app .plan-checklist.is-done {border-color:color-mix(in srgb,var(--success) 30%,var(--border));}
+.eca-app .plan-checklist header {display:flex;align-items:center;gap:7px;color:var(--secondary);}
+.eca-app .plan-checklist header > svg {flex:none;color:var(--accent);}
+.eca-app .plan-checklist.is-plan header > svg {color:var(--accent);}
+.eca-app .plan-checklist.is-done header > svg {color:var(--success);}
+.eca-app .plan-title {font-weight:500;color:var(--text);}
+.eca-app .plan-progress {color:var(--muted);font-variant-numeric:tabular-nums;}
+.eca-app .plan-toggle {margin-left:auto;display:inline-flex;align-items:center;gap:3px;border:0;background:transparent;
+  padding:2px 4px;min-height:22px;border-radius:7px;color:var(--muted);font-size:11px;}
+.eca-app .plan-toggle:hover {background:var(--hover);color:var(--text);}
+.eca-app .plan-toggle[aria-expanded=true] svg {transform:rotate(180deg);}
+.eca-app .plan-checklist ol {list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:5px;}
+.eca-app .plan-item {display:flex;gap:7px;align-items:flex-start;line-height:1.6;color:var(--text);}
+.eca-app .plan-item svg {flex:none;margin-top:3px;color:var(--muted);}
+.eca-app .plan-item.is-in_progress {color:var(--text);}
+.eca-app .plan-item.is-in_progress svg {color:var(--accent);}
+.eca-app .plan-item.is-completed {color:var(--muted);}
+.eca-app .plan-item.is-completed svg {color:var(--success);}
+.eca-app .plan-item.is-completed span {text-decoration:line-through;}
+.eca-app .plan-more {color:var(--muted);font-size:11.5px;padding-left:21px;}
+.eca-app .plan-hint {margin:8px 0 0;color:var(--muted);font-size:11px;line-height:1.5;}

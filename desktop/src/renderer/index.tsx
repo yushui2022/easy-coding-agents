@@ -5,6 +5,7 @@ import {Dialog} from './Dialog';
 import {ModelSettings} from './ModelSettings';
 import {ModelMenu,effortLabels} from './ModelMenu';
 import {RunActivity} from './RunActivity';
+import {PlanChecklist} from './PlanChecklist';
 import {Transcript, LazyDetail, LogText} from './Transcript';
 import {Workspace} from './workspace/Workspace';
 import {EmptyState} from './ui/EmptyState';
@@ -268,7 +269,13 @@ function App() {
     if(sending||state.busy)return;
     const switched=await perform('mode.set',{mode:'code'});
     if(!switched)return;
-    const result=await perform('task.start',{prompt:'按上面的计划开始执行。先简述接下来几步，然后动手；计划需要调整时说明原因。',attachments:[]});
+    // Hand the approved checklist over verbatim so the model works from the same
+    // numbered list the user just read, and keeps updating it with todo.
+    const steps=(state.tasks||[]).map((task:any,index:number)=>`${index+1}. ${task.content}`).join('\n');
+    const prompt=steps
+      ? `按上面的计划开始执行。已批准的计划清单：\n${steps}\n\n按顺序推进：开始一步时用 todo 把它标成 in_progress，真正完成（改动已落地、相关检查跑过）再标 completed。不要跳步，不要为了好看把没验证的标成完成。计划需要调整时说明原因再调整。`
+      : '按上面的计划开始执行。先用 todo 记下这份计划的步骤，再按顺序推进；没有验证过的步骤不要标成完成。';
+    const result=await perform('task.start',{prompt,attachments:[]});
     if(result)setNotice('已切回编码模式，按计划开始执行。');
   };
   const loadOlder = async () => {
@@ -391,6 +398,7 @@ function App() {
               <details className="message-reasoning" open><summary><Sparkle size={13}/><span>思考</span></summary>
                 <div className="message-reasoning-text">{state.activity.reasoning_text}</div></details></article>}
           {state.stream&&<article className="message assistant live"><div className="message-label">ECA <span>正在输出</span></div><div className="stream-text">{state.stream}</div></article>}
+          {!!(state.tasks||[]).length&&<PlanChecklist tasks={state.tasks} busy={state.busy} phase={state.settings?.mode==='plan'?'plan':'run'}/>}
         </div>
         <div className="composer-wrap">
           {!following&&!empty&&<div className="scroll-return"><button className="jump-latest" onClick={()=>{bottom.current=true;setFollowing(true);scroll.current?.scrollTo({top:scroll.current.scrollHeight});}}><ArrowDown size={14}/>回到最新</button></div>}

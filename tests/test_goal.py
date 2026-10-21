@@ -149,6 +149,14 @@ class DesktopGoalRPCTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Session goal: ship it', prompt)
         self.assertIn('tests pass', prompt)
 
+
+    async def test_plan_mode_prompt_asks_for_a_todo_plan(self):
+        await self.rpc.dispatch('mode.set', {'mode': 'plan'})
+        prompt = self.rpc.runtime.agent.system_prompt()
+        self.assertIn('record it with the todo tool', prompt)
+        self.assertIn('gives the user nothing to approve', prompt)
+        await self.rpc.dispatch('mode.set', {'mode': 'code'})
+        self.assertNotIn('record it with the todo tool', self.rpc.runtime.agent.system_prompt())
     async def test_goal_set_rejects_empty_criteria(self):
         with self.assertRaises(ValueError):
             await self.rpc.dispatch('goal.set', {'goal': {'text': 'x', 'criteria': []}})
