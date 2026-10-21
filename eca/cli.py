@@ -25,6 +25,7 @@ from .tools import atomic_write, run_process
 from .doctor import diagnose
 from .usage import UsageLedger
 from .runtime import Runtime
+from .modes import MODES
 
 
 HELP = {
@@ -49,7 +50,7 @@ HELP = {
     "/lsp": "Show language-server status; /lsp disconnect NAME closes one",
     "/mcp": "List configured MCP servers without connecting",
     "/help": "Show commands", "/new": "Start a new session", "/sessions": "List saved sessions",
-    "/resume ID": "Resume a session (or latest)", "/mode code|plan|chat": "Change execution mode",
+    "/resume ID": "Resume a session (or latest)", "/mode code|plan|goal|chat": "Change execution mode",
     "/model NAME": "Change model for this process", "/permission ask|accept-edits": "File edit approvals",
     "/agent NAME": "Select an eca.toml profile (off resets)", "/compact": "Summarize context (one API request)",
     "/tasks": "Show the task plan", "/status": "Show session and configuration", "/diff": "Show Git diff",
@@ -310,8 +311,8 @@ class App:
         elif command == "/sessions":
             self.show_sessions()
         elif command == "/mode":
-            if arg not in {"code", "plan", "chat"}:
-                raise ValueError("Usage: /mode code|plan|chat")
+            if arg not in MODES:
+                raise ValueError("Usage: /mode " + "|".join(MODES))
             self.agent.settings.mode = self.settings.mode = self.state["mode"] = arg
             self.store.save(self.state)
         elif command == "/permission":
@@ -486,7 +487,7 @@ class App:
 
         @bindings.add("s-tab")
         def toggle(event):
-            modes = ["code", "plan", "chat"]
+            modes = list(MODES)
             self.agent.settings.mode = self.settings.mode = self.state["mode"] = modes[(modes.index(self.settings.mode) + 1) % len(modes)]
             self.store.save(self.state)
             event.app.invalidate()

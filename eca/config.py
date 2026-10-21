@@ -157,8 +157,9 @@ class Settings:
             raise ValueError("Invalid reasoning_effort")
         if self.api_format not in {"openai", "anthropic", "responses"}:
             raise ValueError("api_format must be openai, responses or anthropic")
-        if self.mode not in {"code", "plan", "chat"}:
-            raise ValueError("mode must be code, plan or chat")
+        from .modes import MODES
+        if self.mode not in MODES:
+            raise ValueError("mode must be " + ", ".join(MODES))
         if self.permission not in {"ask", "accept-edits"}:
             raise ValueError("permission must be ask or accept-edits")
         for name in ("context_chars", "command_timeout", "request_timeout", "output_limit", "max_output_tokens", "subagent_max_turns", "subagent_max_calls", "subagent_timeout", "subagent_concurrency"):

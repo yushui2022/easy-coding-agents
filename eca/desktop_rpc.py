@@ -20,6 +20,7 @@ from .runtime import Runtime
 from .store import Store
 from .workflow import suite_status
 from . import goal as goals
+from .modes import MODES
 from . import reasoning
 from .activity import tool_target
 
@@ -507,7 +508,7 @@ class DesktopRPC:
                 # approves anything, and a new session starts in the project mode.
                 agent = self.require().agent
                 mode = params.get('mode')
-                if mode not in {'code', 'plan', 'chat'}:
+                if mode not in MODES:
                     raise ValueError('无效的工作模式。')
                 if self.run_id is not None:
                     raise ValueError('请先停止或等待当前任务结束，再切换工作模式。')

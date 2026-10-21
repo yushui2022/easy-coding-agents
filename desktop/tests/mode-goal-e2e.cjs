@@ -12,6 +12,8 @@ const STEPS=['读入口文件确认结构','列出要改的模块','给出改动
 const todoCall=(items,id)=>({id:'fixture',choices:[{index:0,delta:{tool_calls:[{index:0,id,type:'function',
   function:{name:'todo',arguments:JSON.stringify({items})}}]},finish_reason:'tool_calls'}]});
 const textCall=text=>({id:'fixture',choices:[{index:0,delta:{content:text},finish_reason:'stop'}]});
+const goalCall=(updates,id)=>({id:'fixture',choices:[{index:0,delta:{tool_calls:[{index:0,id,type:'function',
+  function:{name:'goal_update',arguments:JSON.stringify({updates})}}]},finish_reason:'tool_calls'}]});
 const server=http.createServer(async(req,res)=>{
   let raw='';for await(const c of req)raw+=c;
   const payload=JSON.parse(raw);requests.push(payload);
@@ -22,8 +24,11 @@ const server=http.createServer(async(req,res)=>{
   const lastIsTool=((payload.messages||[]).slice(-1)[0]||{}).role==='tool';
   res.writeHead(200,{'Content-Type':'text/event-stream'});
   let body;
+  const nudged=JSON.stringify(payload.messages||[]).includes('The session goal is not met');
   if(lastIsTool){
     body=textCall('已完成这一步');
+  } else if(nudged){
+    body=goalCall([{index:1,done:true},{index:2,done:true}],'call_goal');
   } else if(lastUser.includes('按上面的计划开始执行')){
     body=todoCall([{content:STEPS[0],status:'completed'},{content:STEPS[1],status:'in_progress'},{content:STEPS[2],status:'pending'}],'call_run');
   } else if(lastUser.includes('看看这个项目')){
@@ -112,6 +117,26 @@ let app;
   await page.getByLabel('清除目标').click();
   await expect(page.locator('.goal-bar')).toHaveCount(0);
   assert.equal((await invoke('snapshot')).goal,null);
+
+  // 6. Goal mode is its own mode: it asks for an objective on entry, and an unmet
+  //    goal keeps the turn going instead of ending on a progress summary.
+  await page.locator('.mode-chip').click();
+  await page.getByRole('menuitemradio',{name:/目标/}).click();
+  await expect(page.locator('.mode-chip')).toContainText('目标');
+  const goalDialog=page.locator('dialog.goal-dialog');
+  await expect(goalDialog).toBeVisible();
+  await goalDialog.locator('textarea').nth(0).fill('自动推进到达标');
+  await goalDialog.locator('textarea').nth(1).fill('第一阶段完成\n第二阶段完成');
+  await goalDialog.getByRole('button',{name:'开始跟踪'}).click();
+  await expect(page.locator('.goal-bar')).toContainText('0/2');
+  await page.getByLabel('任务指令').fill('达成目标');
+  await page.getByRole('button',{name:'发送任务',exact:true}).click();
+  await expect.poll(()=>turnStart('达成目标').length,{timeout:60000}).toBeGreaterThan(1);
+  await expect.poll(async()=>(await invoke('snapshot')).busy,{timeout:60000}).toBe(false);
+  const pushed=requests.filter(r=>JSON.stringify(r.messages||[]).includes('The session goal is not met'));
+  assert(pushed.length>0,'goal mode ended the turn without pushing for the open criteria');
+  assert.equal((await invoke('snapshot')).goal.status,'done');
+  await expect(page.locator('.goal-bar')).toContainText('2/2');
 
   await page.screenshot({path:path.join(output,'plan-goal.png')});
   assert.deepEqual(errors,[]);

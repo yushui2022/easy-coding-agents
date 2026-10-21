@@ -3,6 +3,8 @@ import json
 import asyncio
 import uuid
 
+from .modes import working
+
 
 def suite_status(agent):
     record = dict(agent.state.get('verification_suite', {'status': 'not_run'}))
@@ -19,7 +21,7 @@ def validate_checks(agent, commands, repair_attempts):
         raise ValueError('Repair requires checks and a budget of 0..3')
     if not isinstance(commands, (list, tuple)) or len(commands) > 10 or any(not isinstance(c, str) or not c.strip() for c in commands):
         raise ValueError('Supply at most 10 nonempty verification commands')
-    if repair_attempts and (agent.settings.mode != 'code' or agent.state.get('isolated')):
+    if repair_attempts and (not working(agent.settings.mode) or agent.state.get('isolated')):
         raise ValueError('Automatic repair requires non-isolated code mode')
 
 
@@ -27,7 +29,7 @@ async def verified_run(agent, prompt, commands, repair_attempts=0, worker_first=
     validate_checks(agent, commands, repair_attempts)
     if worker_first is not None:
         from .models import worker_settings
-        if not commands or agent.settings.mode != 'code' or agent.state.get('isolated') or agent.child:
+        if not commands or not working(agent.settings.mode) or agent.state.get('isolated') or agent.child:
             raise ValueError('Worker-first requires checks and a non-isolated parent in code mode')
         if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 12000 or agent.busy:
             raise ValueError('Worker-first requires an idle agent and a task of 1..12000 characters')

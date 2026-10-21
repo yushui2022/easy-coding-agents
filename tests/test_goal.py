@@ -161,6 +161,50 @@ class DesktopGoalRPCTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             await self.rpc.dispatch('goal.set', {'goal': {'text': 'x', 'criteria': []}})
 
+    async def test_goal_mode_prompt_depends_on_having_an_objective(self):
+        await self.rpc.dispatch('mode.set', {'mode': 'goal'})
+        self.assertIn('this session has no objective yet', self.rpc.runtime.agent.system_prompt())
+        await self.rpc.dispatch('goal.set', {'goal': {'text': 'ship it', 'criteria': ['tests pass']}})
+        prompt = self.rpc.runtime.agent.system_prompt()
+        self.assertIn('pursue the agreed goal until every acceptance criterion', prompt)
+        self.assertNotIn('this session has no objective yet', prompt)
+
+    async def test_goal_mode_continuation_is_bounded(self):
+        await self.rpc.dispatch('mode.set', {'mode': 'goal'})
+        await self.rpc.dispatch('goal.set', {'goal': {'text': 'ship it', 'criteria': ['a', 'b']}})
+        agent = self.rpc.runtime.agent
+        agent.goal_continuations = 0
+        self.assertTrue(agent.continue_goal(float('inf')))
+        self.assertIn('The session goal is not met', agent.state['messages'][-1]['content'])
+        self.assertIn('1. a', agent.state['messages'][-1]['content'])
+        for _ in range(agent.GOAL_CONTINUATIONS - 1):
+            self.assertTrue(agent.continue_goal(float('inf')))
+        self.assertFalse(agent.continue_goal(float('inf')))
+
+    async def test_continuation_respects_mode_goal_state_and_budget(self):
+        agent = self.rpc.runtime.agent
+        agent.goal_continuations = 0
+        await self.rpc.dispatch('goal.set', {'goal': {'text': 'x', 'criteria': ['a']}})
+        self.assertFalse(agent.continue_goal(float('inf')))          # still code mode
+        await self.rpc.dispatch('mode.set', {'mode': 'goal'})
+        self.assertFalse(agent.continue_goal(1))                      # last turn of the budget
+        await agent.tools.execute('goal_update', {'updates': [{'index': 1, 'done': True}]})
+        self.assertFalse(agent.continue_goal(float('inf')))           # already met
+
+    async def test_modes_helper_treats_goal_as_a_working_mode(self):
+        from eca.modes import MODES, working
+        self.assertEqual(MODES, ('code', 'plan', 'goal', 'chat'))
+        self.assertTrue(working('goal'))
+        self.assertTrue(working('code'))
+        self.assertFalse(working('plan'))
+        self.assertFalse(working('chat'))
+
+    async def test_settings_accept_goal_mode_and_reject_unknown(self):
+        base = dict(model='m', base_url='http://localhost:1/v1', api_format='openai', api_key='k')
+        Settings(self.root, mode='goal', **base).validate()
+        with self.assertRaises(ValueError):
+            Settings(self.root, mode='turbo', **base).validate()
+
 
 if __name__ == '__main__':
     unittest.main()

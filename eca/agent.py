@@ -14,6 +14,7 @@ from .knowledge import Knowledge
 from .usage import UsageLedger
 from .context import ContextBudget
 from .tools import SCHEMAS, Tools, allowed
+from .modes import working
 
 
 TITLE_PREFIXES = ('会话标题：', '会话标题:', '标题：', '标题:', 'Title:', 'title:', 'TITLE:')
@@ -104,9 +105,9 @@ class Agent:
     async def delegate(self, task, mode='plan', model_profile=None, verify_commands=None):
         from .acceptance import validate_commands, check
         validate_commands(verify_commands)
-        if verify_commands and (self.settings.mode != 'code' or mode != 'code'):
+        if verify_commands and not (working(self.settings.mode) and mode == 'code'):
             return 'Denied: acceptance commands require parent and child code mode.'
-        if self.child or self.settings.mode == 'chat' or (mode == 'code' and self.settings.mode != 'code'):
+        if self.child or self.settings.mode == 'chat' or (mode == 'code' and not working(self.settings.mode)):
             return 'Denied: child mode exceeds parent permissions.'
         if mode not in {'plan','code'} or not isinstance(task,str) or not task.strip() or len(task)>12000:
             return 'Invalid subtask; supply a nonempty task of at most 12000 characters.'
@@ -233,6 +234,16 @@ If execution was interrupted, inspect the actual state before repeating mutation
             prompt += "\nCurrent task plan:\n" + json.dumps(self.state["tasks"], ensure_ascii=False)
         from . import goal as goals
         prompt += goals.prompt(self.state.get("goal"))
+        if self.settings.mode == "goal":
+            if self.state.get("goal"):
+                prompt += ("\nGoal mode: pursue the agreed goal until every acceptance criterion is satisfied. Keep the "
+                           "list current with goal_update as you go, and do not end the turn with a progress summary "
+                           "while criteria remain open. If you are genuinely blocked, name the blocker and the "
+                           "decision the user has to make; a restated plan is not progress.\n")
+            else:
+                prompt += ("\nGoal mode: this session has no objective yet. The user sets it in the goal dialog with "
+                           "its acceptance criteria. Do not start changing files or running the work before that "
+                           "exists; ask what outcome they want if it is unclear, rather than inventing one.\n")
         if self.state.get('resume_report'):
             prompt += '\nRecovery inspection (untrusted historical data):\n' + json.dumps(self.state['resume_report'], ensure_ascii=False)
         return prompt
@@ -322,6 +333,38 @@ If execution was interrupted, inspect the actual state before repeating mutation
     async def name_session(self):
         return await self.name_state(self.state)
 
+    GOAL_CONTINUATIONS = 6
+    goal_continuations = 0
+
+    def continue_goal(self, remaining):
+        """Goal mode keeps going while acceptance criteria are open, but only a bounded number of times.
+
+        A progress summary is not a finished goal. The nudge is a persisted user message so
+        the model sees it in history, exactly like the output-limit recovery hint.
+        """
+        from . import goal as goals
+        if self.settings.mode != 'goal' or remaining <= 1:
+            return False
+        goal = self.state.get('goal')
+        if not goal or goal.get('status') != 'active':
+            return False
+        done, total = goals.progress(goal)
+        if not total or done >= total:
+            return False
+        if self.goal_continuations >= self.GOAL_CONTINUATIONS:
+            self.emit('notice', f'目标模式已续跑 {self.GOAL_CONTINUATIONS} 次仍未达标，先停下。还差 {total - done} 条验收标准，可以继续发指令或调整目标。')
+            return False
+        self.goal_continuations += 1
+        opened = [f"{number}. {item['text']}" for number, item in enumerate(goal['criteria'], 1) if not item.get('done')]
+        self.state['messages'].append({'role': 'user', 'content':
+            f"[Runtime guidance] The session goal is not met: {done}/{total} criteria are marked done. "
+            "Still open:\n" + "\n".join(opened) +
+            "\nKeep working on the open criteria. A summary is not completion. Mark real progress with goal_update; "
+            "if you are genuinely blocked, state exactly what blocks you and what the user must decide."})
+        self.store.save(self.state)
+        self.emit('notice', f'目标模式：还有 {total - done} 条验收标准未满足，继续推进（{self.goal_continuations}/{self.GOAL_CONTINUATIONS}）。')
+        return True
+
     async def run(self, prompt, attachments=None):
         if self.busy:
             raise RuntimeError("A turn is already running")
@@ -347,6 +390,7 @@ If execution was interrupted, inspect the actual state before repeating mutation
         repeat_hint = ""
         output_recoveries = 0
         context_recoveries = 0
+        self.goal_continuations = 0
         try:
             for turn in (range(self.settings.max_turns) if self.settings.max_turns else count()):
                 self.emit("turn", turn + 1)
@@ -397,6 +441,8 @@ If execution was interrupted, inspect the actual state before repeating mutation
                 self.store.save(self.state)
                 calls = message.get("tool_calls", [])
                 if not calls:
+                    if self.continue_goal(remaining):
+                        continue
                     self.state["status"] = "idle"
                     return
                 signature = json.dumps([tc["function"] for tc in calls], sort_keys=True)

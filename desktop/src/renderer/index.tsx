@@ -254,7 +254,10 @@ function App() {
     setModeChanging(true);
     try {
       const result=await perform('mode.set',{mode:next});
-      if(result&&next!=='plan')setNotice('');
+      if(!result)return;
+      // Goal mode needs an objective before it means anything; ask for it right away.
+      if(next==='goal'&&!result.goal){setNotice('');setGoalOpen(true);}
+      else if(next!=='plan')setNotice('');
     } finally {setModeChanging(false);}
   };
   const saveGoal = async (text:string,criteria:string[]) => {

@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 import subprocess
 
+from .modes import working
+
 
 def source_files(tools):
     """Respect Git ignores without copying Git metadata or credentials."""
@@ -59,7 +61,7 @@ async def parallel(agent, tasks):
             not isinstance(task.get('task'), str) or not task['task'].strip() or len(task['task']) > 12000 or
             task.get('mode', 'plan') not in {'plan', 'code'}):
             raise ValueError('Each task needs task text and optional plan/code mode')
-        if task.get('mode') == 'code' and agent.settings.mode != 'code':
+        if task.get('mode') == 'code' and not working(agent.settings.mode):
             return 'Denied: child mode exceeds parent permissions.'
     from .models import worker_settings
     selected = [worker_settings(agent.settings, task.get('model_profile')) for task in tasks]
