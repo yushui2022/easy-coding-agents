@@ -19,10 +19,25 @@ let sideNotification:ReturnType<typeof setTimeout>|undefined;
 let childNotification:ReturnType<typeof setTimeout>|undefined;
 
 const home = process.env.ECA_DESKTOP_DATA_HOME || (process.platform === 'win32' && fs.existsSync('G:\\') ? 'G:\\Data\\ECA\\Desktop' : app.getPath('userData'));
+const dataHomeGiven = !!process.env.ECA_DESKTOP_DATA_HOME;
 fs.mkdirSync(home, {recursive: true});
 app.setPath('userData', home);
-const cacheHome = process.env.ECA_DESKTOP_CACHE_HOME || (!process.env.ECA_DESKTOP_DATA_HOME && fs.existsSync('G:/') ? 'G:/DevCache/eca-desktop' : path.join(home, 'cache'));
+const cacheHome = process.env.ECA_DESKTOP_CACHE_HOME || (!dataHomeGiven && fs.existsSync('G:/') ? 'G:/DevCache/eca-desktop' : path.join(home, 'cache'));
 fs.mkdirSync(cacheHome, {recursive: true});
+// Which projects were open last run: restored on launch so the sidebar shows the
+// project and session tree instead of a bare list of recent folders.
+const openProjectsFile = path.join(home, 'open-projects.json');
+function readOpenProjects(): string[] {
+  try {
+    const rows = JSON.parse(fs.readFileSync(openProjectsFile, 'utf8'));
+    return Array.isArray(rows) ? rows.filter((row: unknown) => typeof row === 'string').slice(0, 8) : [];
+  } catch { return []; }
+}
+function rememberOpenProject(folder: string, remove = false) {
+  const rows = readOpenProjects().filter(row => row !== folder);
+  if (!remove) rows.unshift(folder);
+  try { fs.writeFileSync(openProjectsFile, JSON.stringify(rows.slice(0, 8))); } catch { /* best effort */ }
+}
 app.setPath('sessionData', cacheHome);
 const tempHome = path.join(cacheHome, 'temp');
 fs.mkdirSync(tempHome, {recursive: true});
@@ -129,6 +144,7 @@ async function openProject(folder: string) {
     await bindWorkspace(result);
     usedModel(sessionSelections.get(key)?.connection_id);
     connections.opened(result.project);
+    rememberOpenProject(result.project);
     return decorate(result);
   } finally {opening = false;}
 }
@@ -239,7 +255,11 @@ async function action(method: string, params: any = {}) {
       const source=prior?.projects?.find((p:any)=>p.id===result.project_id);
       const inherited=source&&sessionSelections.get(contextKey(source.id,source.session_id));
       if(result.session_id&&!sessionSelections.has(key)&&inherited)sessionSelections.set(key,inherited);
-      if(method==='project.close')await closeWorkspaces(params.project_id);
+      if(method==='project.close'){
+        const closed=prior?.projects?.find((p:any)=>p.id===params.project_id)?.path;
+        if(closed)rememberOpenProject(closed,true);
+        await closeWorkspaces(params.project_id);
+      }
       await bindWorkspace(result);
     }
     return decorate(result);
@@ -318,6 +338,19 @@ else {
     });
     window.on('close', event => {if (!quitting) {event.preventDefault(); void closeWindow();}});
     void window.loadFile(html);
+    // Come back to the projects that were open last time, in the same order, so the
+    // sidebar shows the project/session tree instead of a bare recent-folder list.
+    window.webContents.once('did-finish-load', () => {
+      const saved = readOpenProjects();
+      if (!saved.length) return;
+      void (async () => {
+        for (const folder of [...saved].reverse()) {
+          if (!fs.existsSync(folder)) continue;
+          try { await openProject(folder); } catch { /* keep going; skip a locked or missing project */ }
+        }
+        publish('eca:changed', {event: 'project'});
+      })();
+    });
   });
   app.on('before-quit', event => {if (!quitting && window && !window.isDestroyed()) {event.preventDefault(); void closeWindow();}});
   app.on('window-all-closed', () => app.quit());
