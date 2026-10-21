@@ -1,0 +1,35 @@
+name: 功能建议
+description: 想要什么功能，或者哪里用起来不顺手
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你遇到的情况
+      description: 先说你原本想做什么、现在卡在哪里，比直接提方案更有用
+      placeholder: |
+        我想让 agent 一次改好几个文件，但它总是改一个就问一次……
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: 你希望的解决方式
+      description: 有具体想法就写；没有也行，说清楚痛点就够
+  - type: input
+    id: version
+    attributes:
+      label: 版本号
+      placeholder: 1.0.0
+  - type: dropdown
+    id: surface
+    attributes:
+      label: 涉及哪里
+      multiple: true
+      options:
+        - 桌面界面
+        - 对话与工具执行
+        - 模型与连接配置
+        - 子 Agent / 侧聊
+        - CLI
+        - 文档

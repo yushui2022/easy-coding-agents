@@ -1,0 +1,58 @@
+name: 问题反馈
+description: 报一个 bug 或"用着不对劲"的地方
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请尽量填全，尤其是**版本号**和**用的模型**——这两项决定了问题能不能复现。
+  - type: input
+    id: version
+    attributes:
+      label: 版本号
+      description: 桌面版看侧栏底部；CLI 用 `eca --version`
+      placeholder: 1.0.0
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: 模型与端点
+      description: 模型名和 Base URL（不用填密钥）
+      placeholder: deepseek-chat / https://api.deepseek.com/v1
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: 系统
+      placeholder: Windows 11 x64 / macOS 14
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 从打开项目到出问题，尽量一步步写清楚
+      placeholder: |
+        1. 打开项目 xxx
+        2. 输入"帮我重构 yyy"
+        3. 执行到第 3 个工具调用时……
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望发生什么
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际发生了什么
+      description: 有报错就把「执行活动」里的相关行贴上来（密钥会自动打码，但仍建议扫一眼）
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其他信息
+      description: 截图、日志、最近改动过什么，都可以贴这里
