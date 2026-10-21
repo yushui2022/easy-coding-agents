@@ -4,7 +4,7 @@
 
 <h1 align="center">ECA — Easy Coding Agent</h1>
 
-**ECA Desktop 0.34.1 Windows 预览版**：桌面工程位于 `desktop/`，支持多项目与多会话并发、主对话与侧聊附件、网页预览、PowerShell 交互终端，以及按需打开的修改审查。与 CLI 共用 Python 核心和项目数据。[安装、开发与验收说明](docs/desktop/README.md)。npm 启动器同时提供 `eca` 和兼容命令 `ecs`。
+**ECA Desktop 1.0.0（Windows x64）**：桌面工程位于 `desktop/`，支持多项目与多会话并发、主对话与侧聊附件、网页预览、PowerShell 交互终端，以及按需打开的修改审查。与 CLI 共用 Python 核心和项目数据。[下载桌面版](#下载桌面版) · [安装、开发与验收说明](docs/desktop/README.md)。npm 启动器同时提供 `eca` 和兼容命令 `ecs`。
 
 新 Agent 接手请先读 [完整接力文档](HANDOFF.md)：包含本机路径、未提交代码状态、依赖、G 盘缓存、打包更新、测试与陶土界面约定。
 
@@ -20,7 +20,7 @@
   <a href="docs/UPGRADE-v0.18.md">验证记录</a>
 </p>
 
-<p align="center"><code>CLI + Windows Desktop</code> · <code>v0.34.1</code> · <code>预览版</code></p>
+<p align="center"><code>CLI + Windows Desktop</code> · <code>v1.0.0</code> · <code>首个公开版本</code></p>
 
 ---
 
@@ -31,6 +31,20 @@ ECA（Easy Coding Agent）是一个可自行配置模型的编程助手，提供
 > 当前适合个人试用、开发与研究。基础机制已有自动化测试，但真实复杂任务的稳定性仍在验证中；尚未达到成熟编码 CLI 的功能覆盖与可靠性。
 
 大仓库定位：`/related SYMBOL` 查看定义与 Python 调用/导入候选；模型的 `code_search`、`repo_map`、`code_relations` 支持目录筛选与增量读取统计。[用法与验证边界](docs/REPOSITORY_NAVIGATION.md)。
+
+## 下载桌面版
+
+[最新版本](https://github.com/yushui2022/easy-coding-agents/releases/latest) 提供 Windows x64 安装包（`ECA-Desktop-<版本>-x64-Setup.exe`，约 160 MB，**自带 Python 运行时**，无需另外装环境）：
+
+1. 下载并运行安装包，按向导完成安装（默认装在 `G:\Apps\ECA Desktop`，可在向导里改）
+2. 打开应用，在「模型与设置」里添加一个你自己的模型连接——DeepSeek / OpenAI / Anthropic，或任何兼容 OpenAI 协议的端点——并填入 API 密钥
+3. 选择项目文件夹，开始对话；之后每次启动会直接回到你上次打开的项目
+
+**安装包未购买代码签名证书**：Windows SmartScreen 会提示「未知发布者」，需要点「更多信息 → 仍要运行」。每个版本都在说明里给出 SHA256，可以先核对再安装，详见 [未签名分发说明](docs/desktop/UNSIGNED-DISTRIBUTION.md)。
+
+桌面版目前只支持 **Windows x64**。macOS / Linux 可用 CLI，见下方[快速开始](#快速开始)。
+
+用着有问题或有建议，欢迎开 [Issue](https://github.com/yushui2022/easy-coding-agents/issues)；请附上版本号、你用的模型，以及复现步骤。
 
 ## 可选多模型协作
 
