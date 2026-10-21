@@ -5,7 +5,7 @@
   "private": true,
   "description": "Easy Coding Agent desktop workspace",
   "author": "ECA contributors",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "main": "dist/main/index.cjs",
   "scripts": {
     "build": "tsc --noEmit && node scripts/build.mjs",

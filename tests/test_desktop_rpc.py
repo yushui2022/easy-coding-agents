@@ -387,6 +387,8 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
                 return await super().complete(messages, tools, emit)
         self.rpc.runtime.agent.provider = Gate([{'role': 'assistant', 'content': 'first'},
                                                 {'role': 'assistant', 'content': 'second'}])
+        # Session naming is covered elsewhere; keep this test's request count exact.
+        self.rpc.runtime.agent.settings.api_key = ''
         await self.rpc.dispatch('task.start', {'prompt': 'first task'})
         await asyncio.wait_for(entered.wait(), 3)
         alpha = (await self.rpc.dispatch('queue.add', {'prompt': 'alpha'}))['queue']
@@ -406,7 +408,12 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
         prompts = [m['content'] for m in state['messages'] if m.get('role') == 'user']
         self.assertEqual(prompts, ['first task', 'alpha'])
         self.assertEqual(self.rpc.snapshot()['queue'], [])
-        self.assertEqual(state['status'], 'idle')
+        errors = [entry['params']['data'] for entry in self.events
+                  if entry.get('params', {}).get('event') == 'error']
+        calls = getattr(self.rpc.runtime.agent.provider, 'contexts', [])
+        self.assertEqual(state['status'], 'idle',
+                         (state.get('stop_reason'), errors, len(calls),
+                          [probe[0][0].get('content', '')[:40] for probe in calls]))
         self.assertEqual(self.rpc.runtime.agent.store.load(state['id'])['queue'], [])
 
     async def test_queue_rejects_empty_unknown_and_bad_moves(self):
@@ -458,14 +465,17 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
     async def test_regenerate_drops_the_answer_and_reruns_the_same_prompt(self):
         await self.fake([{'role': 'assistant', 'content': 'first answer'},
                          {'role': 'assistant', 'content': 'regenerated answer'}])
+        # Keep naming out of this test so the response queue stays exact.
+        self.rpc.runtime.agent.settings.api_key = ''
         await self.rpc.dispatch('task.start', {'prompt': 'do the thing'})
         await asyncio.wait_for(self.rpc.finishing, 5)
         state = self.rpc.runtime.agent.state
         await self.rpc.dispatch('session.regenerate', {})
         await asyncio.wait_for(self.rpc.finishing, 5)
         exchange = [(m['role'], m.get('content')) for m in state['messages'] if m['role'] in {'user', 'assistant'}]
-        self.assertEqual(exchange, [('user', 'do the thing'), ('assistant', 'regenerated answer')])
-        self.assertEqual(state['status'], 'idle')
+        self.assertEqual(exchange, [('user', 'do the thing'), ('assistant', 'regenerated answer')],
+                         state.get('stop_reason'))
+        self.assertEqual(state['status'], 'idle', state.get('stop_reason'))
 
     async def test_regenerate_needs_a_prompt_and_an_answer(self):
         with self.assertRaises(ValueError):

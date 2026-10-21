@@ -31,7 +31,9 @@ class ThinkingTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(captured[-1]['thinking'], {'type': 'disabled'})
             self.assertNotIn('reasoning_effort', captured[-1])
             self.assertEqual(message['tool_calls'][0]['function']['arguments'], '{"path":"file.txt"}')
-            self.assertNotIn('private reasoning', str(events))
+            # Thinking text is shown to the user since 0.34; the replay scope stays internal.
+            self.assertIn('private reasoning', str([d for e, d in events if e == 'model_activity']))
+            self.assertNotIn('reasoning_scope', str(events))
             self.assertEqual([d['phase'] for e,d in events if e == 'model_activity'], ['thinking', 'tool_arguments'])
             end = next(d for e,d in events if e == 'request_end')
             self.assertIn('first_response_ms', end)

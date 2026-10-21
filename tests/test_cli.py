@@ -79,13 +79,14 @@ class CLITests(unittest.TestCase):
                 self.assertEqual((Path(tmp) / "hello.py").read_text(), "print('hello')\n")
                 second = subprocess.run([*command, "--resume", "latest", "-p", "Continue with summary"], env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
                 self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
-                self.assertEqual(len(requests), 3)
+                # 2 requests for the first task, 1 for session naming, 1 for the resume.
+                self.assertEqual(len(requests), 4)
                 usage = subprocess.run([*command, '--usage'],env=env,capture_output=True,text=True,encoding='utf-8',timeout=60)
                 self.assertEqual(usage.returncode,0,usage.stdout+usage.stderr)
                 totals=json.loads(usage.stdout)
-                self.assertEqual(totals['requests'],3)
-                self.assertEqual(totals['reported_tokens']['input'],15)
-                self.assertEqual(totals['reported_tokens']['output'],6)
+                self.assertEqual(totals['requests'],4)
+                self.assertEqual(totals['reported_tokens']['input'],20)
+                self.assertEqual(totals['reported_tokens']['output'],8)
                 self.assertEqual(totals['incomplete_usage_requests'],0)
                 self.assertTrue(all(payload.get("max_tokens") == 384 for payload in requests))
                 if api_format == "anthropic":
@@ -104,7 +105,7 @@ class CLITests(unittest.TestCase):
                 undo = subprocess.run([*command, "--undo", ident], env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
                 self.assertEqual(undo.returncode, 0, undo.stdout + undo.stderr)
                 self.assertFalse((Path(tmp) / "hello.py").exists())
-                self.assertEqual(len(requests), 3, "Review and undo must not call the model")
+                self.assertEqual(len(requests), 4, "Review and undo must not call the model")
             finally:
                 server.shutdown()
                 server.server_close()

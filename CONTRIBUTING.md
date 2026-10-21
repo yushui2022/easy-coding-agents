@@ -108,4 +108,4 @@ fail stalled model streams instead of waiting forever
 
 ## 9. 许可
 
-当前仓库未附带开源许可证文件。在补充之前，**默认不接受以再分发为目的的贡献**；如需在其他项目中使用，请先开 Issue 说明用途。
+本项目采用 [MIT 许可证](LICENSE)。提交 PR 即表示你同意以 MIT 许可发布你的贡献；如果你代表公司贡献，请确认你有权这样做。

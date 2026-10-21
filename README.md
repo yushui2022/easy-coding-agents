@@ -259,7 +259,11 @@ benchmark/            记忆研究评测，不等同于编码任务评测
 docs/                 使用说明、验证记录与历史文档
 ```
 
-欢迎通过 [Issue](https://github.com/yushui2022/easy-coding-agents/issues) 提供可复现的问题，或提交范围明确的改进。报告时附上版本、操作系统、模型协议、复现步骤和脱敏日志。贡献代码前请阅读 [开发说明](AI_CODER_GUIDE.md)。
+欢迎通过 [Issue](https://github.com/yushui2022/easy-coding-agents/issues) 提供可复现的问题，或提交范围明确的改进。报告时附上版本、操作系统、模型协议、复现步骤和脱敏日志。贡献代码前请阅读 [贡献指南](CONTRIBUTING.md) 与 [开发说明](AI_CODER_GUIDE.md)。
+
+## 许可证
+
+[MIT](LICENSE)。桌面安装包未购买代码签名证书，SHA256 与校验方法见各版本发布说明。
 
 ## 关于这个项目
 
