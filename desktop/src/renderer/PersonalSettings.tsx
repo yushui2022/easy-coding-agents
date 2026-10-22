@@ -1,10 +1,16 @@
-import React from 'react';
-import {Check, PaintBrush, UserCircle, FileText} from '@phosphor-icons/react';
+import React,{useEffect,useMemo,useState} from 'react';
+import {Check, PaintBrush, UserCircle, FileText, GithubLogo} from '@phosphor-icons/react';
 
 export type Personal = {name:string; role:string; about:string; style:string; instructions:string};
 export const emptyPersonal:Personal = {name:'',role:'',about:'',style:'',instructions:''};
+type Stats = {total_tokens:number; requests:number; active_days:number;
+  peak:{date:string; tokens:number}|null; current_streak:number; longest_streak:number;
+  days:{date:string; tokens:number}[]; models:{model:string; requests:number}[]};
 
 const THEMES:[string,string][] = [['system','跟随系统'],['light','浅色'],['dark','深色']];
+const WEEKS = 26;
+const compact = (value:number) => value >= 100_000_000 ? `${(value/100_000_000).toFixed(1)} 亿`
+  : value >= 10_000 ? `${(value/10_000).toFixed(1)} 万` : String(value);
 
 function Pane({title,lead,label,children}:{title:string;lead:string;label:string;children:React.ReactNode}) {
   return <section className="connection-editor personal-pane" aria-label={label}>
@@ -30,14 +36,77 @@ export function AppearancePane({theme,onTheme}:{theme:string;onTheme:(value:stri
   </Pane>;
 }
 
+// Activity grid: one column per week, one row per weekday, coloured by daily tokens.
+// Only recorded requests are drawn; a day without a request stays empty.
+function Heatmap({days}:{days:{date:string; tokens:number}[]}) {
+  const {cells, months, peak} = useMemo(()=>{
+    const byDate = new Map(days.map(row=>[row.date, row.tokens]));
+    const today = new Date(); today.setHours(0,0,0,0);
+    const cells:{key:string; tokens:number; label:string; level:number}[] = [];
+    const start = new Date(today);
+    start.setDate(today.getDate() - (WEEKS*7 - 1) + (6 - ((today.getDay()+6)%7)));
+    const peak = days.reduce((max,row)=>Math.max(max,row.tokens),0);
+    const months:[string,number][] = [];
+    let lastMonth = '';
+    for(let index=0; index<WEEKS*7; index+=1){
+      const date = new Date(start);
+      date.setDate(start.getDate()+index);
+      if(date>today) {cells.push({key:date.toISOString(),tokens:-1,label:'',level:-1});continue;}
+      const key = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+      const tokens = byDate.get(key) || 0;
+      const level = tokens===0 ? 0 : Math.min(4, 1+Math.floor((tokens/(peak||1))*3.999));
+      cells.push({key, tokens, level, label:`${key} · ${tokens} tokens`});
+      const month = `${date.getMonth()+1}月`;
+      if(month!==lastMonth){months.push([month, Math.floor(index/7)]);lastMonth=month;}
+    }
+    return {cells, months, peak};
+  }, [days]);
+  return <div className="heatmap" aria-label="Token 活动">
+    <div className="heatmap-months">{months.map(([label,week])=><span key={label+week} style={{gridColumn:week+1}}>{label}</span>)}</div>
+    <div className="heatmap-grid" role="img" aria-label={`近 ${WEEKS} 周每天消耗的 token，峰值 ${peak}`}>
+      {cells.map(cell=>cell.level<0?<span key={cell.key} className="heat-day is-empty"/>
+        :<span key={cell.key} className={'heat-day level-'+cell.level} title={cell.label}/>)}
+    </div>
+  </div>;
+}
+
 export function ProfilePane({value,onChange,onSave,saving,status,busy}:
   {value:Personal;onChange:(value:Personal)=>void;onSave:()=>void;saving:boolean;status:string;busy?:boolean}) {
+  const [stats,setStats]=useState<Stats|null>(null);
+  const [statsNote,setStatsNote]=useState('');
+  const [handle,setHandle]=useState('');
+  useEffect(()=>{
+    let live = true;
+    void window.eca.invoke('usage.stats')
+      .then((value:Stats)=>{if(live)setStats(value);})
+      .catch(error=>{if(live)setStatsNote(String(error));});
+    void window.eca.invoke('github.status')
+      .then((value:any)=>{if(live)setHandle(value?.connected?String(value.login||''):'');})
+      .catch(()=>{});
+    return ()=>{live=false;};
+  },[]);
   const initial = (value.name||'你').trim().slice(0,1);
+  const days = stats?.days || [];
+  const average = stats && stats.requests ? Math.round(stats.total_tokens/stats.requests) : 0;
   return <Pane title="个人信息" label="个人信息" lead="让模型知道它在和谁合作，以及你希望它怎么回答。">
-    <div className="profile-identity">
-      <span className="profile-avatar" aria-hidden="true">{initial}</span>
-      <div><strong>{value.name||'还没有称呼'}</strong><small>{value.role||'在下面填写你的身份'}</small></div>
+    <div className="profile-hero">
+      <span className="profile-avatar-lg" aria-hidden="true">{initial}</span>
+      <strong className="profile-name">{value.name||'未命名'}</strong>
+      <small className="profile-handle">{handle?`@${handle}`:'本地账号'}</small>
     </div>
+    <div className="profile-stats" role="list" aria-label="本地使用统计">
+      {[['累计 Token', stats?compact(stats.total_tokens):'—'],
+        ['活跃天数', stats?String(stats.active_days):'—'],
+        ['当前连续', stats?`${stats.current_streak} 天`:'—'],
+        ['最长连续', stats?`${stats.longest_streak} 天`:'—'],
+        ['请求数', stats?String(stats.requests):'—']].map(([label,value])=>
+        <div key={label} role="listitem"><strong>{value}</strong><span>{label}</span></div>)}
+    </div>
+    <section className="connection-section profile-activity" aria-labelledby="profile-activity-heading">
+      <h4 id="profile-activity-heading"><UserCircle size={15}/>Token 活动</h4>
+      {days.length ? <Heatmap days={days}/> : <p className="fine-print">{statsNote||'这个项目还没有记录用量；跑一次任务就会出现。'}</p>}
+      <p className="fine-print">统计来自当前项目的本地用量账本（最多近 {WEEKS} 周），不上传，不含未回报 token 的请求。</p>
+    </section>
     <section className="connection-section" aria-labelledby="profile-basic-heading">
       <h4 id="profile-basic-heading"><UserCircle size={15}/>基本</h4>
       <div className="form-row">
@@ -61,6 +130,14 @@ export function ProfilePane({value,onChange,onSave,saving,status,busy}:
           value={value.style} onChange={event=>onChange({...value,style:event.target.value})}/></div>
       <p className="fine-print">这几项会写进每轮对话的系统提示词，所有项目共用，只影响措辞与偏好，不改变权限。</p>
     </section>
+    {(stats?.models?.length||average)?<section className="connection-section" aria-labelledby="profile-insight-heading">
+      <h4 id="profile-insight-heading"><GithubLogo size={15}/>洞察</h4>
+      <dl className="profile-insight">
+        <div><dt>平均每次请求</dt><dd>{average} tokens</dd></div>
+        {stats?.models?.[0]&&<div><dt>最常用模型</dt><dd>{stats.models[0].model} · {stats.models[0].requests} 次</dd></div>}
+        {stats?.peak&&<div><dt>单日峰值</dt><dd>{stats.peak.date} · {compact(stats.peak.tokens)}</dd></div>}
+      </dl>
+    </section>:null}
     <div className="personal-actions">
       {(saving||status)&&<span className="config-status" role="status">{saving?'正在保存…':status}</span>}
       <button className="primary" disabled={saving||busy} onClick={onSave}>保存个人信息</button>

@@ -153,6 +153,37 @@
   border:1px solid var(--border);border-radius:14px;background:var(--settings-button);}
 .eca-app .model-settings .profile-avatar {display:grid;place-items:center;width:42px;height:42px;flex:none;border-radius:50%;
   background:var(--accent-soft);color:var(--accent);font-size:17px;font-weight:600;}
+/* Profile page: hero, stat strip, activity grid, insights. */
+.eca-app .model-settings .profile-hero {display:flex;flex-direction:column;align-items:center;gap:6px;margin:4px 0 20px;}
+.eca-app .model-settings .profile-avatar-lg {display:grid;place-items:center;width:104px;height:104px;border-radius:50%;
+  background:color-mix(in srgb,var(--accent) 78%,#8a6b2f);color:#fff;font-size:38px;font-weight:600;letter-spacing:.02em;
+  box-shadow:0 8px 20px -14px color-mix(in srgb,var(--accent) 70%,transparent);}
+.eca-app .model-settings .profile-name {font-size:22px;font-family:var(--font-reading);font-weight:600;letter-spacing:.01em;}
+.eca-app .model-settings .profile-handle {color:var(--muted);font:12px var(--font-code);}
+.eca-app .model-settings .profile-stats {display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;margin-bottom:22px;
+  border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--border);}
+.eca-app .model-settings .profile-stats > div {display:flex;flex-direction:column;align-items:center;gap:3px;padding:12px 8px;background:var(--surface);}
+.eca-app .model-settings .profile-stats strong {font-size:15px;font-variant-numeric:tabular-nums;}
+.eca-app .model-settings .profile-stats span {color:var(--muted);font-size:10.5px;}
+.eca-app .model-settings .heatmap {margin:2px 0 10px;}
+.eca-app .model-settings .heatmap-months {display:grid;grid-template-columns:repeat(26,1fr);gap:3px;margin-bottom:5px;
+  color:var(--muted);font-size:10px;white-space:nowrap;}
+.eca-app .model-settings .heatmap-months span {grid-row:1;}
+.eca-app .model-settings .heatmap-grid {display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,1fr);gap:3px;}
+.eca-app .model-settings .heat-day {width:12px;height:12px;border-radius:3px;background:color-mix(in srgb,var(--text) 7%,transparent);}
+.eca-app .model-settings .heat-day.is-empty {background:transparent;}
+.eca-app .model-settings .heat-day.level-1 {background:color-mix(in srgb,var(--accent) 22%,transparent);}
+.eca-app .model-settings .heat-day.level-2 {background:color-mix(in srgb,var(--accent) 42%,transparent);}
+.eca-app .model-settings .heat-day.level-3 {background:color-mix(in srgb,var(--accent) 64%,transparent);}
+.eca-app .model-settings .heat-day.level-4 {background:var(--accent);}
+.eca-app .model-settings .profile-insight {display:flex;flex-direction:column;gap:8px;margin:0;}
+.eca-app .model-settings .profile-insight > div {display:flex;justify-content:space-between;gap:16px;font-size:12px;}
+.eca-app .model-settings .profile-insight dt {color:var(--secondary);}
+.eca-app .model-settings .profile-insight dd {margin:0;color:var(--text);font-variant-numeric:tabular-nums;}
+@media (max-width:900px) {
+  .eca-app .model-settings .profile-stats {grid-template-columns:repeat(3,minmax(0,1fr));}
+  .eca-app .model-settings .heat-day {width:9px;height:9px;}
+}
 .eca-app .model-settings .profile-identity strong {display:block;font-size:14px;}
 .eca-app .model-settings .repo-list {list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:42vh;overflow:auto;}
 .eca-app .model-settings .repo-row {display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;}

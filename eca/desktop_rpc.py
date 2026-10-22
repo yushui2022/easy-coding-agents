@@ -453,6 +453,9 @@ class DesktopRPC:
             return self.live(params)
         if method == 'context.compact':
             return await self.compact_context()
+        if method == 'usage.stats':
+            self.require()
+            return self.runtime.agent.ledger.statistics()
         if method == 'subagent.snapshot':
             return self.child_views.snapshot(params)
         if method == 'permissions.set':

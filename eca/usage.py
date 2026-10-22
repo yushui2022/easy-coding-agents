@@ -120,3 +120,56 @@ class UsageLedger:
                     incomplete_usage_requests=unknown_usage, incomplete_cost_requests=unknown_cost,
                     historical_usage_untracked=not state.get('usage_tracking_complete', False),
                     billing_note='Calculated from provider usage and configured price snapshots; not an invoice.')
+
+    def statistics(self, days=371):
+        """Local activity for the profile page, derived only from this project's ledger.
+
+        Token counts that the provider did not report are skipped rather than guessed;
+        a day with no recorded request simply does not appear.
+        """
+        import datetime
+        rows = self.db.execute("SELECT created, tokens, model FROM usage_requests WHERE status != 'pending'").fetchall()
+        per_day, models = {}, {}
+        total = requests = 0
+        cutoff = datetime.date.today() - datetime.timedelta(days=days)
+        for created, tokens, model in rows:
+            if not isinstance(created, (int, float)):
+                continue
+            try:
+                counts = json.loads(tokens or 'null')
+            except ValueError:
+                counts = None
+            amount = sum(value for value in counts.values() if type(value) is int and value > 0) if isinstance(counts, dict) else 0
+            day = datetime.date.fromtimestamp(created)
+            requests += 1
+            total += amount
+            if isinstance(model, str) and model:
+                models[model] = models.get(model, 0) + 1
+            if day >= cutoff:
+                per_day[day] = per_day.get(day, 0) + amount
+        days_list = [{'date': day.isoformat(), 'tokens': per_day[day]} for day in sorted(per_day)]
+        peak = max(days_list, key=lambda row: row['tokens']) if days_list else None
+        longest = current = 0
+        previous = None
+        for row in days_list:
+            day = datetime.date.fromisoformat(row['date'])
+            current = current + 1 if previous and (day - previous).days == 1 else 1
+            longest = max(longest, current)
+            previous = day
+        today = datetime.date.today()
+        running = 0
+        if days_list:
+            last = datetime.date.fromisoformat(days_list[-1]['date'])
+            if (today - last).days <= 1:
+                running = 1
+                for row in reversed(days_list[:-1]):
+                    if (last - datetime.date.fromisoformat(row['date'])).days == 1:
+                        running += 1
+                        last = datetime.date.fromisoformat(row['date'])
+                    else:
+                        break
+        return {'total_tokens': total, 'requests': requests, 'active_days': len(days_list),
+                'peak': peak, 'current_streak': running, 'longest_streak': longest,
+                'days': days_list,
+                'models': [{'model': name, 'requests': count} for name, count in
+                           sorted(models.items(), key=lambda item: -item[1])[:5]]}
