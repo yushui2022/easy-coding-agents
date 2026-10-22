@@ -9,13 +9,15 @@
   --shadow-control:0 2px 4px #5f493810;
   --shadow-composer:0 10px 28px #6e4d3012,0 2px 5px #6e4d300a;
   --shadow-dialog:0 24px 80px #3d2c2038;
-  --material-grain:url('./assets/clay-surfaces/clay-chalk.png');
-  --material-accent-grain:url('./assets/clay-surfaces/clay-rose.png');
+  --material-grain:url('./assets/clay-surfaces/clay-oat-v2.png');
+  --material-accent-grain:url('./assets/clay-surfaces/clay-terracotta-v2.png');
+  --material-field-grain:url('./assets/clay-surfaces/clay-chalk-v2.png');
   /* Preserve visible clay pores instead of shrinking them into fine screen noise. */
   --material-ground-size:1880px;--material-surface-size:1680px;
   --material-accent-size:1470px;--material-field-size:1350px;
   --material-veil:#faf6efb8;--material-ground-veil:#f3eee6bd;
   --material-accent-veil:#efd4c263;--material-field-veil:#f7f1e7d4;
+  /* v2 backgrounds are intentionally coarse and stay behind a translucent veil. */
   --material-rim:#ffffffa6;--material-bottom:#97735418;
   --material-inset:inset 0 2px 4px #76563818,inset 0 -1px 1px #ffffffa6;
   --material-raised:inset 0 1px 1px var(--material-rim),inset 0 -2px 3px var(--material-bottom),0 3px 8px #6246290d;
@@ -67,7 +69,7 @@
 .eca-app .eca-dialog.model-settings .connection-editor-footer {background:var(--surface);box-shadow:0 -1px 0 var(--material-rim);}
 .eca-app .eca-dialog.model-settings .field :is(input,select) {
   background-color:var(--surface);
-  background-image:linear-gradient(var(--material-field-veil),var(--material-field-veil)),var(--material-grain);
+  background-image:linear-gradient(var(--material-field-veil),var(--material-field-veil)),var(--material-field-grain);
   background-size:auto,var(--material-field-size);
   border-radius:9px;box-shadow:var(--material-inset);
 }
@@ -86,7 +88,7 @@
     --surface:#2b2722;--canvas:#221f1b;--context-surface:#322b24;--action:#eee5d9;--on-action:#30251c;
     --panel:#29241f;--text:#eee6dc;--secondary:#c9bcae;--muted:#b3a28f;--border:#443b31;
     --control-border:#62513e;--hover:#3b3128;--selected:#48362b;--accent:#efa17e;--accent-soft:#443027;--code:#211d19;
-    --material-grain:url('./assets/clay-surfaces/clay-charcoal.png');
+    --material-grain:url('./assets/clay-surfaces/clay-charcoal-v2.png');
     --material-accent-grain:var(--material-grain);
     --material-veil:#302a23b8;--material-ground-veil:#211c17d1;
     --material-accent-veil:#693d28ad;--material-field-veil:#1d1914cc;
@@ -107,3 +109,7 @@
   .eca-app .clay-sidebar :is(button,.project-current,.settings-glyph),
   .eca-app .eca-dialog.model-settings :is(.connection-sidebar,header,.model-settings-footer,button,input,select) {background-image:none;box-shadow:none;}
 }
+
+
+
+

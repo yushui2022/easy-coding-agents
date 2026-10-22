@@ -1,0 +1,10 @@
+{
+  "version": "2",
+  "assets": [
+    {"file":"clay-oat-v2.png","label":"燕麦陶土","mode":"light","use":"侧栏与工作区底材"},
+    {"file":"clay-terracotta-v2.png","label":"暖陶粉","mode":"light","use":"选中态与强调表面"},
+    {"file":"clay-charcoal-v2.png","label":"炭陶深色","mode":"dark","use":"深色模式底材"},
+    {"file":"clay-chalk-v2.png","label":"粉笔白陶","mode":"light","use":"浅色工作区与表单"}
+  ],
+  "notes": "2026-10-22 generated coarse-grain background candidates. Use as local CSS backgrounds with a translucent veil; do not stretch as a foreground illustration."
+}
