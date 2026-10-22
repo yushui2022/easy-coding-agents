@@ -11,8 +11,10 @@ export const TitleBar=memo(function TitleBar({title}:{title:string}) {
     return()=>{if(typeof off==='function')off();};
   },[]);
   const act=(action:string)=>{void window.eca?.windowControl?.(action);};
+  // Two-tone wordmark: the lead word carries the weight, the rest stays quiet.
+  const [lead,...rest]=title.trim().split(/\s+/);
   return <header className="titlebar" aria-label="窗口标题栏">
-    <span className="titlebar-brand"><span className="titlebar-mark" aria-hidden="true"/><span>{title}</span></span>
+    <span className="titlebar-brand" aria-label={title}><span className="titlebar-mark" aria-hidden="true"/><span>{lead}{rest.length?<span className="titlebar-suffix"> {rest.join(' ')}</span>:null}</span></span>
     <div className="titlebar-drag" onDoubleClick={()=>act('maximize')}/>
     <div className="titlebar-controls">
       <button type="button" aria-label="最小化" title="最小化" onClick={()=>act('minimize')}><Minus size={13}/></button>
