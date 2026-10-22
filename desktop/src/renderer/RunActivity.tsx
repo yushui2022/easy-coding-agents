@@ -13,7 +13,7 @@ const actions:Record<string,string>={
   process_stop:'正在停止命令',lsp:'正在查询代码符号',lsp_rename:'正在预览重命名',lsp_apply:'正在应用重命名',
 };
 const phases:Record<string,string>={
-  preparing:'正在准备任务',waiting_model:'等待模型响应',thinking:'正在思考',
+  preparing:'正在准备任务',compacting:'正在压缩上下文',waiting_model:'等待模型响应',thinking:'正在思考',
   responding:'正在生成回答',tool_arguments:'正在准备工具调用',executing:'正在执行操作',
   verifying:'正在运行验证',repairing:'正在修复问题',approval:'等待你的授权',question:'等待你的回答',
   tool_done:'工具已返回',
@@ -40,6 +40,7 @@ const formatClock=(seconds:number)=>seconds>=60?`${Math.floor(seconds/60)}:${Str
     :phase==='waiting_model'?'请求已发出，正在等待服务返回。你可以随时停止任务。'
     :phase==='verifying'?'验证结果将在检查完成后显示。'
     :phase==='executing'||phase==='tool_done'?activity.target||'返回结果会显示在对话的执行记录中。'
+    :phase==='compacting'?'上下文接近上限，正在把较早的对话压缩成摘要；完整历史仍保存在磁盘上，完成后会接着执行当前任务。'
     :phase==='responding'?'正在接收模型输出。'
     :phase==='repairing'?'正在处理验证中发现的问题。'
     :phase==='approval'||phase==='question'?'任务正在等待你的回复。'
@@ -50,7 +51,7 @@ const formatClock=(seconds:number)=>seconds>=60?`${Math.floor(seconds/60)}:${Str
     :detail;
   // The phase clock runs locally, so it keeps moving even when the backend has
   // nothing new to report (a long tool call, or a provider that is just slow).
-  const clocked=['preparing','waiting_model','thinking','responding','tool_arguments','executing','verifying','repairing'].includes(phase)?`${subtitle} · 持续 ${formatClock(phaseElapsed)}`:subtitle;
+  const clocked=['preparing','compacting','waiting_model','thinking','responding','tool_arguments','executing','verifying','repairing'].includes(phase)?`${subtitle} · 持续 ${formatClock(phaseElapsed)}`:subtitle;
   // A stream can stay connected while producing nothing; say so instead of looking frozen.
   const silent=typeof activity.updated_at==='number'?Math.floor(now/1000-activity.updated_at):0;
   const stall=['waiting_model','thinking','responding'].includes(phase)&&silent>=15

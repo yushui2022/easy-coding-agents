@@ -16,7 +16,12 @@ async function main(){
   const mismatches=paths.filter(p=>!fs.existsSync(path.join(installed,p))||hash(path.join(built,p))!==hash(path.join(installed,p)));
   if(mismatches.length)throw Error('Installed payload differs: '+mismatches.join(', '));
   const handshake=await new Promise((resolve,reject)=>{
-    const child=spawn(path.join(installed,'resources/backend/eca-backend.exe'),[],{cwd:installed,windowsHide:true,stdio:'pipe'});
+    // The runtime was renamed with the product in 1.8.4; keep the old name as a
+    // fallback so an install that is only half replaced can still be verified.
+    const backend=['ECA Desktop Backend.exe','eca-backend.exe']
+      .map(name=>path.join(installed,'resources/backend',name)).find(file=>fs.existsSync(file));
+    if(!backend)throw Error('Installed backend executable is missing');
+    const child=spawn(backend,[],{cwd:installed,windowsHide:true,stdio:'pipe'});
     let buffer='',result;
     const timer=setTimeout(()=>{child.kill();reject(Error('Backend handshake timed out'));},10000);
     child.on('error',error=>{clearTimeout(timer);reject(error);});

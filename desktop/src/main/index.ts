@@ -181,7 +181,7 @@ async function backend() {
       return;
     }
     if(data.event==='text'||data.event==='model_activity') {
-      if(!liveNotification)liveNotification=setTimeout(()=>{liveNotification=undefined;publish('eca:changed',{event:'text'});},80);
+      if(!liveNotification)liveNotification=setTimeout(()=>{liveNotification=undefined;publish('eca:changed',{event:'text'});},40);
     } else {clearTimeout(liveNotification);liveNotification=undefined;publish('eca:changed', {event:data.event});}
   });
   rpc.on('failure', message => {

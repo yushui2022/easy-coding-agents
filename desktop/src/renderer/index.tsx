@@ -96,6 +96,10 @@ function App() {
   const refreshBusy = useRef(false);
   const refreshAgain = useRef(false);
   const liveBusy = useRef(false);
+  // Events are debounced into one attempt per burst, so silently dropping an
+  // attempt while a refresh was in flight left the transcript frozen until the
+  // next event happened to arrive. Defer instead of dropping.
+  const liveAgain = useRef(false);
   const reportedError = useRef(0);
   const refresh = async () => {
     if (refreshBusy.current) {refreshAgain.current = true; return;}
@@ -108,14 +112,14 @@ function App() {
       }
     }
     catch (e) {setError(String(e));}
-    finally {refreshBusy.current=false; if (refreshAgain.current) {refreshAgain.current=false; void refresh();}}
+  finally {refreshBusy.current=false; if (refreshAgain.current) {refreshAgain.current=false; void refresh();} else if (liveAgain.current) {liveAgain.current=false; void refreshLive();}}
   };
   const loadConfig = async () => {
     const value = await invoke('config.get'); setConfig(value);
 
   };
   const refreshLive = async () => {
-    if(liveBusy.current||refreshBusy.current)return;
+    if(liveBusy.current||refreshBusy.current){liveAgain.current=true;return;}
     liveBusy.current=true;
     try {
       const requested=latest.current;
@@ -128,7 +132,7 @@ function App() {
         }
         latest.current={...old,...value};setState(latest.current);
       }
-    } catch(e){setError(String(e));} finally {liveBusy.current=false;}
+    } catch(e){setError(String(e));} finally {liveBusy.current=false; if(liveAgain.current){liveAgain.current=false; void refreshLive();}}
   };
   const namedProjects = useRef<Record<string,boolean>>({});
   useEffect(() => {
@@ -147,8 +151,12 @@ function App() {
     const off = window.eca.subscribe(data => {
       if(data.event==='config'){void loadConfig().catch(e=>setError(String(e)));return;}
       if(data.event==='sidechat'||data.event==='subagent_live')return;
-      if(!['text','model_activity'].includes(data.event||''))full=true;
-      if (!timer) timer=setTimeout(() => {timer=undefined;const structural=full;full=false;void (structural?refresh():refreshLive());},80);
+      const structural=!['text','model_activity'].includes(data.event||'');
+      if(structural)full=true;
+      // Text is cheap to append, so a tight tick keeps typing smooth. Anything
+      // structural still coalesces over a longer window, and a structural event
+      // arriving during a pending tick escalates it: `full` is read when it fires.
+      if (!timer) timer=setTimeout(() => {timer=undefined;const goFull=full;full=false;void (goFull?refresh():refreshLive());},structural?80:45);
     });
     const failure = window.eca.onFailure(message => {setError(message); setState((old:any) => ({...old,busy:false,any_busy:false,running_count:0,status:'interrupted',pending:[],stream:'',
       projects:[],sessions:old.sessions.map((s:any)=>({...s,busy:false,side_busy:false,pending_count:0}))}));});

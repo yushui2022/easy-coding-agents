@@ -679,6 +679,9 @@ If execution was interrupted, inspect the actual state before repeating mutation
         from .context import summary_request
         messages = summary_request(self.context_budget, history, portable, self.state.get('summary', ''),
                                    self.state.get('tasks', []), self.settings.context_chars)
+        # Surface compaction as its own phase: the summarisation call can stream
+        # for a long time while the transcript legitimately shows nothing new.
+        self.emit('compacting', {'older_messages': max(0, cutoff - start)})
         response, _ = await self.model_complete(messages, [], lambda event, data: self.emit(event, data) if event == "notice" else None, purpose='compact')
         if response.get("tool_calls") or not response.get("content"):
             raise ValueError("Summary was not a text response")

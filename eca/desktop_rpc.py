@@ -38,6 +38,9 @@ class DesktopRPC:
         self.pending = {}
         self.stream = ''
         self.stream_id = 0
+        # Set while the agent summarises older messages: the model call inside
+        # compaction must report as compaction, not as a plain model wait.
+        self.compacting = False
         self.events = deque(maxlen=200)
         self.secrets = {v for k, v in os.environ.items() if ('KEY' in k or 'TOKEN' in k) and len(v) >= 8}
         self.ready = False
@@ -73,13 +76,17 @@ class DesktopRPC:
         if event == 'subagent_progress':
             self.child_views.update(data)
         self.sequence += 1
+        if event == 'compacting':
+            self.compacting = True
         if event == 'request_start':
-            self.activity = {'phase': 'waiting_model', 'since': time.time(), 'request_id': data['id']}
+            self.activity = {'phase': 'compacting' if self.compacting else 'waiting_model',
+                             'since': time.time(), 'request_id': data['id']}
         elif event == 'model_activity':
             if data.get('request_id') and data['request_id'] != self.activity.get('request_id'):
                 return
             self.activity = {**self.activity, **data, 'updated_at': time.time()}
         elif event == 'request_end':
+            self.compacting = False
             self.last_request = data
             if data['id'] == self.activity.get('request_id'):
                 self.activity = {**self.activity, **{k: v for k, v in data.items()
