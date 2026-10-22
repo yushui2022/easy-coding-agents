@@ -6,6 +6,14 @@ import sqlite3
 import time
 import uuid
 
+INTERRUPTED_UNKNOWN = ("Interrupted: outcome unknown. Inspect current files/processes before retrying. "
+                       "Do not assume this action failed or succeeded.")
+# Tools that only read: an interrupted call to one of them provably changed nothing.
+INTERRUPTED_SAFE = ("Interrupted: this read-only step was cancelled before it returned, so nothing was "
+                    "changed and retrying it is safe.")
+SAFE_TOOLS = {"skills", "read", "glob", "grep", "code_search", "repo_map", "code_relations",
+              "web_fetch", "web_search", "todo", "ask", "lsp"}
+
 
 class Store:
     def __init__(self, root: Path):
@@ -98,9 +106,17 @@ class Store:
 
         def close_pending():
             for call_id, exchange in pending.items():
-                row = self.db.execute("SELECT status,result FROM actions WHERE session_id=? AND call_id=? ORDER BY id DESC LIMIT 1",
+                row = self.db.execute("SELECT status,result,name FROM actions WHERE session_id=? AND call_id=? ORDER BY id DESC LIMIT 1",
                                       (state["id"], f"{exchange}:{call_id}")).fetchone()
-                result = row[1] if row and row[0] == "completed" else "Interrupted: outcome unknown. Inspect current files/processes before retrying. Do not assume this action failed or succeeded."
+                completed = bool(row) and row[0] == "completed"
+                if completed:
+                    result = row[1]
+                elif row and row[2] in SAFE_TOOLS:
+                    # A read cannot have changed anything, so say that instead of
+                    # making every interrupted lookup look like a failed write.
+                    result = INTERRUPTED_SAFE
+                else:
+                    result = INTERRUPTED_UNKNOWN
                 repaired.append({"role": "tool", "tool_call_id": call_id, "content": result})
             pending.clear()
 

@@ -48,6 +48,7 @@
 .eca-app .execution-group .tool-target {font-size:12px;}
 .eca-app .execution-group .tool-detail {margin-inline:8px;border-top:1px solid var(--border);padding:4px 8px 12px;}
 .eca-app .execution-group .tool-error-hint {display:block;font:11px/1.7 system-ui,sans-serif;color:var(--danger);overflow:hidden;text-overflow:ellipsis;}
+.eca-app .execution-group .tool-muted-hint {color:var(--muted);}
 .eca-app .outcome-error .tool-outcome {color:var(--danger);}
 .eca-app .execution-group .outcome-error {background:var(--danger-soft); margin-block:3px;}
 .eca-app .outcome-pending .tool-outcome {color:var(--accent);}

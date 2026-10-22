@@ -44,7 +44,13 @@ export function resultInfo(result:any,pending=false):{kind:Outcome;label:string;
   if(!data)try{data=JSON.parse(text);}catch{/* Text is a valid tool result. */}
   const status=String(data?.status||'').toLowerCase();
   if(/^(Denied|Permission denied)\b/i.test(text))return {kind:'denied',label:'已拒绝',hint:text};
-  if(/^(Stopped|Interrupted|Cancelled|Canceled)\b/i.test(text)||['cancelled','canceled','interrupted'].includes(status))return {kind:'stopped',label:'已中断',hint:text};
+  // An interrupted call is not a failure. Say what actually happened instead of
+  // echoing the model-facing English sentence in red under the tool name.
+  if(/^Interrupted\b/i.test(text)||['cancelled','canceled','interrupted'].includes(status)){
+    const safe=/read-only|nothing was changed/i.test(text);
+    return {kind:'stopped',label:'已中断',hint:safe?'这一步被中断，没有返回结果。只读操作不改变任何东西，可以直接重试。':'这一步被中断，结果未知。重试前先核对当前文件和进程状态。'};
+  }
+  if(/^(Stopped|Cancelled|Canceled)\b/i.test(text))return {kind:'stopped',label:'已中断',hint:text};
   if(data?.timed_out)return {kind:'error',label:'已超时',hint:'执行超过时限'};
   if(typeof data?.exit_code==='number')return {kind:data.exit_code===0?'returned':'error',label:data.exit_code===0?'完成':'退出码 '+data.exit_code,hint:'退出码 '+data.exit_code};
   if(/^(Error\b|Failed\b|Tool (error|failed)\b)/i.test(text)||data?.isError===true||data?.success===false||['failed','error'].includes(status))return {kind:'error',label:'失败',hint:text};

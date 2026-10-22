@@ -29,6 +29,15 @@ test('unknown, denied, interrupted, failed and timed-out outcomes stay distinct'
   assert.equal(resultInfo(undefined).kind,'unknown');assert.equal(resultInfo(undefined,true).kind,'pending');
   assert.equal(resultInfo({content:'truncated',tool_summary:{exit_code:0}}).kind,'returned');
 });
+test('an interrupted call explains itself in Chinese and read-only ones say nothing changed',()=>{
+  const safe=resultInfo({content:'Interrupted: this read-only step was cancelled before it returned, so nothing was changed and retrying it is safe.'});
+  assert.equal(safe.kind,'stopped');assert.equal(safe.label,'已中断');
+  assert.match(safe.hint,/只读操作不改变任何东西/);
+  assert.doesNotMatch(safe.hint,/read-only/,'the model-facing English stays out of the UI');
+  const unknown=resultInfo({content:'Interrupted: outcome unknown. Inspect current files/processes before retrying. Do not assume this action failed or succeeded.'});
+  assert.equal(unknown.kind,'stopped');assert.match(unknown.hint,/重试前先核对当前文件和进程状态/);
+  assert.equal(resultInfo({content:'Stopped: repeated identical tool calls.'}).hint,'Stopped: repeated identical tool calls.');
+});
 test('collapse keeps failures, denied, unfinished and opened records in original order',()=>{
   const entries=Array.from({length:9},(_,i)=>({key:String(i),call:call(String(i)).tool_calls[0],source:{},result:result(String(i))}));
   entries[0].result=result('0','Error: broken');entries[2].result=result('2','Denied by user');entries[3].result=undefined;

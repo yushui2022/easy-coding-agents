@@ -99,6 +99,24 @@ os._exit(17)
         self.assertEqual((self.root/'marker.txt').read_text(), 'one effect')
         self.assertEqual(state['resume_report']['uncertain_actions'][0]['tool'], 'shell')
 
+    async def test_interrupted_read_says_nothing_changed_and_a_write_stays_uncertain(self):
+        state = self.state
+        state['messages'] = [
+            {'role': 'user', 'content': 'look at the file'},
+            {'role': 'assistant', 'content': None, 'tool_calls': [
+                {'id': 'r1', 'type': 'function', 'function': {'name': 'read', 'arguments': '{"path":"a.py"}'}},
+                {'id': 'w1', 'type': 'function', 'function': {'name': 'write', 'arguments': '{"path":"a.py"}'}}]}]
+        state['status'] = 'running'
+        self.store.save(state)
+        self.store.begin(state['id'], 'r1', 'read', {'path': 'a.py'})
+        self.store.begin(state['id'], 'w1', 'write', {'path': 'a.py'})
+        self.store.repair(state)
+        contents = {m['tool_call_id']: m['content'] for m in state['messages'] if m['role'] == 'tool'}
+        self.assertIn('read-only', contents['r1'], 'a cancelled read must not read like a failed write')
+        self.assertIn('nothing was changed', contents['r1'])
+        self.assertIn('outcome unknown', contents['w1'])
+        self.assertEqual(state['status'], 'interrupted')
+
     async def test_context_limit_preserves_checkpoint_and_recovers_after_budget_change(self):
         self.settings.context_chars = 1
         with self.assertRaises(ValueError):
