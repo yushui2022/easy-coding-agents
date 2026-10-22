@@ -55,7 +55,6 @@ function App() {
   const projectBusy = useRef(false);
   const [modelSelectionError,setModelSelectionError] = useState('');
   const [queueEdit,setQueueEdit] = useState<{id:string;text:string}|null>(null);
-  const [promptEdit,setPromptEdit] = useState<string|null>(null);
   const [rewindPending,setRewindPending] = useState(false);
   const [error,setError] = useState('');
   const viewKey=state.workspace_owner||state.session_id;
@@ -167,7 +166,7 @@ function App() {
     setStopping(false);setAnswer('');setAnswered(null);setError('');setNotice('');
     setModelPickerOpen(false);setConfirmFull(false);setDiagnostic(null);
     // A pending rewind belongs to the session it was started in.
-    setRewindPending(false);setPromptEdit(null);
+    setRewindPending(false);
     reportedError.current=0;
   },[viewKey]);
   const messages=useMemo(()=>[...older,...state.messages],[older,state.messages]);
@@ -230,14 +229,12 @@ function App() {
     const result=await perform('queue.update',{id:queueEdit.id,prompt:queueEdit.text});
     if(result)setQueueEdit(null);
   };
-  // Editing the newest turn puts the text back in the composer; the rewind happens
-  // when it is actually sent, so nothing is thrown away while the person is still
-  // deciding what the instruction should say.
-  const returnEditedPrompt = () => {
-    const text=(promptEdit||'').trim();
-    if(!text) return;
-    setPrompt(text);
-    setPromptEdit(null);
+  // Clicking 修改重发 drops the newest instruction straight back into the composer —
+  // no dialog in between. The rewind itself still waits for the send.
+  const editPrompt = (text:string) => {
+    const value=(text||'').trim();
+    if(!value||state.busy) return;
+    setPrompt(value);
     setRewindPending(true);
     requestAnimationFrame(()=>promptInput.current?.focus());
   };
@@ -410,7 +407,7 @@ function App() {
           {empty?<Welcome project={projectName} choosing={projectChanging||sending} onProject={pick} onDraft={value=>{setPrompt(value);promptInput.current?.focus();}}/>:<div className="messages">
             {(cursor??state.message_total-50)>0&&<button className="load-older" disabled={historyLoading} onClick={loadOlder}>{historyLoading?'正在加载…':'加载更早的消息'}</button>}
             {older.length>=150&&<p className="fine-print">历史记录分段显示；继续加载查看更早内容。</p>}
-            <Transcript key={viewKey} projectId={state.project_id} messages={messages} sessionId={state.session_id} root={state.project||''} busy={state.busy} agents={state.children} changes={state.changes} onOpenAgent={agent=>{setDetailsOpen(true);setAgentView(old=>({id:agent.id,nonce:(old?.nonce||0)+1}));}} onRegenerate={()=>{void perform('session.regenerate');}} onEditPrompt={text=>setPromptEdit(text)}/>
+            <Transcript key={viewKey} projectId={state.project_id} messages={messages} sessionId={state.session_id} root={state.project||''} busy={state.busy} agents={state.children} changes={state.changes} onOpenAgent={agent=>{setDetailsOpen(true);setAgentView(old=>({id:agent.id,nonce:(old?.nonce||0)+1}));}} onRegenerate={()=>{void perform('session.regenerate');}} onEditPrompt={editPrompt}/>
             {(state.children||[]).some((agent:ChildAgent)=>!agent.parent_call_id)&&<section aria-label="历史子任务"><p className="fine-print">其他子任务记录</p><AgentCards agents={state.children.filter((agent:ChildAgent)=>!agent.parent_call_id)} onOpen={agent=>{setDetailsOpen(true);setAgentView(old=>({id:agent.id,nonce:(old?.nonce||0)+1}));}}/></section>}
             {older.length>0&&<button className="log-more" onClick={()=>{setOlder([]);setCursor(null);bottom.current=true;setFollowing(true);if(scroll.current)scroll.current.scrollTop=scroll.current.scrollHeight;}}>返回最近记录</button>}
           </div>}
@@ -494,16 +491,6 @@ function App() {
     <ModelSettings open={settingsOpen} config={config} state={state} onConfig={setConfig} onClose={()=>setSettingsOpen(false)} onUse={chooseModel} onOpened={async()=>{setSettingsOpen(false);await loadConfig().catch(()=>{});await refresh();setNotice('仓库已克隆并打开。');}}/>
     {confirmFull&&<Dialog title="开启完全访问" closeLabel="取消完全访问" onClose={()=>setConfirmFull(false)}><p>在当前会话中自动批准文件修改、命令、联网及外部工具操作，也会放行本会话正在等待的授权。</p><p>命令按当前系统账户权限执行，可能访问项目外文件和网络；不会获得管理员权限。文件工具仍保留路径和冲突检查，已有沙箱及只读模式继续生效。</p><p className="fine-print">不会改变其他会话的审批模式。重新打开项目后恢复项目审批设置；已执行的操作不会因切回逐次确认而撤销。</p><div className="actions"><button onClick={()=>setConfirmFull(false)}>取消</button><button className="primary" disabled={permissionChanging} onClick={()=>choosePermission('full-access')}>开启完全访问</button></div></Dialog>}
     {goalOpen&&state.project&&<GoalDialog goal={state.goal||null} onClose={()=>setGoalOpen(false)} onSave={saveGoal}/>}
-    {promptEdit!==null&&<Dialog title="修改这一轮的指令" name="修改指令" closeLabel="取消修改" onClose={()=>setPromptEdit(null)}>
-      <p>改完会放回输入框；真正发送时才撤回这一轮的指令和回答，再按新内容重跑。</p>
-      <div className="field"><label htmlFor="prompt-edit">指令</label>
-        <textarea id="prompt-edit" rows={6} value={promptEdit} autoFocus disabled={state.busy}
-          onChange={event=>setPromptEdit(event.target.value)}
-          onKeyDown={event=>{if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();returnEditedPrompt();}}}/></div>
-      <p className="fine-print">Ctrl + Enter 放回输入框。</p>
-      <div className="actions"><button onClick={()=>setPromptEdit(null)}>取消</button>
-        <button className="primary" disabled={state.busy||!promptEdit.trim()} onClick={()=>returnEditedPrompt()}>{state.busy?'任务进行中…':'放回输入框'}</button></div>
-    </Dialog>}
     {diff&&<Dialog title={diff.path} name="文件差异" closeLabel="关闭差异" wide onClose={()=>setDiff(null)}><pre className="diff">{diff.diff.split('\n').map((line:string,i:number)=><span key={i} className={line.startsWith('+')?'added':line.startsWith('-')?'removed':''}>{line}{'\n'}</span>)}</pre></Dialog>}
     {diagnostic&&<Dialog title="项目环境" name="环境检查" closeLabel="关闭环境检查" onClose={()=>setDiagnostic(null)}>{diagnostic.checks.map((item:any,i:number)=><div className="diagnostic" key={i}><strong>{item.name} · {item.status}</strong><p>{item.message}</p></div>)}</Dialog>}
   </div>;

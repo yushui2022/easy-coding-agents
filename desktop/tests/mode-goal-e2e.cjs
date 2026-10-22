@@ -227,14 +227,12 @@ let app;
   const editButton=page.getByRole('button',{name:'修改这条指令并重新发送'});
   await expect(editButton).toHaveCount(1);
   await editButton.click();
-  const editDialog=page.locator('dialog[aria-label="修改指令"]');
-  await expect(editDialog).toBeVisible();
-  await expect(editDialog.locator('#prompt-edit')).toHaveValue('达成目标');
-  await editDialog.locator('#prompt-edit').fill('换个说法再说一遍');
-  await editDialog.getByRole('button',{name:'放回输入框'}).click();
-  await expect(editDialog).toHaveCount(0);
-  await expect(page.getByLabel('任务指令')).toHaveValue('换个说法再说一遍');
+  // No confirmation dialog: the instruction lands in the composer immediately, with
+  // the rewind note telling you what sending it will do.
+  await expect(page.locator('dialog[aria-label="修改指令"]')).toHaveCount(0);
+  await expect(page.getByLabel('任务指令')).toHaveValue('达成目标');
   await expect(page.locator('.rewind-note')).toContainText('撤回上一轮');
+  await page.getByLabel('任务指令').fill('换个说法再说一遍');
   await page.getByRole('button',{name:'发送任务',exact:true}).click();
   await expect.poll(()=>turnStart('换个说法再说一遍').length,{timeout:60000}).toBeGreaterThan(0);
   await expect.poll(async()=>(await invoke('snapshot')).busy,{timeout:60000}).toBe(false);
