@@ -60,6 +60,41 @@ function writeTheme(source: ThemeSource) {
   try {fs.writeFileSync(themeFile, JSON.stringify({source}), {mode: 0o600});} catch { /* a failed write must not block the window */ }
 }
 nativeTheme.themeSource = readTheme();
+
+// User-level context that applies to every project. The backend reads these two
+// files on each turn, so edits take effect without restarting it.
+const profileFile = path.join(home, 'profile.json');
+const globalAgentsFile = path.join(home, 'AGENTS.md');
+process.env.ECA_USER_PROFILE = profileFile;
+process.env.ECA_GLOBAL_AGENTS = globalAgentsFile;
+type Personalization = {name:string; notes:string; instructions:string};
+const limits = {name:80, notes:2000, instructions:20000};
+function readPersonalization(): Personalization {
+  let name = '', notes = '';
+  try {
+    const raw = JSON.parse(fs.readFileSync(profileFile, 'utf8'));
+    if (typeof raw?.name === 'string') name = raw.name;
+    if (typeof raw?.notes === 'string') notes = raw.notes;
+  } catch { /* a missing or corrupt profile is simply empty */ }
+  let instructions = '';
+  try {instructions = fs.readFileSync(globalAgentsFile, 'utf8');} catch { /* not created yet */ }
+  return {name:name.slice(0,limits.name), notes:notes.slice(0,limits.notes),
+    instructions:instructions.slice(0,limits.instructions)};
+}
+function savePersonalization(params:any): Personalization {
+  const text = (value:unknown, limit:number) => typeof value === 'string' ? value.slice(0,limit) : '';
+  const name = text(params?.name, limits.name).trim();
+  const notes = text(params?.notes, limits.notes).trim();
+  const instructions = text(params?.instructions, limits.instructions);
+  fs.mkdirSync(home, {recursive:true});
+  try {
+    if (name || notes) fs.writeFileSync(profileFile, JSON.stringify({name, notes}), {mode:0o600});
+    else fs.rmSync(profileFile, {force:true});
+    if (instructions.trim()) fs.writeFileSync(globalAgentsFile, instructions, {mode:0o600});
+    else fs.rmSync(globalAgentsFile, {force:true});
+  } catch (error) {throw new Error('无法写入个人设置：' + (error instanceof Error ? error.message : String(error)));}
+  return readPersonalization();
+}
 let activeSelection: {choice:string; connection_id:string|null; name:string}|undefined;
 const sessionSelections=new Map<string,NonNullable<typeof activeSelection>>();
 let selecting = false;
@@ -187,6 +222,8 @@ async function action(method: string, params: any = {}) {
   }
   if((selecting||opening)&&['config.save','config.default','config.remove','model.use','project.pick','project.recent','project.close','session.switch','task.start'].includes(method)) throw new Error('项目或模型正在切换，请稍候。');
   if (method === 'config.get') return publicConfig();
+  if (method === 'personalization.get') return readPersonalization();
+  if (method === 'personalization.save') return savePersonalization(params);
   if (method === 'config.save') {const saved=connections.save(params);return {...await publicConfig(),savedId:saved.savedId,warning:saved.warning};}
   if (method === 'config.default') {connections.setDefault(params.id);usedModel(params.id);return publicConfig();}
   if (method === 'config.reasoning') {

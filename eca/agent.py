@@ -222,6 +222,9 @@ If execution was interrupted, inspect the actual state before repeating mutation
             if path.is_file() and not path.is_symlink() and path.stat().st_size <= 64_000:
                 label = "Project guidance" if name == "AGENTS.md" else "Unverified project notes; validate claims against current files"
                 prompt += f"\n{label} ({name}):\n{path.read_text('utf-8', errors='replace')}\n"
+        from .usercontext import blocks as user_blocks
+        for block in user_blocks():
+            prompt += f"\n{block}\n"
         if self.state.get("profile"):
             prompt += f"\nUser-selected agent instructions:\n{self.state['profile']}\n"
         if self.settings.mode == "plan":

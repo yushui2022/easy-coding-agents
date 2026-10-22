@@ -16,7 +16,14 @@ const goalCall=(updates,id)=>({id:'fixture',choices:[{index:0,delta:{tool_calls:
   function:{name:'goal_update',arguments:JSON.stringify({updates})}}]},finish_reason:'tool_calls'}]});
 const server=http.createServer(async(req,res)=>{
   let raw='';for await(const c of req)raw+=c;
-  const payload=JSON.parse(raw);requests.push(payload);
+  // Opening the settings dialog re-reads the model catalogue; answer that here.
+  if(req.method==='GET'){
+    res.writeHead(200,{'Content-Type':'application/json'});
+    res.end(JSON.stringify({data:[{id:'fixture-model',object:'model'}]}));
+    return;
+  }
+  let payload={};try{payload=raw?JSON.parse(raw):{};}catch{payload={};}
+  requests.push(payload);
   // The runtime appends its own guidance message after the prompt, so take the
   // newest genuine user message instead of positionally the last one.
   const lastUser=((payload.messages||[]).filter(m=>m.role==='user')
@@ -55,6 +62,21 @@ let app;
   const saved=await invoke('config.save',{name:'模式测试',api_format:'openai',model:'fixture-model',
     base_url:`http://127.0.0.1:${server.address().port}/v1`,no_auth:true});
   await invoke('config.default',{id:saved.savedId});
+
+  // 0. 个人与全局：主题、个人信息、全局指令都在同一个设置对话框里，且会进系统提示词。
+  await page.getByRole('button',{name:'模型与设置'}).click();
+  await page.getByRole('tab',{name:'个人与全局'}).click();
+  await page.getByRole('radio',{name:'深色'}).click();
+  await expect.poll(()=>page.evaluate(()=>window.eca.theme())).toBe('dark');
+  await page.getByRole('radio',{name:'跟随系统'}).click();
+  await page.getByLabel('称呼').fill('小明');
+  await page.getByLabel('补充说明').fill('偏好简洁中文回答');
+  await page.getByLabel('适用于所有项目的长期要求').fill('每轮回答先给结论。');
+  await page.getByRole('button',{name:'保存个人设置'}).click();
+  await expect(page.locator('.personal-pane .config-status')).toContainText('已保存');
+  await page.getByRole('button',{name:'关闭设置'}).click();
+  assert(fs.existsSync(path.join(home,'data','profile.json')),'profile.json was not written');
+  assert(fs.existsSync(path.join(home,'data','AGENTS.md')),'global AGENTS.md was not written');
   await page.getByRole('button',{name:'打开项目',exact:true}).click();
   await expect.poll(async()=>(await invoke('snapshot')).project).toBe(project);
 
@@ -142,6 +164,10 @@ let app;
   assert(pushed.length>0,'goal mode ended the turn without pushing for the open criteria');
   assert.equal((await invoke('snapshot')).goal.status,'done');
   await expect(page.locator('.goal-bar')).toContainText('2/2');
+  assert(requests.filter(r=>Array.isArray(r.tools)&&r.tools.length)
+    .every(r=>String(r.messages?.[0]?.content||'').includes('每轮回答先给结论')),'global instructions missing from the system prompt');
+  assert(requests.filter(r=>Array.isArray(r.tools)&&r.tools.length)
+    .every(r=>String(r.messages?.[0]?.content||'').includes('小明')),'profile name missing from the system prompt');
 
   await page.screenshot({path:path.join(output,'plan-goal.png')});
   assert.deepEqual(errors,[]);

@@ -132,3 +132,23 @@
   .eca-app .model-settings .model-settings-footer {padding:8px 16px;}
   .eca-app .model-settings .data-location {display:none;}
 }
+
+/* Settings sections: model connections, or the personal/global pane. */
+.eca-app .model-settings .settings-switch {display:flex;gap:4px;flex-shrink:0;padding:4px;border-radius:12px;background:var(--settings-button);}
+.eca-app .model-settings .settings-switch button {flex:1;justify-content:center;min-height:30px;padding:6px 8px;border:0;border-radius:9px;background:transparent;color:var(--secondary);font-size:12px;}
+.eca-app .model-settings .settings-switch button:hover {color:var(--text);}
+.eca-app .model-settings .settings-switch button.active {background:var(--selected);color:var(--text);box-shadow:inset 0 1px 1px var(--material-rim);}
+.eca-app .model-settings .showing-personal .connections-label,
+.eca-app .model-settings .showing-personal .add-connection,
+.eca-app .model-settings .showing-personal nav,
+.eca-app .model-settings .showing-personal .connections-empty,
+.eca-app .model-settings .showing-personal .connections-note {display:none;}
+.eca-app .model-settings .showing-personal .connection-editor:not(.personal-pane) {display:none;}
+.eca-app .model-settings .theme-choices {display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+.eca-app .model-settings .theme-choice {display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:8px 12px;
+  border:1px solid var(--control-border);border-radius:10px;background:var(--settings-button);color:var(--secondary);font-size:12px;}
+.eca-app .model-settings .theme-choice.active {border-color:color-mix(in srgb,var(--accent) 40%,transparent);background:var(--accent-soft);color:var(--accent);}
+.eca-app .model-settings .theme-choice svg {color:var(--accent);}
+.eca-app .model-settings .theme-dot {width:12px;height:12px;border-radius:50%;border:1px solid var(--control-border);}
+.eca-app .model-settings .personal-pane .field textarea {width:100%;min-height:72px;resize:vertical;border:1px solid var(--border);
+  border-radius:10px;padding:9px 11px;background:var(--field);color:var(--text);font:13px/1.7 var(--font-reading);}
