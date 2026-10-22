@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.8.4 — 后端进程也有自己的名字和图标
+
+任务管理器里除了「ECA Desktop」，还有一个没有任何描述、图标是 PyInstaller 默认样的 `eca-backend`——看起来像是系统里某个来路不明的进程，其实是我们的本地运行时。
+
+- `build-runtime.py` 现在给后端 exe 传 `--icon`（就是产品自己的 `icon.ico`）和 `--version-file`：ProductName `ECA Desktop`、FileDescription `ECA Desktop backend runtime`、CompanyName `ECA contributors`、FileVersion/ProductVersion 跟着 `eca/__init__.py` 走、OriginalFilename 指向新名字。
+- 产物从 `eca-backend.exe` 改名成 **`ECA Desktop Backend.exe`**：Windows 的任务管理器显示的就是文件名，所以现在那一行是「ECA Desktop Backend」。
+- 主进程按新名字启动，同时保留旧文件名作为回退，避免升级到一半（旧 exe 还在目录里）时后端起不来。
+- 验证：重新构建运行时后读元数据，ProductName/FileDescription/公司/版本全部正确；提取 exe 图标与旧版对比，哈希不同（旧版是 PyInstaller 默认图标 `4d2da047…`，新版 `58fdb059…`）；装完后再查一次实际进程名与元数据。
+
 ## 1.8.3 — 「已中断」不再像报错
 
 「读取 xxx」下面突然出现一行红字 `Interrupted: outcome unknown. Inspect current files/processes before retrying.`，看起来像读取失败了。它其实不是错误：这一轮被中断时，工具调用已经发出但没拿到结果，后端必须给模型一条"结果未知"的回答，否则协议里的调用和结果对不上。

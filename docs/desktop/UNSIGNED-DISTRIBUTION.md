@@ -57,12 +57,12 @@ Get-FileHash -LiteralPath '.\ECA-Desktop-0.34.2-x64-Setup.exe' -Algorithm SHA256
 
 ## 6. 杀毒软件误报怎么办
 
-PyInstaller 打包的可执行文件（`resources\backend\eca-backend.exe`）偶尔被误报。先按第 2 节核对哈希：
+PyInstaller 打包的可执行文件（`resources\backend\ECA Desktop Backend.exe`）偶尔被误报。先按第 2 节核对哈希：
 
 - **哈希不一致**：不要运行，重新下载，并考虑是不是来源被替换。
 - **哈希一致但仍被拦**：基本可以判定为误报。可以：
   1. 在 Windows 安全中心把安装目录加入排除项（仅限你信任的机器）；
-  2. 向微软提交误报：<https://www.microsoft.com/en-us/wdsi/filesubmission>（选择「软件开发者」，上传安装包或 `eca-backend.exe`，说明这是 PyInstaller 打包的开源项目、附上 SHA256 与发布页地址）。
+  2. 向微软提交误报：<https://www.microsoft.com/en-us/wdsi/filesubmission>（选择「软件开发者」，上传安装包或 `ECA Desktop Backend.exe`，说明这是 PyInstaller 打包的开源项目、附上 SHA256 与发布页地址）。
 - 不要为了安装而全局关闭 SmartScreen 或实时保护。
 
 ## 7. 更新

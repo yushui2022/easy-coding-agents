@@ -164,7 +164,12 @@ async function closeWorkspaces(project?:string) {
 async function backend() {
   if (starting) return starting;
   if (rpc && !rpc.exited) return rpc;
-  const command = app.isPackaged ? path.join(process.resourcesPath, 'backend', 'eca-backend.exe') : (process.env.ECA_PYTHON || 'python');
+  // The runtime is named after the product so Task Manager shows it as ours. The
+  // older file name stays as a fallback for an install that was only half replaced.
+  const backendNames = ['ECA Desktop Backend.exe', 'eca-backend.exe'];
+  const packaged = backendNames.map(name => path.join(process.resourcesPath, 'backend', name)).find(file => fs.existsSync(file))
+    || path.join(process.resourcesPath, 'backend', backendNames[0]);
+  const command = app.isPackaged ? packaged : (process.env.ECA_PYTHON || 'python');
   rpc = new RpcClient(command, app.isPackaged ? [] : ['-B', '-m', 'eca.desktop_rpc'], app.isPackaged ? home : root);
   rpc.on('event', data => {
     if(data.event==='subagent_progress'&&['text','model_activity'].includes(data.data?.event)) {
