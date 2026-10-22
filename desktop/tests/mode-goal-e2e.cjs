@@ -107,6 +107,11 @@ let app;
   await page.getByRole('button',{name:'保存全局指令'}).click();
   await expect(page.locator('.personal-pane .config-status')).toContainText('已保存');
   await page.getByRole('button',{name:'GitHub'}).click();
+  // Without an OAuth client id the pane must say so instead of offering a dead button,
+  // and the token path lives behind its own disclosure.
+  await expect(page.locator('.personal-pane')).toContainText('还没有配置 OAuth App 的 Client ID');
+  await expect(page.getByRole('button',{name:'用 GitHub 登录'})).toHaveCount(0);
+  await page.locator('.github-token summary').click();
   await expect(page.getByLabel('访问令牌')).toBeVisible();
   await page.getByLabel('访问令牌').fill('ghp_fixture');
   await page.getByRole('button',{name:'连接账号'}).click();

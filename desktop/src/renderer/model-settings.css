@@ -205,6 +205,18 @@
 .eca-app .model-settings .repo-row strong {display:block;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .eca-app .model-settings .repo-row small {color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;}
 .eca-app .model-settings .repo-row button {flex:none;}
+.eca-app .model-settings .github-device {display:grid;gap:10px;margin-top:10px;padding:14px 16px;border:1px solid var(--border);border-radius:14px;
+  background:var(--surface);box-shadow:var(--material-inset,inset 0 1px 2px #0000000f);}
+.eca-app .model-settings .github-device p {margin:0;font-size:11.5px;line-height:1.7;color:var(--secondary);}
+.eca-app .model-settings .github-device-row {display:flex;align-items:center;flex-wrap:wrap;gap:10px;}
+.eca-app .model-settings .github-code {font:600 20px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.18em;
+  padding:10px 14px;border:1px solid var(--control-border);border-radius:10px;background:var(--accent-soft);color:var(--text);
+  user-select:all;min-height:0;}
+.eca-app .model-settings .github-waiting {font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;}
+.eca-app .model-settings .github-client {margin-top:14px;padding-top:12px;border-top:1px solid var(--border);}
+.eca-app .model-settings .github-client summary {font-size:11.5px;color:var(--secondary);cursor:pointer;}
+.eca-app .model-settings .github-client[open] summary {margin-bottom:10px;}
+.eca-app .model-settings .github-client .fine-print {margin:0 0 10px;}
 .eca-app .model-settings .profile-identity small {color:var(--muted);font-size:11.5px;}
 .eca-app .model-settings .personal-actions {display:flex;align-items:center;justify-content:flex-end;gap:12px;
   margin-top:18px;padding-top:16px;border-top:1px solid var(--border);}

@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, safeStorage, shell, screen, protocol, clipboard, nativeTheme, net } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { RpcClient } from './rpc-client';
 import { Connections } from './connections';
@@ -47,7 +48,18 @@ process.env.TEMP = tempHome;
 process.env.TMP = tempHome;
 const root = path.resolve(__dirname, '../../..');
 const html = path.resolve(__dirname, '../renderer/index.html');
-const github = new GitHub(path.join(home, 'github.json'), safeStorage, (input: any, init?: any) => net.fetch(input, init));
+// A local `gh auth login` keeps a token on this machine; offering it is one click
+// instead of a browser round trip. Absent or logged out is a normal answer here.
+async function ghTokenFromCli(): Promise<string | undefined> {
+  return await new Promise(resolve => {
+    execFile('gh', ['auth', 'token'], {windowsHide: true, timeout: 5000}, (error, stdout) => {
+      const value = String(stdout || '').trim();
+      resolve(!error && value ? value : undefined);
+    });
+  });
+}
+const github = new GitHub(path.join(home, 'github.json'), safeStorage, (input: any, init?: any) => net.fetch(input, init),
+  {clientId: process.env.ECA_GITHUB_CLIENT_ID, ghToken: ghTokenFromCli});
 const connections = new Connections(path.join(home, 'preferences.json'), safeStorage);
 // The theme lives in its own small file: it is a display preference, not a model
 // connection, and nativeTheme.themeSource drives prefers-color-scheme for the UI.
@@ -234,10 +246,23 @@ async function action(method: string, params: any = {}) {
   if (method === 'config.get') return publicConfig();
   if (method === 'personalization.get') return readPersonalization();
   if (method === 'personalization.save') return savePersonalization(params);
-  if (method === 'github.status') return github.status();
-  if (method === 'github.connect') return await github.connect(params.token);
+  if (method === 'github.status') return {...github.status(), ghAvailable: await github.ghAvailable()};
+  if (method === 'github.connect') return {...await github.connect(params.token), ghAvailable: await github.ghAvailable()};
   if (method === 'github.disconnect') return github.disconnect();
   if (method === 'github.repos') return await github.repos();
+  // Sign in with GitHub: hand the renderer a code, open the consent page, then poll.
+  if (method === 'github.oauth.start') {
+    const start = await github.startDevice();
+    try {await shell.openExternal(start.verificationUri);} catch { /* the pane keeps its own link */ }
+    return start;
+  }
+  if (method === 'github.oauth.poll') return await github.pollDevice();
+  if (method === 'github.oauth.cancel') {github.cancelDevice(); return github.status();}
+  if (method === 'github.oauth.client') {
+    const clientId = github.setClientId(params.clientId);
+    return {oauthReady: github.oauthReady(), configured: !!clientId};
+  }
+  if (method === 'github.gh.login') return {...await github.connectGh(), ghAvailable: true};
   if (method === 'github.clone') {
     // Cloning takes as long as the network does; the picker, the clone and the
     // project open happen in one call so the renderer never opens a half-written tree.

@@ -96,3 +96,82 @@ test('克隆前拒绝非法仓库名和已存在的目录', async t=>{
   fs.writeFileSync(path.join(temp,'repo','a.txt'),'x');
   await assert.rejects(()=>github.clone('owner/repo',temp),/已存在且非空/);
 });
+
+test('设备码登录：先给码，轮询到 pending，授权后把令牌加密保存', async t=>{
+  const {file}=setup(t);
+  const work=fakeFetch((url,init,n)=>{
+    if(url.endsWith('/login/device/code'))return json({device_code:'DEV1',user_code:'ABCD-1234',verification_uri:'https://github.com/login/device',expires_in:900,interval:5});
+    if(url.endsWith('/login/oauth/access_token'))return n===2?json({error:'authorization_pending'}):json({access_token:'gho_new'});
+    return json({login:'me'});
+  });
+  const github=new GitHub(file,cipher,work,{clientId:'Iv1.abcdef123456'});
+  assert.equal(github.oauthReady(),true);
+  const start=await github.startDevice();
+  assert.deepEqual({userCode:start.userCode,uri:start.verificationUri,interval:start.interval},{userCode:'ABCD-1234',uri:'https://github.com/login/device',interval:5});
+  assert.deepEqual(await github.pollDevice(),{status:'pending'});
+  const done=await github.pollDevice();
+  assert.equal(done.status,'connected');
+  assert.equal(done.login,'me');
+  assert.equal(github.token(),'gho_new');
+  const raw=JSON.parse(fs.readFileSync(file,'utf8'));
+  assert.equal(raw.login,'me');
+  assert.ok(raw.encryptedToken && !raw.encryptedToken.includes('gho_new'),'device token must be encrypted at rest');
+  // The device code is single use: a second poll after success cannot mint another session.
+  assert.equal((await github.pollDevice()).status,'failed');
+});
+
+test('设备码登录：没有 Client ID 时不发起请求', async t=>{
+  const {file}=setup(t);
+  let called=false;
+  const github=new GitHub(file,cipher,fakeFetch(()=>{called=true;return json({});}));
+  assert.equal(github.oauthReady(),false);
+  await assert.rejects(()=>github.startDevice(),/Client ID/);
+  assert.equal(called,false,'no network call without a client id');
+});
+
+test('设备码登录：slow_down、过期、被拒绝和未启用都有明确结果', async t=>{
+  const {file}=setup(t);
+  const answers=[{error:'slow_down',interval:15},{error:'expired_token'},{error:'access_denied'}];
+  const github=new GitHub(file,cipher,fakeFetch(url=>url.endsWith('/login/device/code')
+    ? json({device_code:'DEV2',user_code:'WXYZ-9876',expires_in:900,interval:5})
+    : json(answers.shift())),{clientId:'Iv1.abcdef123456'});
+  await github.startDevice();
+  assert.deepEqual(await github.pollDevice(),{status:'slow_down',interval:15});
+  const expired=await github.pollDevice();
+  assert.equal(expired.status,'expired');
+  assert.match(expired.message,/失效|过期/);
+  // An expired code is dropped: the next poll cannot keep asking GitHub.
+  assert.equal((await github.pollDevice()).status,'failed');
+  await github.startDevice();
+  const denied=await github.pollDevice();
+  assert.equal(denied.status,'denied');
+  assert.match(denied.message,/取消/);
+
+  const disabled=new GitHub(file,cipher,fakeFetch(()=>json({error:'device_flow_disabled'},400)),{clientId:'Iv1.abcdef123456'});
+  await assert.rejects(()=>disabled.startDevice(),/Device Flow/);
+});
+
+test('Client ID 可以保存、覆盖，格式不对会拒绝，断开登录也不会丢', async t=>{
+  const {file}=setup(t);
+  const github=new GitHub(file,cipher,fakeFetch(()=>json({login:'me'})));
+  assert.throws(()=>github.setClientId('not a valid id!'),/格式/);
+  assert.equal(github.setClientId('Iv1.0123456789abcdef'),'Iv1.0123456789abcdef');
+  assert.equal(github.oauthReady(),true);
+  await github.connect('ghp_x');
+  github.disconnect();
+  const again=new GitHub(file,cipher,fakeFetch(()=>json({})));
+  assert.equal(again.clientId(),'Iv1.0123456789abcdef','the public client id survives a disconnect');
+  assert.equal(again.status().connected,false);
+});
+
+test('本机 gh 令牌可以直接登录，没有就给出提示', async t=>{
+  const {file}=setup(t);
+  const withToken=new GitHub(file,cipher,fakeFetch(()=>json({login:'me'})),{ghToken:async()=>'ghp_from_gh'});
+  assert.equal(await withToken.ghAvailable(),true);
+  const status=await withToken.connectGh();
+  assert.equal(status.connected,true);
+  assert.equal(withToken.token(),'ghp_from_gh');
+  const bare=new GitHub(path.join(path.dirname(file),'bare.json'),cipher,fakeFetch(()=>json({})));
+  assert.equal(await bare.ghAvailable(),false);
+  await assert.rejects(()=>bare.connectGh(),/gh auth login/);
+});
