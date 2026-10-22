@@ -222,6 +222,23 @@ let app;
   assert(requests.filter(r=>Array.isArray(r.tools)&&r.tools.length)
     .every(r=>String(r.messages?.[0]?.content||'').includes('How they want answers: 先给结论')),'style missing from the system prompt');
 
+  // Editing the newest turn: the button lives on the last instruction the person
+  // typed, the dialog opens prefilled, and saving rewinds that turn before running
+  // the edited text — so the old prompt must disappear from the session.
+  const editButton=page.getByRole('button',{name:'修改这条指令并重新发送'});
+  await expect(editButton).toHaveCount(1);
+  await editButton.click();
+  const editDialog=page.locator('dialog[aria-label="修改指令"]');
+  await expect(editDialog).toBeVisible();
+  await expect(editDialog.locator('#prompt-edit')).toHaveValue('达成目标');
+  await editDialog.locator('#prompt-edit').fill('换个说法再说一遍');
+  await editDialog.getByRole('button',{name:'保存并重新发送'}).click();
+  await expect.poll(()=>turnStart('换个说法再说一遍').length,{timeout:60000}).toBeGreaterThan(0);
+  await expect.poll(async()=>(await invoke('snapshot')).busy,{timeout:60000}).toBe(false);
+  const rewritten=JSON.stringify((await invoke('snapshot')).messages.map(m=>m.content));
+  assert(!rewritten.includes('达成目标'),'the edited-away prompt is still in the session');
+  assert(rewritten.includes('换个说法再说一遍'),'the edited prompt never reached the session');
+
   await page.screenshot({path:path.join(output,'plan-goal.png')});
   assert.deepEqual(errors,[]);
   const report={mode,exe:process.env.ECA_TEST_EXE||'development',requests:requests.length,

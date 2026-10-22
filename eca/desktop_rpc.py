@@ -409,35 +409,65 @@ class DesktopRPC:
             self.queue_changed()
             raise
 
-    async def regenerate(self):
-        """Drop the last answer and run the same prompt again."""
-        runtime = self.idle()
-        agent = runtime.agent
-        state = agent.state
-        messages = state['messages']
-        internal = ('User-requested verification command:', 'Repair the failed user-selected verification')
-        index = None
+    # Prompts the runtime wrote itself are not the user's instruction: regenerating
+    # or editing has to land on what the person actually typed.
+    INTERNAL_PROMPTS = ('User-requested verification command:',
+                        'Repair the failed user-selected verification', '[Runtime guidance]')
+
+    def last_prompt_index(self, messages):
+        """Index of the newest prompt that came from the person, not from the runtime."""
         for position in range(len(messages) - 1, -1, -1):
             message = messages[position]
             if message.get('role') != 'user' or not isinstance(message.get('content'), str):
                 continue
-            if message['content'].startswith(internal):
+            if message['content'].startswith(self.INTERNAL_PROMPTS):
                 continue
-            index = position
-            break
-        if index is None:
-            raise ValueError('This session has no prompt to regenerate.')
-        prompt = messages[index]
-        if prompt.get('attachments'):
-            raise ValueError('This prompt carries attachments; send it again instead of regenerating.')
-        if not any(m.get('role') == 'assistant' for m in messages[index + 1:]):
-            raise ValueError('There is no answer to regenerate yet.')
-        # Remove the prompt and everything after it; the run re-appends it once.
+            return position
+        return None
+
+    def rewind(self, index):
+        """Forget the turn at `index` and everything after it, so a run starts there."""
+        state = self.runtime.agent.state
+        messages = state['messages']
         del messages[index:]
         state['context_start'] = min(state.get('context_start', 0), len(messages))
-        agent.store.save(state)
-        self.emit('notice', 'Regenerating the answer for the previous prompt.')
+        self.runtime.agent.store.save(state)
+
+    async def regenerate(self):
+        """Drop the last answer and run the same prompt again."""
+        runtime = self.idle()
+        state = runtime.agent.state
+        messages = state['messages']
+        index = self.last_prompt_index(messages)
+        if index is None:
+            raise ValueError('这一轮没有可以重新生成的指令。')
+        prompt = messages[index]
+        if prompt.get('attachments'):
+            raise ValueError('这条指令带附件，请重新发送而不是重新生成。')
+        if not any(m.get('role') == 'assistant' for m in messages[index + 1:]):
+            raise ValueError('这一轮还没有可以重新生成的回答。')
+        # Remove the prompt and everything after it; the run re-appends it once.
+        self.rewind(index)
+        self.emit('notice', '正在用同一条指令重新生成回答。')
         return await self.begin_run(prompt['content'])
+
+    async def resend(self, prompt):
+        """Edit the newest prompt: drop that whole turn, then run the edited text."""
+        runtime = self.idle()
+        text = prompt.strip() if isinstance(prompt, str) else ''
+        if not text:
+            raise ValueError('编辑后的指令不能为空。')
+        if len(text) > 20000:
+            raise ValueError('编辑后的指令太长了。')
+        messages = runtime.agent.state['messages']
+        index = self.last_prompt_index(messages)
+        if index is None:
+            raise ValueError('这一轮没有可以编辑的指令。')
+        if messages[index].get('attachments'):
+            raise ValueError('这条指令带附件，请在输入框里重新发送。')
+        self.rewind(index)
+        self.emit('notice', '正在用编辑后的指令重新发送。')
+        return await self.begin_run(text)
 
     async def dispatch(self, method, params):
         if method == 'initialize':
@@ -612,6 +642,8 @@ class DesktopRPC:
                 return self.safe({'messages': self.public_messages(state['messages'][max(0, before-50):before], max(0,before-50), params.get('preview') is True), 'before': max(0, before-50)})
             if method == 'session.regenerate':
                 return await self.regenerate()
+            if method == 'session.resend':
+                return await self.resend(params.get('prompt'))
             if method == 'task.start':
                 return await self.begin_run(params.get('prompt'), params.get('checks', []),
                                             params.get('repair_attempts', 0),

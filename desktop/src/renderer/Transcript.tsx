@@ -4,7 +4,7 @@ const ProjectContext=createContext<string|undefined>(undefined);
 import React, {memo, useEffect, useMemo, useRef, useState} from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import {CaretRight, TerminalWindow, FileText, CheckCircle, WarningCircle, Code, Circle, ListChecks, MinusCircle, Copy, Check, Sparkle, ArrowsClockwise} from '@phosphor-icons/react';
+import {CaretRight, TerminalWindow, FileText, CheckCircle, WarningCircle, Code, Circle, ListChecks, MinusCircle, Copy, Check, Sparkle, ArrowsClockwise, PencilSimple} from '@phosphor-icons/react';
 import {transcriptNodes,resultInfo,toolArgs,toolTarget,failureHint,visibleEntries,type ToolEntry} from './transcript-model';
 import {AgentCards,agentsForCall,type ChildAgent} from './subagents/AgentCards';
 
@@ -126,7 +126,16 @@ const RegenerateButton=memo(function RegenerateButton({onRegenerate}:{onRegenera
       <ArrowsClockwise size={13}/><span>重新生成</span>
     </button>;
 });
-const Message=memo(function Message({message,sessionId,regenerate,onRegenerate}:{message:any;sessionId:string;regenerate?:boolean;onRegenerate?:()=>void}) {
+// The newest instruction is the one thing worth editing in place: changing and
+// resending drops that turn and runs the edited text, so the answer never sits on
+// top of a prompt the person has already moved past.
+const EditPromptButton=memo(function EditPromptButton({blocked,onEdit}:{blocked:boolean;onEdit?:()=>void}) {
+  return <button type="button" className="message-edit" disabled={blocked} onClick={()=>onEdit?.()}
+      aria-label="修改这条指令并重新发送" title={blocked?'这条指令带附件，请在输入框里重新发送':undefined}>
+      <PencilSimple size={13}/><span>修改重发</span>
+    </button>;
+});
+const Message=memo(function Message({message,sessionId,regenerate,onRegenerate,editable,onEdit}:{message:any;sessionId:string;regenerate?:boolean;onRegenerate?:()=>void;editable?:boolean;onEdit?:()=>void}) {
   const project_id=useContext(ProjectContext);
   const [full,setFull]=useState<any>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
   const data=full||message;
@@ -140,8 +149,9 @@ const Message=memo(function Message({message,sessionId,regenerate,onRegenerate}:
     {reasoning&&<details className="message-reasoning"><summary><Sparkle size={13}/><span>思考</span><i>{reasoning.length.toLocaleString()} 字符</i></summary><div className="message-reasoning-text">{reasoning}</div></details>}
     {typeof data.content==='string'&&data.content&&<RichText text={data.content}/>}
     <AttachmentNames items={data.attachments}/>{more}
-    {(typeof data.content==='string'&&data.content.trim()||regenerate)&&<div className="message-actions">
+    {(typeof data.content==='string'&&data.content.trim()||regenerate||editable)&&<div className="message-actions">
       {typeof data.content==='string'&&data.content.trim()&&<CopyButton text={data.content}/>}
+      {editable&&<EditPromptButton blocked={!!(data.attachments&&data.attachments.length)} onEdit={onEdit}/>}
       {regenerate&&<RegenerateButton onRegenerate={onRegenerate}/>}
     </div>}
   </article>;
@@ -149,12 +159,22 @@ const Message=memo(function Message({message,sessionId,regenerate,onRegenerate}:
 
 const noAgents:ChildAgent[]=[];
 const noChanges:any[]=[];
-export const Transcript=memo(function Transcript({messages,sessionId,projectId,root='',busy=false,agents=noAgents,onOpenAgent,changes=noChanges,onRegenerate}:{messages:any[];sessionId:string;projectId?:string;root?:string;busy?:boolean;agents?:ChildAgent[];onOpenAgent?:(agent:ChildAgent)=>void;changes?:any[];onRegenerate?:()=>void}) {
+export const Transcript=memo(function Transcript({messages,sessionId,projectId,root='',busy=false,agents=noAgents,onOpenAgent,changes=noChanges,onRegenerate,onEditPrompt}:{messages:any[];sessionId:string;projectId?:string;root?:string;busy?:boolean;agents?:ChildAgent[];onOpenAgent?:(agent:ChildAgent)=>void;changes?:any[];onRegenerate?:()=>void;onEditPrompt?:(text:string)=>void}) {
   const nodes=useMemo(()=>transcriptNodes(messages),[messages]);
   // Regenerating only makes sense for the newest answer.
   const lastAnswer=useMemo(()=>messages.reduce((found:any,message:any)=>message?.role==='assistant'?message:found,null),[messages]);
+  // Editing is offered for the newest instruction the person typed. Runtime guidance
+  // and verification commands are written by the agent, so they are skipped.
+  const lastPrompt=useMemo(()=>{
+    for(let position=messages.length-1;position>=0;position-=1){
+      const message=messages[position];
+      if(!message||message.role!=='user'||typeof message.content!=='string'||!message.content.trim())continue;
+      if(/^(User-requested verification command:|Repair the failed user-selected verification|\[Runtime guidance\])/.test(message.content))continue;
+      return message;
+    }
+    return null;},[messages]);
   return <ProjectContext.Provider value={projectId}>{nodes.map((node,index)=><React.Fragment key={sessionId+'-'+node.key}>
     {node.kind==='gap'?<div className="history-gap">中间 {node.count} 条记录已收起。返回最近记录后可重新加载。</div>:
       node.kind==='tools'?<ExecutionEntries entries={node.entries} sessionId={sessionId} root={root} pending={busy&&index===nodes.length-1} agents={agents} onOpenAgent={onOpenAgent} changes={changes}/>:
-      <Message message={node.message} sessionId={sessionId} regenerate={!busy&&node.message===lastAnswer} onRegenerate={onRegenerate}/>}</React.Fragment>)}</ProjectContext.Provider>;
+      <Message message={node.message} sessionId={sessionId} regenerate={!busy&&node.message===lastAnswer} onRegenerate={onRegenerate} editable={!busy&&node.message===lastPrompt} onEdit={()=>onEditPrompt?.(String(lastPrompt?.content||''))}/>}</React.Fragment>)}</ProjectContext.Provider>;
 });

@@ -492,6 +492,40 @@ class DesktopTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             await self.rpc.dispatch('session.regenerate', {})
 
+    async def test_resend_replaces_the_last_prompt_and_runs_the_edited_text(self):
+        await self.fake([{'role': 'assistant', 'content': 'first answer'},
+                         {'role': 'assistant', 'content': 'edited answer'}])
+        self.rpc.runtime.agent.settings.api_key = ''
+        await self.rpc.dispatch('task.start', {'prompt': 'do the thing'})
+        await asyncio.wait_for(self.rpc.finishing, 5)
+        state = self.rpc.runtime.agent.state
+        await self.rpc.dispatch('session.resend', {'prompt': '  do it better  '})
+        await asyncio.wait_for(self.rpc.finishing, 5)
+        exchange = [(m['role'], m.get('content')) for m in state['messages'] if m['role'] in {'user', 'assistant'}]
+        self.assertEqual(exchange, [('user', 'do it better'), ('assistant', 'edited answer')],
+                         state.get('stop_reason'))
+        self.assertEqual(state['status'], 'idle', state.get('stop_reason'))
+
+    async def test_resend_needs_a_prompt_the_person_typed(self):
+        with self.assertRaises(ValueError):
+            await self.rpc.dispatch('session.resend', {'prompt': 'anything'})
+        # Runtime guidance is written by the agent; it is not editable.
+        self.rpc.runtime.agent.state['messages'].append(
+            {'role': 'user', 'content': '[Runtime guidance] Keep working on the open criteria.'})
+        with self.assertRaises(ValueError):
+            await self.rpc.dispatch('session.resend', {'prompt': 'anything'})
+
+    async def test_resend_rejects_blank_text_and_prompts_with_attachments(self):
+        state = self.rpc.runtime.agent.state
+        state['messages'].extend([
+            {'role': 'user', 'content': 'look at this', 'attachments': [{'path': 'a.png'}]},
+            {'role': 'assistant', 'content': 'seen'}])
+        with self.assertRaises(ValueError):
+            await self.rpc.dispatch('session.resend', {'prompt': '   '})
+        with self.assertRaises(ValueError):
+            await self.rpc.dispatch('session.resend', {'prompt': 'look at that'})
+        self.assertEqual(len(state['messages']), 2, 'a refused edit must leave the turn intact')
+
     async def test_question_and_redaction(self):
         self.rpc.secrets.add('private-test-key')
         task = asyncio.create_task(self.rpc.question('Question private-test-key'))
