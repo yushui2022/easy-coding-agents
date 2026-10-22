@@ -63,16 +63,22 @@ let app;
     base_url:`http://127.0.0.1:${server.address().port}/v1`,no_auth:true});
   await invoke('config.default',{id:saved.savedId});
 
-  // 0. 个人与全局：主题、个人信息、全局指令都在同一个设置对话框里，且会进系统提示词。
+  // 0. 四个设置分区各自独立：外观主题、个人信息、全局指令分页保存，且都进系统提示词。
   await page.getByRole('button',{name:'模型与设置'}).click();
-  await page.getByRole('tab',{name:'个人与全局'}).click();
+  await page.getByRole('button',{name:'外观主题'}).click();
   await page.getByRole('radio',{name:'深色'}).click();
   await expect.poll(()=>page.evaluate(()=>window.eca.theme())).toBe('dark');
   await page.getByRole('radio',{name:'跟随系统'}).click();
+  await page.getByRole('button',{name:'个人信息'}).click();
   await page.getByLabel('称呼').fill('小明');
-  await page.getByLabel('补充说明').fill('偏好简洁中文回答');
-  await page.getByLabel('适用于所有项目的长期要求').fill('每轮回答先给结论。');
-  await page.getByRole('button',{name:'保存个人设置'}).click();
+  await page.getByLabel('身份').fill('后端工程师');
+  await page.getByLabel('关于我').fill('在做 ECA 这个项目');
+  await page.getByLabel('回答偏好').fill('先给结论');
+  await page.getByRole('button',{name:'保存个人信息'}).click();
+  await expect(page.locator('.personal-pane .config-status')).toContainText('已保存');
+  await page.getByRole('button',{name:'全局指令'}).click();
+  await page.getByLabel('每轮对话都会带上').fill('每轮回答先给结论。');
+  await page.getByRole('button',{name:'保存全局指令'}).click();
   await expect(page.locator('.personal-pane .config-status')).toContainText('已保存');
   await page.getByRole('button',{name:'关闭设置'}).click();
   assert(fs.existsSync(path.join(home,'data','profile.json')),'profile.json was not written');
@@ -168,6 +174,10 @@ let app;
     .every(r=>String(r.messages?.[0]?.content||'').includes('每轮回答先给结论')),'global instructions missing from the system prompt');
   assert(requests.filter(r=>Array.isArray(r.tools)&&r.tools.length)
     .every(r=>String(r.messages?.[0]?.content||'').includes('小明')),'profile name missing from the system prompt');
+  assert(requests.filter(r=>Array.isArray(r.tools)&&r.tools.length)
+    .every(r=>String(r.messages?.[0]?.content||'').includes('Their role: 后端工程师')),'role missing from the system prompt');
+  assert(requests.filter(r=>Array.isArray(r.tools)&&r.tools.length)
+    .every(r=>String(r.messages?.[0]?.content||'').includes('How they want answers: 先给结论')),'style missing from the system prompt');
 
   await page.screenshot({path:path.join(output,'plan-goal.png')});
   assert.deepEqual(errors,[]);

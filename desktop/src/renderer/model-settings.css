@@ -134,16 +134,27 @@
 }
 
 /* Settings sections: model connections, or the personal/global pane. */
-.eca-app .model-settings .settings-switch {display:flex;gap:4px;flex-shrink:0;padding:4px;border-radius:12px;background:var(--settings-button);}
-.eca-app .model-settings .settings-switch button {flex:1;justify-content:center;min-height:30px;padding:6px 8px;border:0;border-radius:9px;background:transparent;color:var(--secondary);font-size:12px;}
-.eca-app .model-settings .settings-switch button:hover {color:var(--text);}
-.eca-app .model-settings .settings-switch button.active {background:var(--selected);color:var(--text);box-shadow:inset 0 1px 1px var(--material-rim);}
+.eca-app .model-settings .settings-nav {display:flex;flex-direction:column;gap:2px;flex-shrink:0;margin-bottom:6px;padding-bottom:10px;border-bottom:1px solid var(--border);}
+.eca-app .model-settings .settings-nav-item {display:flex;align-items:center;justify-content:flex-start;gap:9px;min-height:34px;
+  padding:7px 10px;border:0;border-radius:9px;background:transparent;color:var(--secondary);font-size:12.5px;text-align:left;}
+.eca-app .model-settings .settings-nav-item svg {flex:none;color:var(--muted);}
+.eca-app .model-settings .settings-nav-item:hover {background:var(--hover);color:var(--text);}
+.eca-app .model-settings .settings-nav-item.active {background:var(--selected);color:var(--text);box-shadow:inset 0 1px 1px var(--material-rim);}
+.eca-app .model-settings .settings-nav-item.active svg {color:var(--accent);}
 .eca-app .model-settings .showing-personal .connections-label,
 .eca-app .model-settings .showing-personal .add-connection,
-.eca-app .model-settings .showing-personal nav,
+.eca-app .model-settings .showing-personal nav[aria-label="已保存的模型连接"],
 .eca-app .model-settings .showing-personal .connections-empty,
 .eca-app .model-settings .showing-personal .connections-note {display:none;}
 .eca-app .model-settings .showing-personal .connection-editor:not(.personal-pane) {display:none;}
+.eca-app .model-settings .profile-identity {display:flex;align-items:center;gap:12px;margin-bottom:18px;padding:14px 16px;
+  border:1px solid var(--border);border-radius:14px;background:var(--settings-button);}
+.eca-app .model-settings .profile-avatar {display:grid;place-items:center;width:42px;height:42px;flex:none;border-radius:50%;
+  background:var(--accent-soft);color:var(--accent);font-size:17px;font-weight:600;}
+.eca-app .model-settings .profile-identity strong {display:block;font-size:14px;}
+.eca-app .model-settings .profile-identity small {color:var(--muted);font-size:11.5px;}
+.eca-app .model-settings .personal-actions {display:flex;align-items:center;justify-content:flex-end;gap:12px;
+  margin-top:18px;padding-top:16px;border-top:1px solid var(--border);}
 .eca-app .model-settings .theme-choices {display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
 .eca-app .model-settings .theme-choice {display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:8px 12px;
   border:1px solid var(--control-border);border-radius:10px;background:var(--settings-button);color:var(--secondary);font-size:12px;}

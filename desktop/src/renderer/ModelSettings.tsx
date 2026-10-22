@@ -1,8 +1,8 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Plus, Check, ArrowClockwise, PlugsConnected, Desktop, Key, Cpu, SlidersHorizontal, LockSimple, Trash, PaintBrush, UserCircle, FileText} from '@phosphor-icons/react';
+import {Plus, Check, ArrowClockwise, PlugsConnected, Desktop, Key, Cpu, SlidersHorizontal, LockSimple, Trash, Sun, UserCircle, FileText} from '@phosphor-icons/react';
 import {Dialog} from './Dialog';
+import {AppearancePane, ProfilePane, InstructionsPane, emptyPersonal, type Personal} from './PersonalSettings';
 import './model-settings.css';
-
 const presets = [
   {id:'deepseek',name:'DeepSeek',base_url:'https://api.deepseek.com/v1',api_format:'openai'},
   {id:'openai',name:'OpenAI',base_url:'https://api.openai.com/v1',api_format:'responses'},
@@ -28,15 +28,17 @@ export function ModelSettings({open,config,state,onConfig,onClose,onUse}:any) {
   const [confirmRemove,setConfirmRemove]=useState(false);
   const initialized=useRef(false);
   const drafts=useRef(new Map<string,Form>());
-  const [view,setView]=useState<'connections'|'personal'>('connections');
-  const [personal,setPersonal]=useState({name:'',notes:'',instructions:''});
+  const [section,setSection]=useState<'connections'|'appearance'|'profile'|'instructions'>('connections');
+  const [personal,setPersonal]=useState<Personal>(emptyPersonal);
   const [personalStatus,setPersonalStatus]=useState('');
   const [savingPersonal,setSavingPersonal]=useState(false);
   const [theme,setTheme]=useState('system');
   useEffect(()=>{
     if(!open)return;
     void invoke('personalization.get')
-      .then((value:any)=>setPersonal({name:value?.name||'',notes:value?.notes||'',instructions:value?.instructions||''}))
+      .then((value:any)=>setPersonal({...emptyPersonal,
+        name:value?.name||'', role:value?.role||'', about:value?.about||'',
+        style:value?.style||'', instructions:value?.instructions||''}))
       .catch(()=>{});
     void window.eca?.theme?.().then((value:string)=>setTheme(String(value))).catch(()=>{});
   },[open]);
@@ -44,7 +46,8 @@ export function ModelSettings({open,config,state,onConfig,onClose,onUse}:any) {
     setSavingPersonal(true);setPersonalStatus('');
     try {
       const value:any = await invoke('personalization.save', personal);
-      setPersonal({name:value.name,notes:value.notes,instructions:value.instructions});
+      setPersonal({name:value.name||'', role:value.role||'', about:value.about||'',
+        style:value.style||'', instructions:value.instructions||''});
       setPersonalStatus('已保存，下一轮对话生效。');
     } catch (error) {setPersonalStatus(String(error));}
     finally {setSavingPersonal(false);}
@@ -113,12 +116,16 @@ export function ModelSettings({open,config,state,onConfig,onClose,onUse}:any) {
   if(!open)return null;
   const isDefault=!!current&&current.id===config.defaultId;
   return <Dialog title="模型与设置" closeLabel="关闭设置" wide className="model-settings" onClose={onClose}>
-    <div className={'connection-layout'+(view==='personal'?' showing-personal':'')}>
+    <div className={'connection-layout'+(section!=='connections'?' showing-personal':'')}>
       <aside className="connection-sidebar">
-        <div className="settings-switch" role="tablist" aria-label="设置分区">
-          <button type="button" role="tab" aria-selected={view==='connections'} className={view==='connections'?'active':''} onClick={()=>setView('connections')}>模型连接</button>
-          <button type="button" role="tab" aria-selected={view==='personal'} className={view==='personal'?'active':''} onClick={()=>setView('personal')}>个人与全局</button>
-        </div>
+        <nav className="settings-nav" aria-label="设置分区">
+          {([['connections','模型连接',<PlugsConnected size={15} key="c"/>],
+             ['appearance','外观主题',<Sun size={15} key="a"/>],
+             ['profile','个人信息',<UserCircle size={15} key="p"/>],
+             ['instructions','全局指令',<FileText size={15} key="i" />]] as [typeof section,string,React.ReactNode][])
+            .map(([id,label,icon])=><button key={id} type="button" aria-pressed={section===id}
+              className={'settings-nav-item'+(section===id?' active':'')} onClick={()=>setSection(id)}>{icon}<span>{label}</span></button>)}
+        </nav>
         <div className="connections-label"><span>模型连接</span><span>{config.connections?.length||0}</span></div>
         <button className="add-connection" disabled={busy} onClick={()=>select()}><Plus size={15}/>添加连接</button>
         <nav aria-label="已保存的模型连接">{config.connections?.map((c:any)=><button key={c.id} className={c.id===form.id?'selected':''} aria-pressed={c.id===form.id} disabled={busy} onClick={()=>select(c)}>
@@ -128,39 +135,11 @@ export function ModelSettings({open,config,state,onConfig,onClose,onUse}:any) {
         {!config.connections?.length&&<div className="connections-empty"><PlugsConnected size={24}/><p>从一个模型开始</p><span>添加 API 连接，或接入本机服务。</span></div>}
         <div className="connections-note"><LockSimple size={15}/><p>每个连接独立保存密钥。<br/>可选择系统加密保存。</p></div>
       </aside>
-      {view==='personal'&&<section className="connection-editor personal-pane" aria-label="个人与全局">
-        <div className="connection-scroll">
-          <header className="connection-heading"><div><h3>个人与全局</h3><p>外观、对模型的自述，以及适用于所有项目的指令。</p></div></header>
-          <section className="connection-section" aria-labelledby="personal-theme-heading">
-            <h4 id="personal-theme-heading"><PaintBrush size={15}/>背景主题</h4>
-            <div className="theme-choices" role="radiogroup" aria-label="背景主题">
-              {[['system','跟随系统'],['light','浅色'],['dark','深色']].map(([value,label])=>
-                <button key={value} type="button" role="radio" aria-checked={theme===value} aria-label={label}
-                  className={'theme-choice'+(theme===value?' active':'')} onClick={()=>void chooseTheme(value)}>
-                  {theme===value?<Check size={13}/>:<span className="theme-dot"/>}<span>{label}</span></button>)}
-            </div>
-            <p className="fine-print">只改变界面显示，不影响模型、项目或审批档位。</p>
-          </section>
-          <section className="connection-section" aria-labelledby="personal-profile-heading">
-            <h4 id="personal-profile-heading"><UserCircle size={15}/>个人信息</h4>
-            <div className="field"><label htmlFor="personal-name">称呼</label><input id="personal-name" maxLength={80} placeholder="模型怎么称呼你，可留空" value={personal.name} onChange={e=>setPersonal({...personal,name:e.target.value})}/></div>
-            <div className="field"><label htmlFor="personal-notes">补充说明</label><textarea id="personal-notes" rows={3} maxLength={2000} placeholder="例如：偏好中文回答，解释先给结论" value={personal.notes} onChange={e=>setPersonal({...personal,notes:e.target.value})}/></div>
-            <p className="fine-print">这两项会写进每轮对话的系统提示词，所有项目共用。</p>
-          </section>
-          <section className="connection-section" aria-labelledby="personal-agents-heading">
-            <h4 id="personal-agents-heading"><FileText size={15}/>全局指令（AGENTS.md）</h4>
-            <div className="field"><label htmlFor="personal-instructions">适用于所有项目的长期要求</label>
-              <textarea id="personal-instructions" rows={8} maxLength={20000} spellCheck={false}
-                placeholder={'每行一条，例如：\n回答前先说结论\n提交信息用英文'}
-                value={personal.instructions} onChange={e=>setPersonal({...personal,instructions:e.target.value})}/></div>
-            <p className="fine-print">保存到数据目录的 AGENTS.md，每轮对话都会带上；项目自己的 AGENTS.md 仍然优先。它不能改动审批权限或工具限制。</p>
-          </section>
-        </div>
-        <footer className="connection-editor-footer">
-          {(savingPersonal||personalStatus)&&<div className="config-status" role="status">{savingPersonal?'正在保存…':personalStatus}</div>}
-          <div className="actions config-actions"><span className="save-state"><span/>保存在本机</span><button className="primary" disabled={savingPersonal} onClick={()=>void savePersonal()}>保存个人设置</button></div>
-        </footer>
-      </section>}
+      {section==='appearance'&&<AppearancePane theme={theme} onTheme={value=>void chooseTheme(value)}/>}
+      {section==='profile'&&<ProfilePane value={personal} onChange={setPersonal} onSave={()=>void savePersonal()}
+        saving={savingPersonal} status={personalStatus} busy={busy}/>}
+      {section==='instructions'&&<InstructionsPane value={personal} onChange={setPersonal} onSave={()=>void savePersonal()}
+        saving={savingPersonal} status={personalStatus} busy={busy}/>}
       <section className="connection-editor" aria-label="连接设置">
         <div className="connection-scroll">
           <header className="connection-heading"><div><h3>{current?current.name:'添加模型连接'}</h3><p>{current?'管理此连接使用的服务与模型。':'接入你喜欢的模型，开始协作。'}</p></div>{isDefault&&<span className="connection-default-badge"><Check size={12}/>桌面默认</span>}</header>

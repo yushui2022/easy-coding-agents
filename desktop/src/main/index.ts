@@ -67,28 +67,36 @@ const profileFile = path.join(home, 'profile.json');
 const globalAgentsFile = path.join(home, 'AGENTS.md');
 process.env.ECA_USER_PROFILE = profileFile;
 process.env.ECA_GLOBAL_AGENTS = globalAgentsFile;
-type Personalization = {name:string; notes:string; instructions:string};
-const limits = {name:80, notes:2000, instructions:20000};
+type Personalization = {name:string; role:string; about:string; style:string; instructions:string};
+const limits = {name:80, role:120, about:2000, style:1000, instructions:20000};
 function readPersonalization(): Personalization {
-  let name = '', notes = '';
+  const profile:Record<string, unknown> = {};
   try {
     const raw = JSON.parse(fs.readFileSync(profileFile, 'utf8'));
-    if (typeof raw?.name === 'string') name = raw.name;
-    if (typeof raw?.notes === 'string') notes = raw.notes;
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) Object.assign(profile, raw);
   } catch { /* a missing or corrupt profile is simply empty */ }
+  const field = (key:string, limit:number) => typeof profile[key] === 'string' ? String(profile[key]).slice(0,limit) : '';
   let instructions = '';
   try {instructions = fs.readFileSync(globalAgentsFile, 'utf8');} catch { /* not created yet */ }
-  return {name:name.slice(0,limits.name), notes:notes.slice(0,limits.notes),
-    instructions:instructions.slice(0,limits.instructions)};
+  return {
+    name:field('name', limits.name),
+    role:field('role', limits.role),
+    // Older profiles stored a single notes field; keep it readable.
+    about:field('about', limits.about) || field('notes', limits.about),
+    style:field('style', limits.style),
+    instructions:instructions.slice(0, limits.instructions),
+  };
 }
 function savePersonalization(params:any): Personalization {
   const text = (value:unknown, limit:number) => typeof value === 'string' ? value.slice(0,limit) : '';
   const name = text(params?.name, limits.name).trim();
-  const notes = text(params?.notes, limits.notes).trim();
+  const role = text(params?.role, limits.role).trim();
+  const about = text(params?.about, limits.about).trim();
+  const style = text(params?.style, limits.style).trim();
   const instructions = text(params?.instructions, limits.instructions);
   fs.mkdirSync(home, {recursive:true});
   try {
-    if (name || notes) fs.writeFileSync(profileFile, JSON.stringify({name, notes}), {mode:0o600});
+    if (name || role || about || style) fs.writeFileSync(profileFile, JSON.stringify({name, role, about, style}), {mode:0o600});
     else fs.rmSync(profileFile, {force:true});
     if (instructions.trim()) fs.writeFileSync(globalAgentsFile, instructions, {mode:0o600});
     else fs.rmSync(globalAgentsFile, {force:true});

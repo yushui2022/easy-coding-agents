@@ -6,7 +6,6 @@ import unittest
 from unittest import mock
 
 from eca import usercontext
-from eca.config import Settings
 from eca.desktop_rpc import DesktopRPC
 
 
@@ -20,28 +19,33 @@ class UserContextTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def env(self, profile=True, agents=True):
-        values = {}
-        if profile:
-            values['ECA_USER_PROFILE'] = str(self.profile)
-        if agents:
-            values['ECA_GLOBAL_AGENTS'] = str(self.agents)
-        return mock.patch.dict(os.environ, values, clear=False)
+    def env(self):
+        return mock.patch.dict(os.environ, {'ECA_USER_PROFILE': str(self.profile),
+                                            'ECA_GLOBAL_AGENTS': str(self.agents)}, clear=False)
 
     def test_nothing_configured_produces_no_blocks(self):
         with mock.patch.dict(os.environ, {}, clear=True):
             self.assertEqual(usercontext.blocks(), [])
 
     def test_profile_and_instructions_become_labelled_blocks(self):
-        self.profile.write_text(json.dumps({'name': '小明', 'notes': '偏好中文回答'}), encoding='utf-8')
+        self.profile.write_text(json.dumps({'name': '小明', 'role': '后端工程师',
+                                            'about': '在做 ECA', 'style': '先给结论'}), encoding='utf-8')
         self.agents.write_text('始终用中文回答。\n提交信息用英文。', encoding='utf-8')
         with self.env():
             blocks = usercontext.blocks()
         self.assertEqual(len(blocks), 2)
         self.assertIn('prefers to be called 小明', blocks[0])
-        self.assertIn('偏好中文回答', blocks[0])
+        self.assertIn('Their role: 后端工程师', blocks[0])
+        self.assertIn('About the user: 在做 ECA', blocks[0])
+        self.assertIn('How they want answers: 先给结论', blocks[0])
         self.assertIn('Global user instructions for every project', blocks[1])
         self.assertIn('提交信息用英文', blocks[1])
+
+    def test_legacy_notes_field_still_reads_as_about(self):
+        self.profile.write_text(json.dumps({'name': 'A', 'notes': '旧版字段'}), encoding='utf-8')
+        with self.env():
+            blocks = usercontext.blocks()
+        self.assertIn('About the user: 旧版字段', blocks[0])
 
     def test_missing_corrupt_and_linked_files_are_ignored(self):
         with self.env():
@@ -61,15 +65,18 @@ class UserContextTests(unittest.TestCase):
 
     def test_oversized_values_are_truncated(self):
         self.agents.write_text('x' * (usercontext.INSTRUCTIONS_LIMIT + 500), encoding='utf-8')
-        self.profile.write_text(json.dumps({'name': 'y' * 200, 'notes': 'n' * 5000}), encoding='utf-8')
+        self.profile.write_text(json.dumps({'name': 'y' * 200, 'about': 'n' * 5000,
+                                            'style': 's' * 3000}), encoding='utf-8')
         with self.env():
             blocks = usercontext.blocks()
-        self.assertLessEqual(len(blocks[1]), len('Global user instructions for every project (set by the user in the desktop):\n') + usercontext.INSTRUCTIONS_LIMIT)
-        self.assertNotIn('y' * 81, blocks[0])
-        self.assertLess(blocks[0].count('n'), 2100)
+        header = 'Global user instructions for every project (set by the user in the desktop):\n'
+        self.assertLessEqual(len(blocks[1]), len(header) + usercontext.INSTRUCTIONS_LIMIT)
+        self.assertNotIn('y' * (usercontext.NAME_LIMIT + 1), blocks[0])
+        self.assertLess(blocks[0].count('n'), usercontext.ABOUT_LIMIT + 100)
+        self.assertLess(blocks[0].count('s'), usercontext.STYLE_LIMIT + 100)
 
     def test_wrong_types_do_not_crash(self):
-        self.profile.write_text(json.dumps({'name': 12, 'notes': ['a']}), encoding='utf-8')
+        self.profile.write_text(json.dumps({'name': 12, 'role': ['a'], 'about': None, 'style': {}}), encoding='utf-8')
         with self.env():
             self.assertEqual(usercontext.blocks(), [])
 
@@ -91,11 +98,14 @@ class PromptInjectionTests(unittest.IsolatedAsyncioTestCase):
     async def test_global_context_reaches_the_system_prompt(self):
         profile = self.root / 'profile.json'
         agents = self.root / 'global.md'
-        profile.write_text(json.dumps({'name': '小明', 'notes': '偏好简洁'}), encoding='utf-8')
+        profile.write_text(json.dumps({'name': '小明', 'role': '后端', 'about': '在做 ECA', 'style': '先给结论'}),
+                           encoding='utf-8')
         agents.write_text('回答前先说结论。', encoding='utf-8')
         with mock.patch.dict(os.environ, {'ECA_USER_PROFILE': str(profile), 'ECA_GLOBAL_AGENTS': str(agents)}):
             prompt = self.rpc.runtime.agent.system_prompt()
         self.assertIn('prefers to be called 小明', prompt)
+        self.assertIn('Their role: 后端', prompt)
+        self.assertIn('How they want answers: 先给结论', prompt)
         self.assertIn('回答前先说结论', prompt)
 
     async def test_project_guidance_and_global_context_coexist(self):
