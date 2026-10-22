@@ -206,6 +206,11 @@ body {margin: 0; font-family: var(--font-ui);}
 .eca-app .message.user .message-edit {opacity: 0;}
 .eca-app .message.user:hover .message-edit,.eca-app .message.user:focus-within .message-edit {opacity: 1;}
 @media (hover: none) {.eca-app .message.user .message-edit {opacity: 1;}}
+.eca-app .rewind-note {display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 8px; padding: 8px 12px;
+  border: 1px solid var(--control-border); border-radius: 10px; background: var(--accent-soft); color: var(--text); font: 500 11px/1.5 var(--font-ui);}
+.eca-app .rewind-note button {min-height: 24px; padding: 2px 9px; border: 1px solid var(--control-border); border-radius: 7px;
+  background: var(--surface); color: var(--secondary); font: 500 11px/1.4 var(--font-ui);}
+.eca-app .rewind-note button:hover {color: var(--text); border-color: var(--accent);}
 .eca-app .message :where(p, ul, ol) {margin: 8px 0 12px; line-height: 1.8;}
 .eca-app .message :where(h1, h2, h3) {font-size: 18px; font-weight: 600; line-height: 1.5;}
 .eca-app .message code {font: 12px/1.7 var(--font-code); background: var(--code); border-radius: 3px; padding: 2px 5px;}

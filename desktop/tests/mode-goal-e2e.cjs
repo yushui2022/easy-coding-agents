@@ -222,9 +222,8 @@ let app;
   assert(requests.filter(r=>Array.isArray(r.tools)&&r.tools.length)
     .every(r=>String(r.messages?.[0]?.content||'').includes('How they want answers: 先给结论')),'style missing from the system prompt');
 
-  // Editing the newest turn: the button lives on the last instruction the person
-  // typed, the dialog opens prefilled, and saving rewinds that turn before running
-  // the edited text — so the old prompt must disappear from the session.
+  // Editing the newest turn hands the text back to the composer; the rewind happens
+  // on send, so the old prompt must then disappear and the edited one must be in.
   const editButton=page.getByRole('button',{name:'修改这条指令并重新发送'});
   await expect(editButton).toHaveCount(1);
   await editButton.click();
@@ -232,9 +231,14 @@ let app;
   await expect(editDialog).toBeVisible();
   await expect(editDialog.locator('#prompt-edit')).toHaveValue('达成目标');
   await editDialog.locator('#prompt-edit').fill('换个说法再说一遍');
-  await editDialog.getByRole('button',{name:'保存并重新发送'}).click();
+  await editDialog.getByRole('button',{name:'放回输入框'}).click();
+  await expect(editDialog).toHaveCount(0);
+  await expect(page.getByLabel('任务指令')).toHaveValue('换个说法再说一遍');
+  await expect(page.locator('.rewind-note')).toContainText('撤回上一轮');
+  await page.getByRole('button',{name:'发送任务',exact:true}).click();
   await expect.poll(()=>turnStart('换个说法再说一遍').length,{timeout:60000}).toBeGreaterThan(0);
   await expect.poll(async()=>(await invoke('snapshot')).busy,{timeout:60000}).toBe(false);
+  await expect(page.locator('.rewind-note')).toHaveCount(0);
   const rewritten=JSON.stringify((await invoke('snapshot')).messages.map(m=>m.content));
   assert(!rewritten.includes('达成目标'),'the edited-away prompt is still in the session');
   assert(rewritten.includes('换个说法再说一遍'),'the edited prompt never reached the session');

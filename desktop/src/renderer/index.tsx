@@ -56,6 +56,7 @@ function App() {
   const [modelSelectionError,setModelSelectionError] = useState('');
   const [queueEdit,setQueueEdit] = useState<{id:string;text:string}|null>(null);
   const [promptEdit,setPromptEdit] = useState<string|null>(null);
+  const [rewindPending,setRewindPending] = useState(false);
   const [error,setError] = useState('');
   const viewKey=state.workspace_owner||state.session_id;
   const promptKey=viewKey?draftKey+'.'+viewKey:draftKey;
@@ -165,6 +166,8 @@ function App() {
     setOlder([]);setCursor(null);setDiff(null);setAgentView(null);bottom.current=true;setFollowing(true);
     setStopping(false);setAnswer('');setAnswered(null);setError('');setNotice('');
     setModelPickerOpen(false);setConfirmFull(false);setDiagnostic(null);
+    // A pending rewind belongs to the session it was started in.
+    setRewindPending(false);setPromptEdit(null);
     reportedError.current=0;
   },[viewKey]);
   const messages=useMemo(()=>[...older,...state.messages],[older,state.messages]);
@@ -211,10 +214,13 @@ function App() {
       // Choosing a directory never implicitly runs a draft against that project.
       if (!state.project) {const picked=await pick();if(picked&&attachments.items.length)await attachments.moveTo('main.'+draftKey+'.'+(picked.workspace_owner||picked.session_id));return;}
       const submitted=prompt, queued=!!state.busy;
-      const result=await perform(queued?'queue.add':'task.start',{prompt:submitted,attachments:attachments.items});
+      // A prompt that came back from "编辑这一轮" rewinds that turn when it is sent.
+      const rewinding=rewindPending&&!queued&&!attachments.items.length;
+      const result=await perform(rewinding?'session.resend':(queued?'queue.add':'task.start'),{prompt:submitted,attachments:attachments.items});
       if(result) {
         setPrompt(current=>current===submitted?'':current);
         await attachments.clear();
+        if(rewinding)setRewindPending(false);
         if(queued)setNotice('已排队；当前任务结束后按顺序发送。');
       }
     } finally {startBusy.current=false;setSending(false);}
@@ -224,13 +230,16 @@ function App() {
     const result=await perform('queue.update',{id:queueEdit.id,prompt:queueEdit.text});
     if(result)setQueueEdit(null);
   };
-  // Editing the newest turn rewinds it in the session, then runs the edited text, so
-  // the old answer never stays on screen next to a prompt that no longer asked for it.
-  const resendPrompt = async () => {
+  // Editing the newest turn puts the text back in the composer; the rewind happens
+  // when it is actually sent, so nothing is thrown away while the person is still
+  // deciding what the instruction should say.
+  const returnEditedPrompt = () => {
     const text=(promptEdit||'').trim();
-    if(!text||state.busy)return;
-    const result=await perform('session.resend',{prompt:text});
-    if(result)setPromptEdit(null);
+    if(!text) return;
+    setPrompt(text);
+    setPromptEdit(null);
+    setRewindPending(true);
+    requestAnimationFrame(()=>promptInput.current?.focus());
   };
   const chooseModel = async (choice:string,keepOpen=false) => {
     if(modelChanging||state.busy||projectBusy.current)return false;
@@ -444,6 +453,10 @@ function App() {
               </div>)}
           </div>}
           {state.project&&<GoalBar goal={state.goal||null} onEdit={()=>setGoalOpen(true)} onClear={()=>void clearGoal()}/>}
+          {rewindPending&&state.project&&<div className="rewind-note" role="status">
+            <span>发送时会先撤回上一轮的指令和回答，再按现在这段内容重跑。</span>
+            <button type="button" onClick={()=>setRewindPending(false)}>只是发一条新消息</button>
+          </div>}
           <div className="composer" {...attachments.events}>{attachments.preview}
             <textarea rows={3} ref={promptInput} id="prompt" aria-label="任务指令" disabled={projectChanging} placeholder={state.project?'描述你想完成的事…':'写下想法，稍后选择项目…'} value={prompt} onChange={e=>setPrompt(e.target.value)}
               onCompositionStart={()=>{composing.current=true;}}
@@ -482,14 +495,14 @@ function App() {
     {confirmFull&&<Dialog title="开启完全访问" closeLabel="取消完全访问" onClose={()=>setConfirmFull(false)}><p>在当前会话中自动批准文件修改、命令、联网及外部工具操作，也会放行本会话正在等待的授权。</p><p>命令按当前系统账户权限执行，可能访问项目外文件和网络；不会获得管理员权限。文件工具仍保留路径和冲突检查，已有沙箱及只读模式继续生效。</p><p className="fine-print">不会改变其他会话的审批模式。重新打开项目后恢复项目审批设置；已执行的操作不会因切回逐次确认而撤销。</p><div className="actions"><button onClick={()=>setConfirmFull(false)}>取消</button><button className="primary" disabled={permissionChanging} onClick={()=>choosePermission('full-access')}>开启完全访问</button></div></Dialog>}
     {goalOpen&&state.project&&<GoalDialog goal={state.goal||null} onClose={()=>setGoalOpen(false)} onSave={saveGoal}/>}
     {promptEdit!==null&&<Dialog title="修改这一轮的指令" name="修改指令" closeLabel="取消修改" onClose={()=>setPromptEdit(null)}>
-      <p>保存后会先撤回这一轮的指令和回答，再用新内容重新发送。</p>
+      <p>改完会放回输入框；真正发送时才撤回这一轮的指令和回答，再按新内容重跑。</p>
       <div className="field"><label htmlFor="prompt-edit">指令</label>
         <textarea id="prompt-edit" rows={6} value={promptEdit} autoFocus disabled={state.busy}
           onChange={event=>setPromptEdit(event.target.value)}
-          onKeyDown={event=>{if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();void resendPrompt();}}}/></div>
-      <p className="fine-print">Ctrl + Enter 直接发送。</p>
+          onKeyDown={event=>{if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();returnEditedPrompt();}}}/></div>
+      <p className="fine-print">Ctrl + Enter 放回输入框。</p>
       <div className="actions"><button onClick={()=>setPromptEdit(null)}>取消</button>
-        <button className="primary" disabled={state.busy||!promptEdit.trim()} onClick={()=>void resendPrompt()}>{state.busy?'任务进行中…':'保存并重新发送'}</button></div>
+        <button className="primary" disabled={state.busy||!promptEdit.trim()} onClick={()=>returnEditedPrompt()}>{state.busy?'任务进行中…':'放回输入框'}</button></div>
     </Dialog>}
     {diff&&<Dialog title={diff.path} name="文件差异" closeLabel="关闭差异" wide onClose={()=>setDiff(null)}><pre className="diff">{diff.diff.split('\n').map((line:string,i:number)=><span key={i} className={line.startsWith('+')?'added':line.startsWith('-')?'removed':''}>{line}{'\n'}</span>)}</pre></Dialog>}
     {diagnostic&&<Dialog title="项目环境" name="环境检查" closeLabel="关闭环境检查" onClose={()=>setDiagnostic(null)}>{diagnostic.checks.map((item:any,i:number)=><div className="diagnostic" key={i}><strong>{item.name} · {item.status}</strong><p>{item.message}</p></div>)}</Dialog>}
