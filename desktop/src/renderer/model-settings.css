@@ -31,9 +31,9 @@
 .eca-app .model-settings button {font-size:12px;border-radius:8px;transition:background 150ms ease,color 150ms ease,border-color 150ms ease;}
 .eca-app .model-settings button:hover:not(:disabled) {color:var(--settings-hover-text);}
 .eca-app .model-settings .add-connection {justify-content:flex-start;flex-shrink:0;min-height:36px;margin:0;padding:8px 10px;background:var(--settings-button);border-color:transparent;}
-.eca-app .model-settings .connection-sidebar nav {display:flex;flex-direction:column;gap:4px;overflow:auto;min-height:0;scrollbar-width:thin;scrollbar-color:var(--control-border) transparent;}
-.eca-app .model-settings .connection-sidebar nav button {display:flex;flex-shrink:0;align-items:flex-start;justify-content:flex-start;gap:10px;padding:12px 10px;border:0;min-height:76px;}
-.eca-app .model-settings .connection-sidebar nav button.selected {background:var(--selected);}
+.eca-app .model-settings .connection-sidebar nav[aria-label="已保存的模型连接"] {display:flex;flex-direction:column;gap:4px;overflow:auto;min-height:0;scrollbar-width:thin;scrollbar-color:var(--control-border) transparent;}
+.eca-app .model-settings .connection-sidebar nav[aria-label="已保存的模型连接"] button {display:flex;flex-shrink:0;align-items:flex-start;justify-content:flex-start;gap:10px;padding:12px 10px;border:0;min-height:76px;}
+.eca-app .model-settings .connection-sidebar nav[aria-label="已保存的模型连接"] button.selected {background:var(--selected);}
 .eca-app .model-settings .connection-symbol {display:flex;align-items:center;justify-content:center;flex-shrink:0;width:30px;height:30px;margin:0;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--secondary);}
 .eca-app .model-settings .connection-item-copy {display:block;min-width:0;flex:1;margin:0;}
 .eca-app .model-settings .connection-item-copy strong {font-size:12px;line-height:1.5;font-weight:600;margin:0;}
@@ -123,8 +123,8 @@
   .eca-app .model-settings .connection-sidebar {flex-direction:row;gap:8px;align-items:center;flex-shrink:0;padding:10px 14px;border-right:0;border-bottom:1px solid var(--border);}
   .eca-app .model-settings :is(.connections-label,.connections-note,.connections-empty) {display:none;}
   .eca-app .model-settings .add-connection {width:auto;}
-  .eca-app .model-settings .connection-sidebar nav {flex-direction:row;flex:1;}
-  .eca-app .model-settings .connection-sidebar nav button {min-height:36px;width:auto;max-width:180px;padding:8px 10px;align-items:center;}
+  .eca-app .model-settings .connection-sidebar nav[aria-label="已保存的模型连接"] {flex-direction:row;flex:1;}
+  .eca-app .model-settings .connection-sidebar nav[aria-label="已保存的模型连接"] button {min-height:36px;width:auto;max-width:180px;padding:8px 10px;align-items:center;}
   .eca-app .model-settings .connection-item-copy :where(.connection-model-id,small),.eca-app .model-settings .connection-symbol {display:none;}
   .eca-app .model-settings .connection-editor {flex:1;}
   .eca-app .model-settings .connection-scroll {padding:20px;}
@@ -134,13 +134,15 @@
 }
 
 /* Settings sections: model connections, or the personal/global pane. */
-.eca-app .model-settings .settings-nav {display:flex;flex-direction:column;gap:2px;flex-shrink:0;margin-bottom:6px;padding-bottom:10px;border-bottom:1px solid var(--border);}
-.eca-app .model-settings .settings-nav-item {display:flex;align-items:center;justify-content:flex-start;gap:9px;min-height:34px;
-  padding:7px 10px;border:0;border-radius:9px;background:transparent;color:var(--secondary);font-size:12.5px;text-align:left;}
+.eca-app .model-settings .settings-nav {display:flex;flex-direction:column;gap:1px;flex-shrink:0;margin:0 0 10px;padding:0 0 12px;border-bottom:1px solid var(--border);}
+.eca-app .model-settings .settings-nav-item {display:flex;align-items:center;justify-content:flex-start;gap:9px;min-height:32px;
+  padding:6px 10px;border:0;border-radius:9px;background:transparent;color:var(--secondary);font-size:12.5px;text-align:left;line-height:1.4;}
 .eca-app .model-settings .settings-nav-item svg {flex:none;color:var(--muted);}
-.eca-app .model-settings .settings-nav-item:hover {background:var(--hover);color:var(--text);}
+.eca-app .model-settings .settings-nav-item:hover:not(:disabled) {background:var(--hover);color:var(--text);}
 .eca-app .model-settings .settings-nav-item.active {background:var(--selected);color:var(--text);box-shadow:inset 0 1px 1px var(--material-rim);}
 .eca-app .model-settings .settings-nav-item.active svg {color:var(--accent);}
+.eca-app .model-settings .settings-nav-item.active .settings-nav-count {color:var(--secondary);}
+.eca-app .model-settings .settings-nav-count {margin-left:auto;color:var(--muted);font:11px var(--font-code);font-variant-numeric:tabular-nums;}
 .eca-app .model-settings .showing-personal .connections-label,
 .eca-app .model-settings .showing-personal .add-connection,
 .eca-app .model-settings .showing-personal nav[aria-label="已保存的模型连接"],

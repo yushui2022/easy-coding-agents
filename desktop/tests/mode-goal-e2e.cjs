@@ -78,6 +78,12 @@ let app;
 
   // 0. 四个设置分区各自独立：外观主题、个人信息、全局指令分页保存，且都进系统提示词。
   await page.getByRole('button',{name:'模型与设置'}).click();
+  // The section rail must stay compact: the connection rows used to stretch these
+  // buttons because both live in a <nav>.
+  const firstNav = await page.locator('.settings-nav-item').first().boundingBox();
+  assert(firstNav && firstNav.height <= 40, 'section nav items are stretched');
+  await expect(page.locator('.connections-label')).toHaveCount(0);
+  await page.screenshot({path:path.join(output,'settings-rail.png')});
   await page.getByRole('button',{name:'外观主题'}).click();
   await page.getByRole('radio',{name:'深色'}).click();
   await expect.poll(()=>page.evaluate(()=>window.eca.theme())).toBe('dark');

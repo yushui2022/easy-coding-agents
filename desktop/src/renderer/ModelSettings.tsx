@@ -126,9 +126,11 @@ export function ModelSettings({open,config,state,onConfig,onClose,onUse,onOpened
              ['instructions','全局指令',<FileText size={15} key="i"/>],
              ['github','GitHub',<GithubLogo size={15} key="g"/>]] as [typeof section,string,React.ReactNode][])
             .map(([id,label,icon])=><button key={id} type="button" aria-pressed={section===id}
-              className={'settings-nav-item'+(section===id?' active':'')} onClick={()=>setSection(id)}>{icon}<span>{label}</span></button>)}
+              className={'settings-nav-item'+(section===id?' active':'')} onClick={()=>setSection(id)}>
+              {icon}<span>{label}</span>
+              {id==='connections'&&<span className="settings-nav-count">{config.connections?.length||0}</span>}
+            </button>)}
         </nav>
-        <div className="connections-label"><span>模型连接</span><span>{config.connections?.length||0}</span></div>
         <button className="add-connection" disabled={busy} onClick={()=>select()}><Plus size={15}/>添加连接</button>
         <nav aria-label="已保存的模型连接">{config.connections?.map((c:any)=><button key={c.id} className={c.id===form.id?'selected':''} aria-pressed={c.id===form.id} disabled={busy} onClick={()=>select(c)}>
           <span className="connection-symbol">{c.no_auth?<Desktop size={17}/>:<PlugsConnected size={17}/>}</span>

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.1 — 修设置左栏被撑开与重复标题
+
+1.5.0 的左栏五个分区之间被撑到约 100px 一格，下面还重复出现一次「模型连接」标题，看着很散。
+
+- 根因：连接列表用的是 `.connection-sidebar nav button {min-height:76px}`，而分区导航也是 `.connection-sidebar` 里的 `<nav>`，于是每项都被拉到 76px。现在把这几条规则限定到 `nav[aria-label="已保存的模型连接"]`，窄窗口那组规则同样处理。
+- 去掉重复的「模型连接 N」标题，数量改成导航项右侧的计数徽标。
+- 分区项收紧到 32px、间距 1px，选中态用 `--selected` 加内描边，图标在选中时用强调色。
+- 验证：端到端新增两条断言——分区项高度不超过 40px、页面里不再有 `.connections-label`；并截图 `output/playwright/mode-goal/settings-rail.png`。桌面单测 22 项、Python 117 项继续通过。
+
+
 ## 1.5.0 — GitHub 账号登录，直接克隆仓库打开
 
 之前要在 ECA 里干活，得先自己把仓库 clone 下来再选文件夹。这版加上 GitHub 登录：连上账号，选仓库，克隆并直接作为项目打开。
