@@ -1,8 +1,10 @@
 import React,{memo,useEffect,useState} from 'react';
 import {Minus, Square, Copy, X} from '@phosphor-icons/react';
 
-// The window is frameless, so this bar replaces the native title bar. The bar is
-// draggable; the three buttons talk to the desktop process and never touch files.
+// The window is frameless, so this bar replaces the native title bar. It carries
+// nothing but the drag region and the three window buttons: the app name and logo
+// already sit in the sidebar brand directly below, and repeating them up here made
+// the top of the window read as a second, competing header.
 export const TitleBar=memo(function TitleBar({title}:{title:string}) {
   const [maximized,setMaximized]=useState(false);
   useEffect(()=>{
@@ -11,10 +13,7 @@ export const TitleBar=memo(function TitleBar({title}:{title:string}) {
     return()=>{if(typeof off==='function')off();};
   },[]);
   const act=(action:string)=>{void window.eca?.windowControl?.(action);};
-  // Two-tone wordmark: the lead word carries the weight, the rest stays quiet.
-  const [lead,...rest]=title.trim().split(/\s+/);
-  return <header className="titlebar" aria-label="窗口标题栏">
-    <span className="titlebar-brand" aria-label={title}><span className="titlebar-mark" aria-hidden="true"/><span>{lead}{rest.length?<span className="titlebar-suffix"> {rest.join(' ')}</span>:null}</span></span>
+  return <header className="titlebar" aria-label={title+' 窗口标题栏'}>
     <div className="titlebar-drag" onDoubleClick={()=>act('maximize')}/>
     <div className="titlebar-controls">
       <button type="button" aria-label="最小化" title="最小化" onClick={()=>act('minimize')}><Minus size={13}/></button>

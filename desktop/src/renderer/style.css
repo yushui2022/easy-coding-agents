@@ -1,15 +1,11 @@
 @charset "UTF-8";
 * {box-sizing: border-box;}
 body {margin: 0; font-family: var(--font-ui);}
-.eca-app {font-family: var(--font-ui); -webkit-font-smoothing: antialiased; --titlebar-height: 36px;}
-.eca-app .titlebar {position: fixed; inset: 0 0 auto; z-index: 30; display: flex; align-items: center; gap: 10px; height: var(--titlebar-height); padding: 0 7px 0 14px; background: var(--surface); border-bottom: 1px solid var(--border); box-shadow: inset 0 1px 0 #ffffff26; user-select: none; -webkit-app-region: drag;}
-.eca-app .titlebar-brand {display: inline-flex; align-items: center; gap: 9px; font: 600 11.5px/1 var(--font-ui); color: var(--text); letter-spacing: .02em; opacity: .92;}
-.eca-app .titlebar-mark {position: relative; flex: none; width: 17px; height: 17px; border-radius: 6px; background: linear-gradient(155deg,color-mix(in srgb,var(--accent) 70%,#ffffff),var(--accent) 56%,color-mix(in srgb,var(--accent) 84%,#231610)); box-shadow: inset 0 1px 0 #ffffff73, inset 0 -1px 1px #2a140c40, 0 1px 2px #6d4a3226;}
-.eca-app .titlebar-mark::after {content: ""; position: absolute; inset: 5px; border-radius: 2px; border: 1px solid #ffe4d452;}
-.eca-app .titlebar-suffix {font-weight: 400; color: var(--muted);}
+.eca-app {font-family: var(--font-ui); -webkit-font-smoothing: antialiased; --titlebar-height: 32px;}
+.eca-app .titlebar {position: fixed; inset: 0 0 auto; z-index: 30; display: flex; align-items: center; height: var(--titlebar-height); padding: 0 5px 0 10px; background: var(--canvas); border-bottom: 1px solid var(--border); user-select: none; -webkit-app-region: drag;}
 .eca-app .titlebar-drag {flex: 1; align-self: stretch; -webkit-app-region: drag;}
 .eca-app .titlebar-controls {display: flex; align-items: center; gap: 2px; -webkit-app-region: no-drag;}
-.eca-app .titlebar-controls button {width: 34px; min-height: 26px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--muted); justify-content: center; transition: background 120ms ease, color 120ms ease;}
+.eca-app .titlebar-controls button {width: 31px; min-height: 22px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted); justify-content: center; transition: background 120ms ease, color 120ms ease;}
 .eca-app .titlebar-controls button:hover:not(:disabled) {background: var(--hover); color: var(--text);}
 .eca-app .titlebar-controls button:active:not(:disabled) {box-shadow: inset 0 1px 2px #0000001f;}
 .eca-app .titlebar-controls button:focus-visible {outline: 2px solid var(--accent); outline-offset: -2px;}
