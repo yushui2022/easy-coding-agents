@@ -184,6 +184,20 @@
   .eca-app .model-settings .profile-stats {grid-template-columns:repeat(3,minmax(0,1fr));}
   .eca-app .model-settings .heat-day {width:9px;height:9px;}
 }
+/* Heatmap head with the 每天/每周 switch, and the weekly cells. */
+.eca-app .model-settings .heatmap-head {display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;}
+.eca-app .model-settings .heatmap-caption {color:var(--muted);font-size:10.5px;}
+.eca-app .model-settings .heatmap-modes {display:flex;gap:2px;padding:2px;border-radius:8px;background:var(--settings-button);}
+.eca-app .model-settings .heatmap-modes button {min-height:22px;padding:2px 9px;border:0;border-radius:6px;background:transparent;color:var(--secondary);font-size:11px;}
+.eca-app .model-settings .heatmap-modes button:hover {color:var(--text);}
+.eca-app .model-settings .heatmap-modes button.active {background:var(--selected);color:var(--text);}
+.eca-app .model-settings .heatmap-grid.is-weekly {grid-auto-flow:row;grid-template-columns:repeat(26,1fr);grid-template-rows:none;gap:3px;}
+.eca-app .model-settings .heat-week {height:26px;border-radius:4px;background:color-mix(in srgb,var(--text) 7%,transparent);}
+.eca-app .model-settings .heat-week.level-1 {background:color-mix(in srgb,var(--accent) 22%,transparent);}
+.eca-app .model-settings .heat-week.level-2 {background:color-mix(in srgb,var(--accent) 42%,transparent);}
+.eca-app .model-settings .heat-week.level-3 {background:color-mix(in srgb,var(--accent) 64%,transparent);}
+.eca-app .model-settings .heat-week.level-4 {background:var(--accent);}
+.eca-app .model-settings .heatmap-months {margin-top:6px;margin-bottom:0;}
 .eca-app .model-settings .profile-identity strong {display:block;font-size:14px;}
 .eca-app .model-settings .repo-list {list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:42vh;overflow:auto;}
 .eca-app .model-settings .repo-row {display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;}

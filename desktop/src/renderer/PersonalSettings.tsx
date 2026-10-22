@@ -39,34 +39,56 @@ export function AppearancePane({theme,onTheme}:{theme:string;onTheme:(value:stri
 // Activity grid: one column per week, one row per weekday, coloured by daily tokens.
 // Only recorded requests are drawn; a day without a request stays empty.
 function Heatmap({days}:{days:{date:string; tokens:number}[]}) {
-  const {cells, months, peak} = useMemo(()=>{
+  const [mode,setMode]=useState<'day'|'week'>('day');
+  const {cells, weeks, months, peak} = useMemo(()=>{
     const byDate = new Map(days.map(row=>[row.date, row.tokens]));
     const today = new Date(); today.setHours(0,0,0,0);
-    const cells:{key:string; tokens:number; label:string; level:number}[] = [];
+    // Start on the Monday of the first of 26 weeks so columns are whole weeks.
     const start = new Date(today);
-    start.setDate(today.getDate() - (WEEKS*7 - 1) + (6 - ((today.getDay()+6)%7)));
+    start.setDate(today.getDate() - (WEEKS*7 - 1) - ((today.getDay()+6)%7));
     const peak = days.reduce((max,row)=>Math.max(max,row.tokens),0);
+    const cells:{key:string; level:number; label:string}[] = [];
+    const weeks:{key:string; tokens:number; level:number; label:string}[] = [];
     const months:[string,number][] = [];
     let lastMonth = '';
-    for(let index=0; index<WEEKS*7; index+=1){
-      const date = new Date(start);
-      date.setDate(start.getDate()+index);
-      if(date>today) {cells.push({key:date.toISOString(),tokens:-1,label:'',level:-1});continue;}
-      const key = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
-      const tokens = byDate.get(key) || 0;
-      const level = tokens===0 ? 0 : Math.min(4, 1+Math.floor((tokens/(peak||1))*3.999));
-      cells.push({key, tokens, level, label:`${key} · ${tokens} tokens`});
-      const month = `${date.getMonth()+1}月`;
-      if(month!==lastMonth){months.push([month, Math.floor(index/7)]);lastMonth=month;}
+    for(let week=0; week<WEEKS; week+=1){
+      let weekTokens = 0;
+      let weekLabel = '';
+      for(let day=0; day<7; day+=1){
+        const date = new Date(start);
+        date.setDate(start.getDate() + week*7 + day);
+        const key = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+        const tokens = byDate.get(key) || 0;
+        weekTokens += tokens;
+        if(!weekLabel && tokens) weekLabel = `${date.getMonth()+1}月${date.getDate()}日`;
+        if(date>today){cells.push({key, level:-1, label:''});continue;}
+        const level = tokens===0 ? 0 : Math.min(4, 1+Math.floor((tokens/(peak||1))*3.999));
+        cells.push({key, level, label:`${date.getMonth()+1}月${date.getDate()}日 · ${compact(tokens)} Token`});
+        const month = `${date.getMonth()+1}月`;
+        if(month!==lastMonth){months.push([month, week]);lastMonth=month;}
+      }
+      weeks.push({key:`w${week}`, tokens:weekTokens, label:`${weekLabel||''} 那周 · ${compact(weekTokens)} Token`,
+        level:weekTokens===0?0:Math.min(4, 1+Math.floor((weekTokens/(peak*7||1))*3.999))});
     }
-    return {cells, months, peak};
+    return {cells, weeks, months, peak};
   }, [days]);
-  return <div className="heatmap" aria-label="Token 活动">
-    <div className="heatmap-months">{months.map(([label,week])=><span key={label+week} style={{gridColumn:week+1}}>{label}</span>)}</div>
-    <div className="heatmap-grid" role="img" aria-label={`近 ${WEEKS} 周每天消耗的 token，峰值 ${peak}`}>
-      {cells.map(cell=>cell.level<0?<span key={cell.key} className="heat-day is-empty"/>
-        :<span key={cell.key} className={'heat-day level-'+cell.level} title={cell.label}/>)}
+  return <div className="heatmap">
+    <div className="heatmap-head">
+      <span className="heatmap-caption">近 {WEEKS} 周</span>
+      <div className="heatmap-modes" role="group" aria-label="统计粒度">
+        <button type="button" aria-pressed={mode==='day'} className={mode==='day'?'active':''} onClick={()=>setMode('day')}>每天</button>
+        <button type="button" aria-pressed={mode==='week'} className={mode==='week'?'active':''} onClick={()=>setMode('week')}>每周</button>
+      </div>
     </div>
+    {mode==='day'
+      ? <div className="heatmap-grid" role="img" aria-label={`近 ${WEEKS} 周每天消耗的 token，峰值 ${peak}`}>
+          {cells.map(cell=>cell.level<0?<span key={cell.key} className="heat-day is-empty"/>
+            :<span key={cell.key} className={'heat-day level-'+cell.level} title={cell.label}/>)}
+        </div>
+      : <div className="heatmap-grid is-weekly" role="img" aria-label={`近 ${WEEKS} 周每周消耗的 token`}>
+          {weeks.map(week=><span key={week.key} className={'heat-week level-'+week.level} title={week.label}/>)}
+        </div>}
+    <div className="heatmap-months">{months.map(([label,week])=><span key={label+week} style={{gridColumn:week+1}}>{label}</span>)}</div>
   </div>;
 }
 
@@ -79,7 +101,7 @@ export function ProfilePane({value,onChange,onSave,saving,status,busy}:
     let live = true;
     void window.eca.invoke('usage.stats')
       .then((value:Stats)=>{if(live)setStats(value);})
-      .catch(error=>{if(live)setStatsNote(String(error));});
+      .catch(()=>{if(live)setStatsNote('打开一个项目后，这里会显示这个项目的用量统计。');});
     void window.eca.invoke('github.status')
       .then((value:any)=>{if(live)setHandle(value?.connected?String(value.login||''):'');})
       .catch(()=>{});
