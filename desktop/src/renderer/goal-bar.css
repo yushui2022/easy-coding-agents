@@ -1,6 +1,3 @@
-.eca-app .goal-chip.is-active {color:var(--accent);border-color:color-mix(in srgb,var(--accent) 28%,transparent);background:var(--accent-soft);}
-.eca-app .goal-chip.is-active svg {color:var(--accent);}
-
 /* Sits under the composer's rounded top edge, like the project context strip. */
 .eca-app .goal-bar {position:relative;display:flex;align-items:center;gap:6px;margin:0 14px -14px;padding:6px 8px 20px;
   border-radius:16px 16px 0 0;background:var(--context-surface);color:var(--secondary);font-size:11.5px;}

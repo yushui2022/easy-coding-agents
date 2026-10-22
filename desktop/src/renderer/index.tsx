@@ -14,7 +14,7 @@ import {Sidebar} from './Sidebar';
 import {ContextMeter} from './ContextMeter';
 import {PermissionControl,permissionLabels} from './PermissionMenu';
 import {ModeControl} from './ModeMenu';
-import {GoalBar,GoalChip,GoalDialog} from './GoalBar';
+import {GoalBar,GoalDialog} from './GoalBar';
 import {TitleBar} from './TitleBar';
 import {useAttachments} from './Attachments';
 import {AgentCards,type ChildAgent} from './subagents/AgentCards';
@@ -449,7 +449,6 @@ function App() {
               <div className="composer-options">{attachments.button}
               {state.project&&<PermissionControl mode={state.approval_mode||'ask'} busy={permissionChanging||projectChanging} onChange={mode=>mode==='full-access'?setConfirmFull(true):void choosePermission(mode)}/>}
               {state.project&&<ModeControl mode={state.settings?.mode||'code'} busy={modeChanging||state.busy||projectChanging} onChange={mode=>void chooseMode(mode)}/>}
-              {state.project&&<GoalChip active={!!state.goal} disabled={projectChanging} onClick={()=>setGoalOpen(true)}/>}
               </div>
               <div className="composer-actions">
               <ContextMeter context={state.context} busy={state.busy} onCompact={async()=>{const result=await perform('context.compact'); if(result)setNotice('上下文已压缩，原始历史仍保留。');}}/>

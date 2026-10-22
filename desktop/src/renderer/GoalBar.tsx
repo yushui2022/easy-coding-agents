@@ -1,5 +1,5 @@
 import React,{useState} from 'react';
-import {CaretDown, CheckCircle, Circle, Flag, PencilSimple, Target, X} from '@phosphor-icons/react';
+import {CaretDown, CheckCircle, Circle, PencilSimple, Target, X} from '@phosphor-icons/react';
 import {Dialog} from './Dialog';
 import './goal-bar.css';
 
@@ -32,13 +32,6 @@ export function GoalDialog({goal,onClose,onSave}:{goal:Goal|null;onClose:()=>voi
       <button className="primary" disabled={saving||!text.trim()||!criteria.length} onClick={save}>{goal?'保存目标':'开始跟踪'}</button>
     </div>
   </Dialog>;
-}
-
-export function GoalChip({active,disabled,onClick}:{active:boolean;disabled?:boolean;onClick:()=>void}) {
-  return <button type="button" className={'permission-chip goal-chip'+(active?' is-active':'')} disabled={disabled}
-    title={active?'查看或修改当前目标':'设定目标与验收标准'} aria-label={active?'当前目标':'设定目标'} onClick={onClick}>
-    <Flag size={14}/><span>目标</span>
-  </button>;
 }
 
 export function GoalBar({goal,onEdit,onClear}:{goal:Goal|null;onEdit:()=>void;onClear:()=>void}) {

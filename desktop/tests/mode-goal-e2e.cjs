@@ -64,21 +64,26 @@ let app;
   const turnStart=text=>requests.filter(r=>Array.isArray(r.tools)&&r.tools.length
     &&JSON.stringify(r.messages).includes(text)&&r.messages.slice(-1)[0]?.role!=='tool');
 
-  // 1. Mode chip switches the session to plan mode.
+  // 1. The goal is set from goal mode only: entering it without an objective opens
+  //    the dialog, and there is no separate goal chip in the composer any more.
   await expect(page.locator('.mode-chip')).toContainText('编码');
+  await expect(page.locator('.goal-chip')).toHaveCount(0);
   await page.locator('.mode-chip').click();
-  await page.getByRole('menuitemradio',{name:/计划/}).click();
-  await expect(page.locator('.mode-chip')).toContainText('计划');
-  await expect.poll(async()=>(await invoke('snapshot')).settings.mode).toBe('plan');
-
-  // 2. The goal dialog stores a goal with acceptance criteria.
-  await page.locator('.goal-chip').click();
+  await page.getByRole('menuitemradio',{name:/目标/}).click();
+  await expect(page.locator('.mode-chip')).toContainText('目标');
   const dialog=page.locator('dialog.goal-dialog');
+  await expect(dialog).toBeVisible();
   await dialog.locator('textarea').nth(0).fill('交付可用的计划模式');
   await dialog.locator('textarea').nth(1).fill('给出分步计划\n标注已知风险');
   await dialog.getByRole('button',{name:'开始跟踪'}).click();
   await expect(page.locator('.goal-bar')).toContainText('交付可用的计划模式');
   await expect(page.locator('.goal-bar')).toContainText('0/2');
+
+  // 2. Switching to plan mode keeps the goal and drops to read-only tools.
+  await page.locator('.mode-chip').click();
+  await page.getByRole('menuitemradio',{name:/计划/}).click();
+  await expect(page.locator('.mode-chip')).toContainText('计划');
+  await expect.poll(async()=>(await invoke('snapshot')).settings.mode).toBe('plan');
 
   // 3. A plan-mode request only receives read-only tools plus goal_update, and the
   //    model's todo call becomes the plan checklist in the conversation.
