@@ -152,6 +152,12 @@
 .eca-app .model-settings .profile-avatar {display:grid;place-items:center;width:42px;height:42px;flex:none;border-radius:50%;
   background:var(--accent-soft);color:var(--accent);font-size:17px;font-weight:600;}
 .eca-app .model-settings .profile-identity strong {display:block;font-size:14px;}
+.eca-app .model-settings .repo-list {list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:42vh;overflow:auto;}
+.eca-app .model-settings .repo-row {display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;}
+.eca-app .model-settings .repo-row .repo-copy {min-width:0;flex:1;}
+.eca-app .model-settings .repo-row strong {display:block;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.eca-app .model-settings .repo-row small {color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;}
+.eca-app .model-settings .repo-row button {flex:none;}
 .eca-app .model-settings .profile-identity small {color:var(--muted);font-size:11.5px;}
 .eca-app .model-settings .personal-actions {display:flex;align-items:center;justify-content:flex-end;gap:12px;
   margin-top:18px;padding-top:16px;border-top:1px solid var(--border);}

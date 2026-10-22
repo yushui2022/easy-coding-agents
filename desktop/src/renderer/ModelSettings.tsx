@@ -1,7 +1,8 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Plus, Check, ArrowClockwise, PlugsConnected, Desktop, Key, Cpu, SlidersHorizontal, LockSimple, Trash, Sun, UserCircle, FileText} from '@phosphor-icons/react';
+import {Plus, Check, ArrowClockwise, PlugsConnected, Desktop, Key, Cpu, SlidersHorizontal, LockSimple, Trash, Sun, UserCircle, FileText, GithubLogo} from '@phosphor-icons/react';
 import {Dialog} from './Dialog';
 import {AppearancePane, ProfilePane, InstructionsPane, emptyPersonal, type Personal} from './PersonalSettings';
+import {GitHubPane} from './GitHubPane';
 import './model-settings.css';
 const presets = [
   {id:'deepseek',name:'DeepSeek',base_url:'https://api.deepseek.com/v1',api_format:'openai'},
@@ -15,7 +16,7 @@ type Form = ReturnType<typeof blank>;
 const fromConnection = (c:any):Form => ({...blank(),...c,api_key:'',make_default:false});
 const invoke = (method:string,params:Record<string,unknown>={}) => window.eca.invoke(method,params);
 
-export function ModelSettings({open,config,state,onConfig,onClose,onUse}:any) {
+export function ModelSettings({open,config,state,onConfig,onClose,onUse,onOpened}:any) {
   const [form,setForm]=useState<Form>(blank);
   const [provider,setProvider]=useState('deepseek');
   const [models,setModels]=useState<string[]>([]);
@@ -28,7 +29,7 @@ export function ModelSettings({open,config,state,onConfig,onClose,onUse}:any) {
   const [confirmRemove,setConfirmRemove]=useState(false);
   const initialized=useRef(false);
   const drafts=useRef(new Map<string,Form>());
-  const [section,setSection]=useState<'connections'|'appearance'|'profile'|'instructions'>('connections');
+  const [section,setSection]=useState<'connections'|'appearance'|'profile'|'instructions'|'github'>('connections');
   const [personal,setPersonal]=useState<Personal>(emptyPersonal);
   const [personalStatus,setPersonalStatus]=useState('');
   const [savingPersonal,setSavingPersonal]=useState(false);
@@ -122,7 +123,8 @@ export function ModelSettings({open,config,state,onConfig,onClose,onUse}:any) {
           {([['connections','模型连接',<PlugsConnected size={15} key="c"/>],
              ['appearance','外观主题',<Sun size={15} key="a"/>],
              ['profile','个人信息',<UserCircle size={15} key="p"/>],
-             ['instructions','全局指令',<FileText size={15} key="i" />]] as [typeof section,string,React.ReactNode][])
+             ['instructions','全局指令',<FileText size={15} key="i"/>],
+             ['github','GitHub',<GithubLogo size={15} key="g"/>]] as [typeof section,string,React.ReactNode][])
             .map(([id,label,icon])=><button key={id} type="button" aria-pressed={section===id}
               className={'settings-nav-item'+(section===id?' active':'')} onClick={()=>setSection(id)}>{icon}<span>{label}</span></button>)}
         </nav>
@@ -140,6 +142,7 @@ export function ModelSettings({open,config,state,onConfig,onClose,onUse}:any) {
         saving={savingPersonal} status={personalStatus} busy={busy}/>}
       {section==='instructions'&&<InstructionsPane value={personal} onChange={setPersonal} onSave={()=>void savePersonal()}
         saving={savingPersonal} status={personalStatus} busy={busy}/>}
+      {section==='github'&&<GitHubPane onOpened={()=>onOpened?.()} blocked={busy||state?.busy}/>}
       <section className="connection-editor" aria-label="连接设置">
         <div className="connection-scroll">
           <header className="connection-heading"><div><h3>{current?current.name:'添加模型连接'}</h3><p>{current?'管理此连接使用的服务与模型。':'接入你喜欢的模型，开始协作。'}</p></div>{isDefault&&<span className="connection-default-badge"><Check size={12}/>桌面默认</span>}</header>

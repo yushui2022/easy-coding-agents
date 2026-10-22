@@ -1,10 +1,11 @@
-import { app, BrowserWindow, ipcMain, dialog, safeStorage, shell, screen, protocol, clipboard, nativeTheme } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, safeStorage, shell, screen, protocol, clipboard, nativeTheme, net } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RpcClient } from './rpc-client';
 import { Connections } from './connections';
 import {BrowserManager} from './browser-manager';
+import { GitHub } from './github';
 import {TerminalManager} from './terminal-manager';
 protocol.registerSchemesAsPrivileged([{scheme:'eca-preview',privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true}}]);
 let browsers:BrowserManager;
@@ -46,6 +47,7 @@ process.env.TEMP = tempHome;
 process.env.TMP = tempHome;
 const root = path.resolve(__dirname, '../../..');
 const html = path.resolve(__dirname, '../renderer/index.html');
+const github = new GitHub(path.join(home, 'github.json'), safeStorage, (input: any, init?: any) => net.fetch(input, init));
 const connections = new Connections(path.join(home, 'preferences.json'), safeStorage);
 // The theme lives in its own small file: it is a display preference, not a model
 // connection, and nativeTheme.themeSource drives prefers-color-scheme for the UI.
@@ -232,6 +234,19 @@ async function action(method: string, params: any = {}) {
   if (method === 'config.get') return publicConfig();
   if (method === 'personalization.get') return readPersonalization();
   if (method === 'personalization.save') return savePersonalization(params);
+  if (method === 'github.status') return github.status();
+  if (method === 'github.connect') return await github.connect(params.token);
+  if (method === 'github.disconnect') return github.disconnect();
+  if (method === 'github.repos') return await github.repos();
+  if (method === 'github.clone') {
+    // Cloning takes as long as the network does; the picker, the clone and the
+    // project open happen in one call so the renderer never opens a half-written tree.
+    const picked = await dialog.showOpenDialog(window, {title: '选择克隆到哪个文件夹', properties: ['openDirectory', 'createDirectory']});
+    if (picked.canceled || !picked.filePaths[0]) throw new Error('已取消克隆。');
+    const folder = await github.clone(params.repo, picked.filePaths[0]);
+    const result = await openProject(folder);
+    return {...result, folder};
+  }
   if (method === 'config.save') {const saved=connections.save(params);return {...await publicConfig(),savedId:saved.savedId,warning:saved.warning};}
   if (method === 'config.default') {connections.setDefault(params.id);usedModel(params.id);return publicConfig();}
   if (method === 'config.reasoning') {

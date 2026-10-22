@@ -17,6 +17,18 @@ const goalCall=(updates,id)=>({id:'fixture',choices:[{index:0,delta:{tool_calls:
 const server=http.createServer(async(req,res)=>{
   let raw='';for await(const c of req)raw+=c;
   // Opening the settings dialog re-reads the model catalogue; answer that here.
+  // GitHub API and the model catalogue share this fixture; branch on the path.
+  if(req.method==='GET'&&String(req.url)=== '/user'){
+    res.writeHead(200,{'Content-Type':'application/json'});
+    res.end(JSON.stringify({login:'fixture-user'}));
+    return;
+  }
+  if(req.method==='GET'&&String(req.url).startsWith('/user/repos')){
+    res.writeHead(200,{'Content-Type':'application/json'});
+    res.end(JSON.stringify([{full_name:'fixture-org/demo',private:true,description:'fixture repo',
+      updated_at:'2026-01-01T00:00:00Z',default_branch:'main',clone_url:'https://github.com/fixture-org/demo.git'}]));
+    return;
+  }
   if(req.method==='GET'){
     res.writeHead(200,{'Content-Type':'application/json'});
     res.end(JSON.stringify({data:[{id:'fixture-model',object:'model'}]}));
@@ -49,6 +61,7 @@ let app;
   const env={...process.env};
   for(const k of Object.keys(env))if(k.startsWith('ECA_')||/API_KEY|API_BASE|BASE_URL|MODEL_NAME|PYTHONHOME|PYTHONPATH/.test(k))delete env[k];
   Object.assign(env,{TEMP:base,TMP:base,ECA_DESKTOP_TEST_HIDDEN:'1',ECA_DESKTOP_DATA_HOME:path.join(home,'data'),
+    ECA_GITHUB_API:`http://127.0.0.1:${server.address().port}`,
     ECA_PYTHON:path.resolve('.venv/Scripts/python.exe'),PYTHONUTF8:'1',NO_PROXY:'localhost,127.0.0.1'});
   delete env.ELECTRON_RUN_AS_NODE;
   app=await electron.launch(process.env.ECA_TEST_EXE?{executablePath:process.env.ECA_TEST_EXE,args:[],env}:{args:['.'],env});
@@ -80,6 +93,15 @@ let app;
   await page.getByLabel('每轮对话都会带上').fill('每轮回答先给结论。');
   await page.getByRole('button',{name:'保存全局指令'}).click();
   await expect(page.locator('.personal-pane .config-status')).toContainText('已保存');
+  await page.getByRole('button',{name:'GitHub'}).click();
+  await expect(page.getByLabel('访问令牌')).toBeVisible();
+  await page.getByLabel('访问令牌').fill('ghp_fixture');
+  await page.getByRole('button',{name:'连接账号'}).click();
+  await expect(page.locator('.personal-pane .connection-default-badge')).toContainText('fixture-user');
+  await expect(page.locator('.repo-row')).toContainText('fixture-org/demo');
+  assert(fs.existsSync(path.join(home,'data','github.json')),'github.json was not written');
+  const stored=fs.readFileSync(path.join(home,'data','github.json'),'utf8');
+  assert(!stored.includes('ghp_fixture'),'token must not be stored in clear text');
   await page.getByRole('button',{name:'关闭设置'}).click();
   assert(fs.existsSync(path.join(home,'data','profile.json')),'profile.json was not written');
   assert(fs.existsSync(path.join(home,'data','AGENTS.md')),'global AGENTS.md was not written');
