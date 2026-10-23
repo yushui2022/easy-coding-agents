@@ -1,5 +1,6 @@
 """Workspace tools, explicit approvals, bounded output and cancellable processes."""
 import asyncio
+import codecs
 import difflib
 import fnmatch
 import hashlib
@@ -11,6 +12,7 @@ import shutil
 import signal
 import subprocess
 import tempfile
+import time
 from .verification import no_tests_found
 
 
@@ -76,7 +78,7 @@ READ_ONLY = {"skills", "lsp_rename", "web_fetch", "web_search", "read", "glob", 
 def allowed(mode):
     # Modes restrict the tool set, never the approval requirements: the permission
     # layer still asks for every write, command and network call it normally would.
-    return READ_ONLY if mode == "plan" else (set() if mode == "chat" else {s["function"]["name"] for s in SCHEMAS})
+    return READ_ONLY if mode in {"plan", "research"} else (set() if mode == "chat" else {s["function"]["name"] for s in SCHEMAS})
 
 
 def atomic_write(path, content):
@@ -115,10 +117,10 @@ async def terminate(proc):
         await proc.wait()
 
 
-async def run_process(argv, root, timeout=120, limit=24_000):
+async def run_process(argv, root, timeout=120, limit=24_000, on_progress=None):
     options = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {"start_new_session": True}
     spawning = asyncio.create_task(asyncio.create_subprocess_exec(*argv, cwd=root, stdout=asyncio.subprocess.PIPE,
-                                               stderr=asyncio.subprocess.PIPE, **options))
+                                               stderr=asyncio.subprocess.PIPE, stdin=asyncio.subprocess.DEVNULL, **options))
     try:
         proc = await asyncio.shield(spawning)
     except asyncio.CancelledError:
@@ -129,17 +131,39 @@ async def run_process(argv, root, timeout=120, limit=24_000):
         await proc.communicate()
         raise
 
-    async def drain(reader):
-        parts, size, truncated = [], 0, False
-        while chunk := await reader.read(8192):
-            if size < limit:
-                parts.append(chunk[:limit-size])
-            size += len(chunk)
-            truncated = size > limit
-        return b"".join(parts).decode("utf-8", errors="replace") + ("\n[output truncated]" if truncated else "")
+    # At most two progress reports a second: enough to prove the command is
+    # producing output, cheap enough to send over the JSON-RPC pipe.
+    reported = {"at": time.monotonic()}
 
-    out = asyncio.create_task(drain(proc.stdout))
-    err = asyncio.create_task(drain(proc.stderr))
+    def report(stream, tail):
+        if on_progress is None or not tail:
+            return
+        now = time.monotonic()
+        if now - reported["at"] < 0.5:
+            return
+        reported["at"] = now
+        try:
+            on_progress(stream, tail)
+        except Exception:
+            pass
+
+    def making(reader, stream):
+        async def drain():
+            decoder = codecs.getincrementaldecoder("utf-8")("replace")
+            parts, size, truncated, tail = [], 0, False, ""
+            while chunk := await reader.read(8192):
+                if size < limit:
+                    parts.append(chunk[:limit-size])
+                size += len(chunk)
+                truncated = size > limit
+                tail = (tail + decoder.decode(chunk))[-1200:]
+                report(stream, tail)
+            return b"".join(parts).decode("utf-8", errors="replace") + ("\n[output truncated]" if truncated else "")
+        return drain()
+
+    out = asyncio.create_task(making(proc.stdout, "stdout"))
+    err = asyncio.create_task(making(proc.stderr, "stderr"))
+
     timed_out = False
     try:
         await asyncio.wait_for(proc.wait(), timeout)
@@ -147,10 +171,16 @@ async def run_process(argv, root, timeout=120, limit=24_000):
     except asyncio.TimeoutError:
         timed_out = True
         await terminate(proc)
-        for task in (out, err):
-            if not task.done():
-                task.cancel()
-        await asyncio.gather(out, err, return_exceptions=True)
+        # Killing the tree closes its pipes, so the drains finish with whatever
+        # the command had already printed. Keeping that beats an empty result:
+        # "timed out with no output at all" tells nobody what was happening.
+        try:
+            await asyncio.wait_for(asyncio.gather(out, err), 3)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            for task in (out, err):
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(out, err, return_exceptions=True)
         stdout = out.result() if out.done() and not out.cancelled() and out.exception() is None else "[output unavailable after timeout]"
         stderr = err.result() if err.done() and not err.cancelled() and err.exception() is None else ""
     except asyncio.CancelledError:
@@ -171,6 +201,21 @@ class Tools:
         self.mcp = None
         self.language_servers = None
         self.guidance_seen, self.guidance_pending = set(), set()
+        self.web_auto_noted = False
+
+    async def approve_web(self, message, detail=None):
+        """Research mode is consent for reading many pages.
+
+        Asking once per page would interrupt exactly the work the mode exists for,
+        so the choice of mode covers network reads. Everything else, this mode
+        cannot even attempt: its tool set stops at read-only.
+        """
+        if self.settings.mode != 'research':
+            return await self.approve(message, detail)
+        if not self.web_auto_noted:
+            self.web_auto_noted = True
+            self.emit('notice', '网络调研模式：联网读取已由模式预先同意，本次运行不再逐页询问。')
+        return True
 
     def file_guidance(self, target):
         from .guidance import guidance
@@ -510,7 +555,12 @@ class Tools:
         else:
             argv = ["/bin/sh", "-c", command]
         if self.settings.sandbox != 'docker':
-            result = await run_process(argv, self.settings.root, timeout, max(1, self.settings.output_limit // 3))
+            def progress(stream, tail):
+                # The model still only sees the final result; this live tail is
+                # for the person watching the row, not for the next request.
+                self.emit('tool_progress', {'tool': 'shell', 'stream': stream, 'tail': tail})
+            result = await run_process(argv, self.settings.root, timeout, max(1, self.settings.output_limit // 3),
+                                       on_progress=progress)
         output = json.loads(result)
         if no_tests_found(command, output):
             output["test_status"] = "no_tests"

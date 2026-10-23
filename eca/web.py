@@ -6,7 +6,7 @@ import json
 import os
 import re
 import socket
-from urllib.parse import urlsplit, urljoin
+from urllib.parse import urlsplit, urljoin, parse_qs
 import httpx
 from dotenv import dotenv_values
 
@@ -126,7 +126,7 @@ async def fetch(tools, url, max_chars=12000):
             async with httpx.AsyncClient(timeout=15, follow_redirects=False, trust_env=False, headers={'Accept-Encoding': 'identity'}) as client:
                 for redirect in range(4):
                     url_parts(url)
-                    if await tools.approve('Fetch public web page? URL is sent to the website; proxy Fake-IP DNS may be resolved via Cloudflare.', url) is not True:
+                    if await getattr(tools, 'approve_web', tools.approve)('Fetch public web page? URL is sent to the website; proxy Fake-IP DNS may be resolved via Cloudflare.', url) is not True:
                         return 'Denied by user. No request sent to this URL.'
                     address = await public_url(url)
                     # Connect to the checked address, keeping the original TLS
@@ -156,23 +156,140 @@ async def fetch(tools, url, max_chars=12000):
         return 'Web request failed (network, timeout or decoding). No automatic retry; exception body omitted.'
 
 
+SEARCH_PROVIDERS = ('duckduckgo', 'brave')
+# Searching must work without asking anyone for an API key: the research mode
+# exists to read the web, and a missing credential used to look like "cannot
+# go online" even though plain fetching needed no key at all.
+DEFAULT_PROVIDER = 'duckduckgo'
+
+
+class SearchPage(HTMLParser):
+    """Collects result links from a keyless search result page."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.hits = []
+        self._open = None
+        self._last = None
+        self._field = None
+
+    def handle_starttag(self, tag, attrs):
+        if tag != 'a':
+            return
+        values = dict(attrs)
+        classes = values.get('class') or ''
+        if 'result__a' in classes or 'result-link' in classes:
+            self._open = {'href': values.get('href') or '', 'title': '', 'snippet': ''}
+            self._field = 'title'
+        elif 'result__snippet' in classes:
+            self._field = 'snippet'
+
+    def handle_endtag(self, tag):
+        if tag != 'a':
+            return
+        if self._field == 'title' and self._open:
+            self.hits.append(self._open)
+            self._last = self._open
+            self._open = None
+        self._field = None
+
+    def handle_data(self, data):
+        if self._field == 'title' and self._open is not None:
+            self._open['title'] = (self._open['title'] + data)[:600]
+        elif self._field == 'snippet' and self._last is not None:
+            self._last['snippet'] = (self._last['snippet'] + data)[:600]
+
+
+def parse_search_page(html, count=5):
+    """Pure parser, so markup handling is testable without the network."""
+    page = SearchPage()
+    page.feed(html)
+    results = []
+    for hit in page.hits:
+        url = hit['href']
+        parts = urlsplit(urljoin('https://duckduckgo.com', url))
+        if parts.path.startswith('/l/') or 'duckduckgo.com/l/' in url:
+            target = parse_qs(parts.query).get('uddg')
+            if not target:
+                continue
+            url = target[0]
+        try:
+            url_parts(url)
+            host = urlsplit(url).hostname or ''
+            if host == 'localhost' or host.endswith('.localhost'):
+                continue
+            try:
+                if not ipaddress.ip_address(host).is_global:
+                    continue
+            except ValueError:
+                pass
+        except ValueError:
+            continue
+        results.append({'title': ' '.join(hit['title'].split())[:200], 'url': url,
+                        'snippet': ' '.join(hit['snippet'].split())[:600]})
+        if len(results) >= count:
+            break
+    return results
+
+
+async def keyless_search(tools, query, count):
+    if await getattr(tools, 'approve_web', tools.approve)(
+            'Search the web without an API key? The query is sent to duckduckgo.com.', query) is not True:
+        return 'Denied by user. No search request sent.'
+    try:
+        async with asyncio.timeout(30):
+            async with httpx.AsyncClient(timeout=15, follow_redirects=False, trust_env=False,
+                                         headers={'Accept-Encoding': 'identity'}) as client:
+                original = httpx.URL('https://html.duckduckgo.com/html/')
+                address = await public_url(str(original))
+                target = original.copy_with(host=address)
+                client.cookies.clear()
+                async with client.stream('POST', target, data={'q': query},
+                        headers={'Host': 'html.duckduckgo.com', 'Accept': 'text/html',
+                                 'User-Agent': 'Mozilla/5.0 (compatible; ECA-Web/1)'},
+                        extensions={'sni_hostname': 'html.duckduckgo.com'}) as response:
+                    if response.status_code != 200:
+                        return f'Search HTTP {response.status_code}. Response body omitted; no retry.'
+                    media = response.headers.get('content-type', '').split(';')[0].strip().lower()
+                    if media not in {'text/html', 'application/xhtml+xml'}:
+                        return 'Keyless search returned an unexpected content type. Body omitted.'
+                    page = (await read_response(response)).decode(response.encoding or 'utf-8', errors='replace')
+    except (httpx.HTTPError, TimeoutError, OSError, ValueError, AttributeError):
+        return 'Search failed (network, timeout or an unusable address). Provider body omitted; no retry.'
+    results = parse_search_page(page, count)
+    if not results:
+        return ('Keyless search returned no results: the page may be rate limited or its markup changed. '
+                'Open a known URL with web_fetch, or configure a search API key. No retry.')
+    return NOTICE + '\n' + json.dumps({'provider': 'duckduckgo', 'api_key': 'not required',
+                                       'results': results}, ensure_ascii=False)
+
+
 async def search(tools, query, count=5):
     if not query.strip() or len(query) > 1000 or not 1 <= count <= 10:
         raise ValueError('Search requires a query of 1..1000 characters and count 1..10')
     config = tools.settings.web
-    if config.get('search_provider') != 'brave':
-        return 'Web search is not configured. Set [web] search_provider = "brave" and supply a search API key via search_api_key_env. Model API keys do not enable search. Known HTTPS URLs can still be read with web_fetch without a search API key; this error does not mean the internet is unavailable.'
+    provider = str(config.get('search_provider') or DEFAULT_PROVIDER).strip().lower()
+    if provider not in SEARCH_PROVIDERS:
+        return (f'Unknown search provider {provider!r}. Use "duckduckgo" (no API key) or "brave" '
+                '(needs an API key). Known HTTPS URLs can still be read with web_fetch.')
+    if provider == DEFAULT_PROVIDER:
+        return await keyless_search(tools, query, count)
     name = config.get('search_api_key_env', 'BRAVE_SEARCH_API_KEY')
     key = os.environ.get(name) or dotenv_values(tools.settings.root/'.env').get(name)
     if not key:
-        return 'Search credential is missing. Set the configured search API key environment variable.'
-    if await tools.approve('Search using Brave? Query is sent externally; search-provider charges may apply.', query) is not True:
+        return ('Search credential is missing. Set the configured search API key, or set '
+                '[web] search_provider = "duckduckgo" to search without a key. Model API keys do not '
+                'enable search; known HTTPS URLs can still be read with web_fetch.')
+    if await getattr(tools, 'approve_web', tools.approve)(
+            'Search using Brave? Query is sent externally; search-provider charges may apply.', query) is not True:
         return 'Denied by user. No search request sent.'
     try:
         async with asyncio.timeout(30):
-            async with httpx.AsyncClient(timeout=15, follow_redirects=False, trust_env=False, headers={'Accept-Encoding': 'identity'}) as client:
+            async with httpx.AsyncClient(timeout=15, follow_redirects=False, trust_env=False,
+                                         headers={'Accept-Encoding': 'identity'}) as client:
                 async with client.stream('GET', 'https://api.search.brave.com/res/v1/web/search',
-                        params={'q': query, 'count': count}, headers={'X-Subscription-Token': key, 'Accept': 'application/json'}) as response:
+                        params={'q': query, 'count': count},
+                        headers={'X-Subscription-Token': key, 'Accept': 'application/json'}) as response:
                     if response.status_code != 200:
                         return f'Search HTTP {response.status_code}. Response body omitted; no retry.'
                     data = json.loads(await read_response(response))
@@ -185,6 +302,7 @@ async def search(tools, query, count=5):
                             continue
                         results.append({'title': str(row.get('title', ''))[:200], 'url': url,
                                         'snippet': str(row.get('description', ''))[:600]})
-                    return (NOTICE + '\n' + json.dumps({'provider': 'brave', 'results': results}, ensure_ascii=False)).replace(key, '[redacted]')
+                    return (NOTICE + '\n' + json.dumps({'provider': 'brave', 'results': results},
+                            ensure_ascii=False)).replace(key, '[redacted]')
     except (httpx.HTTPError, TimeoutError, OSError, ValueError, TypeError, AttributeError):
         return 'Search failed (network, timeout or invalid response). Provider body and credential omitted.'

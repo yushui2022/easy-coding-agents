@@ -103,7 +103,8 @@ class DesktopProjects(DesktopRPC):
             if params.get('project_id') and params['project_id'] != self.active_project:
                 params = {k: v for k, v in params.items() if k not in {'stream_id', 'stream_offset'}}
             return await self.snapshot_view(method, params)
-        if method in {'model.capabilities', 'connection.check', 'connection.models'}:
+        if method in {'model.capabilities', 'connection.check', 'connection.models',
+                      'external.sessions', 'external.session'}:
             return await super().dispatch(method, params)
         ident = params.get('project_id') or self.active_project
         hub = self.projects.get(ident)

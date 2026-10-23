@@ -82,7 +82,7 @@ def parser():
     p.add_argument("--model-profile", help="Select [model_profiles.NAME] with its own endpoint and credential variable")
     p.add_argument("--base-url")
     p.add_argument("--api-format", choices=["openai", "anthropic", "responses"], help="Model wire protocol")
-    p.add_argument("--mode", choices=["code", "plan", "chat"])
+    p.add_argument("--mode", choices=["code", "plan", "research", "chat"])
     p.add_argument('--sandbox', choices=['none', 'docker'], help='Docker runs shell in disposable offline Linux containers; never falls back to host')
     p.add_argument('--sandbox-image', help='Preinstalled trusted Linux image with required tools; never downloaded automatically')
     p.add_argument("--accept-edits", action="store_true", help="Approve file edits inside project; shell still requires approval")

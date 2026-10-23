@@ -51,7 +51,7 @@ export function resultInfo(result:any,pending=false):{kind:Outcome;label:string;
     return {kind:'stopped',label:'已中断',hint:safe?'这一步被中断，没有返回结果。只读操作不改变任何东西，可以直接重试。':'这一步被中断，结果未知。重试前先核对当前文件和进程状态。'};
   }
   if(/^(Stopped|Cancelled|Canceled)\b/i.test(text))return {kind:'stopped',label:'已中断',hint:text};
-  if(data?.timed_out)return {kind:'error',label:'已超时',hint:'执行超过时限'};
+  if(data?.timed_out)return {kind:'error',label:'已超时',hint:'已终止这次执行，输出可能不完整'};
   if(typeof data?.exit_code==='number')return {kind:data.exit_code===0?'returned':'error',label:data.exit_code===0?'完成':'退出码 '+data.exit_code,hint:'退出码 '+data.exit_code};
   if(/^(Error\b|Failed\b|Tool (error|failed)\b)/i.test(text)||data?.isError===true||data?.success===false||['failed','error'].includes(status))return {kind:'error',label:'失败',hint:text};
   return {kind:'returned',label:'已返回',hint:'工具已返回结果，不代表任务验证通过'};

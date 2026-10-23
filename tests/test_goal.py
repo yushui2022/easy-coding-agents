@@ -192,12 +192,17 @@ class DesktopGoalRPCTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(agent.continue_goal(float('inf')))           # already met
 
     async def test_modes_helper_treats_goal_as_a_working_mode(self):
-        from eca.modes import MODES, working
-        self.assertEqual(MODES, ('code', 'plan', 'goal', 'chat'))
+        from eca.modes import MODES, reading, working
+        self.assertEqual(MODES, ('code', 'plan', 'goal', 'research', 'chat'))
         self.assertTrue(working('goal'))
         self.assertTrue(working('code'))
         self.assertFalse(working('plan'))
         self.assertFalse(working('chat'))
+        # Research reads the project and the web but never writes.
+        self.assertFalse(working('research'))
+        self.assertTrue(reading('research'))
+        self.assertTrue(reading('plan'))
+        self.assertFalse(reading('code'))
 
     async def test_settings_accept_goal_mode_and_reject_unknown(self):
         base = dict(model='m', base_url='http://localhost:1/v1', api_format='openai', api_key='k')

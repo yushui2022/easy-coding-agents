@@ -49,6 +49,27 @@ search_api_key_env = "BRAVE_SEARCH_API_KEY"
 
 实现依据：[Brave 官方接口](https://api-dashboard.search.brave.com/app/documentation/web-search/get-started)。本轮没有可用的搜索服务凭据，搜索接口通过模拟响应验证，不能声称已通过真实付费搜索验收。
 
+### 1.9.2：默认免密钥搜索
+
+原来的搜索必须显式配置 `search_provider = "brave"` 并提供密钥，否则 `web_search` 直接返回「未配置」，一次请求都不发。结果就是：**模型没有 URL 可读**，看起来像不会主动上网，而 `web_fetch` 其实从来不需要密钥。
+
+现在不配置任何东西也能搜：
+
+```toml
+[web]
+search_provider = "duckduckgo"   # 默认值，无需密钥
+```
+
+- `duckduckgo` 抓取 `https://html.duckduckgo.com/html/` 的公开结果页并解析标题、链接、摘要；查询会发给 duckduckgo.com。
+- 仍然走同一套保护：先解析 DNS 且所有地址必须是公网、连校验过的 IP 并保留 SNI、`trust_env=False`、不接受压缩响应、单页 1 MiB 上限、15s 超时。
+- 结果里的链接再过一遍：只接受 HTTPS:443 公网地址，`localhost`、私网 IP、`http://` 一律丢弃。
+- 解析失败或被限流时返回「没有结果，可能被限流或页面结构变了」，不会静默成功。
+- 想换回 Brave：`search_provider = "brave"` 加 `search_api_key_env`，行为与之前一致；未知 provider 会明确列出可选值。
+
+实测：本机对 `html.duckduckgo.com` 发起真实查询，解析出三条带标题、解码链接和摘要的结果，未使用任何 API key。解析器另有 8 项离线单测（含嵌套跳转链接解码、非 HTTPS 与 localhost 过滤、条数上限）。
+
+这条通路依赖对方页面结构，属于非官方接口：可能被限流或改版。上面已经写了失败时的可读提示，不做静默重试。
+
 ## 浏览器：Playwright MCP 配置示例
 
 复用现有 `mcp_list` / `mcp_call` 接口接入 [微软 Playwright MCP](https://github.com/microsoft/playwright-mcp)。这是可选配置示例，本轮没有安装或执行真实浏览器，不自动修改用户配置。

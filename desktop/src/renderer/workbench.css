@@ -54,6 +54,7 @@
 .eca-app .outcome-pending .tool-outcome {color:var(--accent);}
 .eca-app .outcome-pending .tool-pulse {animation:eca-pulse 1.6s ease-in-out infinite;}
 .eca-app .tool-wait {color:var(--muted);font-variant-numeric:tabular-nums;}
+.eca-app .tool-live-output {margin:0 12px 10px;padding:8px 10px;border-left:2px solid var(--border-strong,var(--border));background:var(--code);color:var(--muted);font:12px/1.6 var(--font-code);white-space:pre-wrap;overflow-wrap:anywhere;max-height:132px;overflow:hidden;}
 @keyframes eca-pulse {0%,100% {opacity:.35;transform:scale(.85);} 50% {opacity:1;transform:scale(1.1);}}
 @media (prefers-reduced-motion: reduce) {
   .eca-app .outcome-pending .tool-pulse {animation:none;opacity:.8;}

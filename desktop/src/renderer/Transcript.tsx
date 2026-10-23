@@ -29,15 +29,19 @@ export function LazyDetail({title,text,className=''}:{title:React.ReactNode;text
 }
 
 const names:Record<string,string>={read:'读取',write:'写入',edit:'修改',edit_many:'批量修改',delete:'删除',shell:'运行命令',glob:'查找文件',grep:'搜索内容',search:'搜索代码',code_search:'搜索代码',repo_map:'项目结构',code_relations:'调用关系',delegate:'子任务',delegate_parallel:'并行任务',web_fetch:'读取网页',web_search:'搜索资料',todo:'更新计划'};
-const ToolRecord=memo(function ToolRecord({entry,sessionId,root,pending,onOpen,change}:{entry:ToolEntry;sessionId:string;root:string;pending:boolean;onOpen:(key:string,open:boolean)=>void;change?:any}) {
+const ToolRecord=memo(function ToolRecord({entry,sessionId,root,pending,onOpen,change,live=''}:{entry:ToolEntry;sessionId:string;root:string;pending:boolean;onOpen:(key:string,open:boolean)=>void;change?:any;live?:string}) {
   const project_id=useContext(ProjectContext);
   const {call,result,source}=entry;
   const [open,setOpen]=useState(false),[full,setFull]=useState<any>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
   // A pending step keeps a local clock: the backend sends no progress for a
   // running tool, so the row must prove it is still alive without inventing data.
   const since=useRef(Date.now());
-  const now=useTick(pending);
-  const waited=pending?Math.max(0,Math.floor((now-since.current)/1000)):0;
+  // Only a row that has no result is still waiting. `pending` describes the
+  // whole turn, so using it here kept finished and timed-out rows ticking and
+  // made them claim they might still be running.
+  const waiting=pending&&!result;
+  const now=useTick(waiting);
+  const waited=waiting?Math.max(0,Math.floor((now-since.current)/1000)):0;
   const info=resultInfo(result,pending),target=toolTarget(call,root),hint=failureHint(entry);
   const longScript=call.function.name==='shell'&&target.text.length>160;
   const displayTarget=longScript?`脚本 · ${target.raw.split(/\r?\n/).length} 行 · ${target.raw.length.toLocaleString()} 字符`:target.text;
@@ -59,13 +63,14 @@ const ToolRecord=memo(function ToolRecord({entry,sessionId,root,pending,onOpen,c
   const needsFull=source.truncated&&!callLoaded||result?.truncated&&!resultLoaded;
   const args=toolArgs(data.call),command=typeof args.command==='string'?args.command:null;
   return <details className={'tool-record outcome-'+info.kind} onToggle={e=>{setOpen(e.currentTarget.open);onOpen(entry.key,e.currentTarget.open);}}>
-    <summary><CaretRight size={12}/>{call.function.name==='shell'?<TerminalWindow size={15}/>:<FileText size={15}/>}<span className="tool-name">{names[call.function.name]||call.function.name}</span><span className="tool-target" title={target.raw}>{displayTarget||'查看执行详情'}{hint&&<small className={'hint-line '+(info.kind==='error'||info.kind==='denied'?'tool-error-hint':'tool-muted-hint')}>{hint}</small>}</span>{typeof change?.added==='number'&&change?.status!=='prepared'&&<span className="tool-diff" title="本次修改的行数"><b>+{change.added}</b>{typeof change.removed==='number'&&<i>−{change.removed}</i>}</span>}<span className="tool-outcome" title={info.hint}>{info.kind==='error'?<WarningCircle size={13}/>:info.kind==='returned'?<CheckCircle size={13}/>:info.kind==='denied'||info.kind==='stopped'?<MinusCircle size={13}/>:<Circle size={11} className="tool-pulse"/>}<span>{info.label}</span>{pending&&waited>0&&<span className="tool-wait">{clock(waited)}{waited>=20?' · 可能仍在执行':''}</span>}</span></summary>
+    <summary><CaretRight size={12}/>{call.function.name==='shell'?<TerminalWindow size={15}/>:<FileText size={15}/>}<span className="tool-name">{names[call.function.name]||call.function.name}</span><span className="tool-target" title={target.raw}>{displayTarget||'查看执行详情'}{hint&&<small className={'hint-line '+(info.kind==='error'||info.kind==='denied'?'tool-error-hint':'tool-muted-hint')}>{hint}</small>}</span>{typeof change?.added==='number'&&change?.status!=='prepared'&&<span className="tool-diff" title="本次修改的行数"><b>+{change.added}</b>{typeof change.removed==='number'&&<i>−{change.removed}</i>}</span>}<span className="tool-outcome" title={info.hint}>{info.kind==='error'?<WarningCircle size={13}/>:info.kind==='returned'?<CheckCircle size={13}/>:info.kind==='denied'||info.kind==='stopped'?<MinusCircle size={13}/>:<Circle size={11} className="tool-pulse"/>}<span>{info.label}</span>{waiting&&waited>0&&<span className="tool-wait">{clock(waited)}{waited>=20?' · 可能仍在执行':''}</span>}</span></summary>
+    {waiting&&live&&<pre className="tool-live-output" aria-label="命令实时输出">{live.split(/\r?\n/).filter(line=>line.trim()).slice(-6).join('\n')}</pre>}
     {open&&<div className="tool-detail"><div className="panel-label">{command?'命令':'参数'}</div><LogText text={command??data.call.function.arguments}/>{command&&Object.keys(args).length>1&&<LazyDetail title="其他参数" text={JSON.stringify(Object.fromEntries(Object.entries(args).filter(([key])=>key!=='command')),null,2)}/>}{data.result&&<><div className="panel-label">返回结果</div><LogText text={typeof data.result.content==='string'?data.result.content:JSON.stringify(data.result.content,null,2)}/></>}
       {needsFull&&<button disabled={loading} onClick={load}>{loading?'正在加载…':'加载完整工具记录'}</button>}{error&&<p role="alert">{error}</p>}</div>}
   </details>;
 });
 
-const ExecutionGroup=memo(function ExecutionGroup({entries,sessionId,root,pending,changes}:{entries:ToolEntry[];sessionId:string;root:string;pending:boolean;changes?:any[]}) {
+const ExecutionGroup=memo(function ExecutionGroup({entries,sessionId,root,pending,changes,liveOutput=''}:{entries:ToolEntry[];sessionId:string;root:string;pending:boolean;changes?:any[];liveOutput?:string}) {
   const [expanded,setExpanded]=useState(false),[pinned,setPinned]=useState<Set<string>>(()=>new Set());
   const onOpen=React.useCallback((key:string,open:boolean)=>setPinned(old=>{const next=new Set(old);if(open)next.add(key);else next.delete(key);return next;}),[]);
   // A change record carries the local line counts for the file this call touched.
@@ -82,17 +87,17 @@ const ExecutionGroup=memo(function ExecutionGroup({entries,sessionId,root,pendin
     <header className="execution-heading"><ListChecks size={15}/><strong>执行记录</strong><span className="execution-count">{entries.length} 项操作</span><div className="execution-totals">{[...counts].map(([kind,count])=><span key={kind} className={'count-'+kind}>{count} {countNames[kind]}</span>)}</div></header>
     <div className="execution-steps">{visible.map(({entry,index},i)=><React.Fragment key={entry.key}>
       {index>(visible[i-1]?.index??-1)+1&&<button className="execution-fold" onClick={()=>setExpanded(true)}><CaretRight size={12}/>{index-(visible[i-1]?.index??-1)-1} 项已返回操作已收起</button>}
-      <ToolRecord entry={entry} sessionId={sessionId} root={root} pending={pending} onOpen={onOpen} change={changeFor(entry)}/>
+      <ToolRecord entry={entry} sessionId={sessionId} root={root} pending={pending} onOpen={onOpen} change={changeFor(entry)} live={pending&&!entry.result&&i===visible.length-1?liveOutput:''}/>
     </React.Fragment>)}</div>
     {(hidden>0||expanded&&entries.length>3)&&<button className="execution-toggle" aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}>{expanded?'收起已返回操作':`查看全部 ${entries.length} 项操作`}</button>}
   </section>;
 });
 
 // Keep child entries in conversation order without wrapping them in a tool log.
-function ExecutionEntries({entries,sessionId,root,pending,agents,onOpenAgent,changes}:{entries:ToolEntry[];sessionId:string;root:string;pending:boolean;agents:ChildAgent[];onOpenAgent?:(agent:ChildAgent)=>void;changes?:any[]}) {
+function ExecutionEntries({entries,sessionId,root,pending,agents,onOpenAgent,changes,liveOutput=''}:{entries:ToolEntry[];sessionId:string;root:string;pending:boolean;agents:ChildAgent[];onOpenAgent?:(agent:ChildAgent)=>void;changes?:any[];liveOutput?:string}) {
   const parts:React.ReactNode[]=[];
   let ordinary:ToolEntry[]=[];
-  const flush=()=>{if(ordinary.length){parts.push(<ExecutionGroup key={ordinary[0].key} entries={ordinary} sessionId={sessionId} root={root} pending={pending} changes={changes}/>);ordinary=[];}};
+  const flush=()=>{if(ordinary.length){parts.push(<ExecutionGroup key={ordinary[0].key} entries={ordinary} sessionId={sessionId} root={root} pending={pending} changes={changes} liveOutput={liveOutput}/>);ordinary=[];}};
   for(const entry of entries) {
     const children=onOpenAgent?agentsForCall(entry,agents):[];
     if(children.length&&onOpenAgent){flush();parts.push(<AgentCards key={entry.key} agents={children} onOpen={onOpenAgent}/>);}
@@ -159,7 +164,7 @@ const Message=memo(function Message({message,sessionId,regenerate,onRegenerate,e
 
 const noAgents:ChildAgent[]=[];
 const noChanges:any[]=[];
-export const Transcript=memo(function Transcript({messages,sessionId,projectId,root='',busy=false,agents=noAgents,onOpenAgent,changes=noChanges,onRegenerate,onEditPrompt}:{messages:any[];sessionId:string;projectId?:string;root?:string;busy?:boolean;agents?:ChildAgent[];onOpenAgent?:(agent:ChildAgent)=>void;changes?:any[];onRegenerate?:()=>void;onEditPrompt?:(text:string)=>void}) {
+export const Transcript=memo(function Transcript({messages,sessionId,projectId,root='',busy=false,agents=noAgents,onOpenAgent,changes=noChanges,onRegenerate,onEditPrompt,activity}:{messages:any[];sessionId:string;projectId?:string;root?:string;busy?:boolean;agents?:ChildAgent[];onOpenAgent?:(agent:ChildAgent)=>void;changes?:any[];onRegenerate?:()=>void;onEditPrompt?:(text:string)=>void;activity?:any}) {
   const nodes=useMemo(()=>transcriptNodes(messages),[messages]);
   // Regenerating only makes sense for the newest answer.
   const lastAnswer=useMemo(()=>messages.reduce((found:any,message:any)=>message?.role==='assistant'?message:found,null),[messages]);
@@ -175,6 +180,6 @@ export const Transcript=memo(function Transcript({messages,sessionId,projectId,r
     return null;},[messages]);
   return <ProjectContext.Provider value={projectId}>{nodes.map((node,index)=><React.Fragment key={sessionId+'-'+node.key}>
     {node.kind==='gap'?<div className="history-gap">中间 {node.count} 条记录已收起。返回最近记录后可重新加载。</div>:
-      node.kind==='tools'?<ExecutionEntries entries={node.entries} sessionId={sessionId} root={root} pending={busy&&index===nodes.length-1} agents={agents} onOpenAgent={onOpenAgent} changes={changes}/>:
+      node.kind==='tools'?<ExecutionEntries entries={node.entries} sessionId={sessionId} root={root} pending={busy&&index===nodes.length-1} agents={agents} onOpenAgent={onOpenAgent} changes={changes} liveOutput={busy&&index===nodes.length-1&&activity?.phase==='executing'?String(activity?.output||''):''}/>:
       <Message message={node.message} sessionId={sessionId} regenerate={!busy&&node.message===lastAnswer} onRegenerate={onRegenerate} editable={!busy&&node.message===lastPrompt} onEdit={()=>onEditPrompt?.(String(lastPrompt?.content||''))}/>}</React.Fragment>)}</ProjectContext.Provider>;
 });

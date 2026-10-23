@@ -180,7 +180,7 @@ async function backend() {
       if(!sideNotification)sideNotification=setTimeout(()=>{sideNotification=undefined;publish('eca:changed',{event:'sidechat'});},80);
       return;
     }
-    if(data.event==='text'||data.event==='model_activity') {
+    if(data.event==='text'||data.event==='model_activity'||data.event==='tool_progress') {
       if(!liveNotification)liveNotification=setTimeout(()=>{liveNotification=undefined;publish('eca:changed',{event:'text'});},40);
     } else {clearTimeout(liveNotification);liveNotification=undefined;publish('eca:changed', {event:data.event});}
   });
@@ -210,7 +210,7 @@ async function openProject(folder: string) {
     return decorate(result);
   } finally {opening = false;}
 }
-const allowed = new Set(['snapshot', 'live', 'permissions.set', 'mode.set', 'goal.set', 'usage.stats', 'project.close', 'session.switch', 'session.messages', 'session.message', 'sessions.name-missing', 'session.regenerate', 'session.resend', 'queue.add', 'queue.update', 'queue.move', 'queue.priority', 'queue.send-now', 'queue.remove', 'subagent.snapshot', 'task.start', 'task.cancel', 'input.reply', 'changes.diff', 'changes.accept', 'changes.undo', 'diagnostics']);
+const allowed = new Set(['snapshot', 'live', 'permissions.set', 'mode.set', 'goal.set', 'usage.stats', 'project.close', 'session.switch', 'session.messages', 'session.message', 'sessions.name-missing', 'session.regenerate', 'session.resend', 'queue.add', 'queue.update', 'queue.move', 'queue.priority', 'queue.send-now', 'queue.remove', 'subagent.snapshot', 'external.sessions', 'external.session', 'external.import', 'task.start', 'task.cancel', 'input.reply', 'changes.diff', 'changes.accept', 'changes.undo', 'diagnostics']);
 function trusted(event: Electron.IpcMainInvokeEvent) {
   try {return event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && path.resolve(fileURLToPath(event.senderFrame.url)) === html;}
   catch {return false;}

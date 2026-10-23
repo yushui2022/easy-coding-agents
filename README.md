@@ -58,13 +58,13 @@ ECA（Easy Coding Agent）是一个可自行配置模型的编程助手，提供
 | 能力 | 实际行为 |
 | --- | --- |
 | **终端编码** | 流式输出；读取、搜索、编辑文件；执行需要确认的 Shell 命令。 |
-| **工作模式** | 编码 / 计划 / 对话三档。计划模式只给只读工具（read、搜索、代码索引、子 Agent），不写文件、不跑验证；对话模式不给工具。按会话保存，运行中不可切换。模式不是权限，审批档位照旧。[说明](docs/desktop/MODES-1.1.0.md)。 |
+| **工作模式** | 编码 / 计划 / 目标 / 网络调研 / 对话五档。计划与网络调研只给只读工具（read、搜索、代码索引、子 Agent），不写文件、不跑验证；网络调研另外把「联网读取」视为已被模式同意，不再逐页询问；对话模式不给工具。按会话保存，运行中不可切换。模式不是权限：写文件和跑命令在任何模式下都要审批，而这两种模式下根本没有这些工具。[说明](docs/desktop/RESEARCH-1.9.0.md)。 |
 | **目标与验收标准** | 输入区可写一句话目标加逐条验收标准，进入 system prompt 后模型持续做到全部满足，并用 `goal_update` 逐条标记。勾选是模型的判断，不等于测试通过。[说明](docs/desktop/MODES-1.1.0.md)。 |
 | **本地 Skills（源码新增）** | 项目/用户 SKILL.md，`/skills`、`/skill` 显式调用；技能不绕过授权。[说明](docs/SKILLS_REFACTOR_COLLABORATION.md)。 |
 | **LSP 重命名（源码新增）** | 跨文件预览、冲突检查、审批和修改后诊断；逐文件记录撤销。[边界](docs/SKILLS_REFACTOR_COLLABORATION.md)。 |
 | **协作验收与额度（源码新增）** | 主子 Agent 共享请求次数上限，子任务可指定验收命令，提供单模型/Worker-first 对照评测入口。[配置](docs/SKILLS_REFACTOR_COLLABORATION.md)。 |
 | **后台服务（源码新增）** | `/run` 启动服务，`/jobs` 查看状态，`/logs` 读取日志，`/stop` 停止；有并发、日志和存活时间上限，正常会话关闭时清理。[用法与边界](docs/BACKGROUND_PROCESSES.md)。 |
-| **联网查资料（源码新增）** | `web_fetch` 授权读取公共 HTTPS 网页；`web_search` 可选接入 Brave Search。提供来源、正文限制和不可信数据标记。[配置说明](docs/WEB_TOOLS.md)。 |
+| **联网查资料（源码新增）** | `web_fetch` 授权读取公共 HTTPS 网页；`web_search` **默认免密钥**（抓取 DuckDuckGo 公开结果页），也可选接入 Brave Search。提供来源、正文限制和不可信数据标记。[配置说明](docs/WEB_TOOLS.md)。 |
 | **浏览器接入示例** | 通过现有 MCP 桥接配置 Playwright，使用页面结构进行操作；本轮未做真实浏览器验收，图片结果尚不传给模型。[边界与示例](docs/WEB_TOOLS.md#浏览器playwright-mcp-配置示例)。 |
 | **检查与撤销** | 编辑前展示差异；记录修改前后内容；撤销时检查冲突，保留用户原有内容和 Git 暂存区。 |
 | **可靠编辑** | 已读取文件的版本检查；受约束的行尾空白匹配；`edit_many` 全部预检后一次写入、一次撤销。 |
