@@ -12,6 +12,8 @@ import {EmptyState} from './ui/EmptyState';
 import {Welcome} from './Welcome';
 import {Sidebar} from './Sidebar';
 import {ExternalHistory} from './ExternalHistory';
+import {SkillsPane} from './SkillsPane';
+import {SkillMenu, type SkillRow} from './SkillMenu';
 import {ContextMeter} from './ContextMeter';
 import {PermissionControl,permissionLabels} from './PermissionMenu';
 import {ModeControl} from './ModeMenu';
@@ -47,6 +49,10 @@ function App() {
   const [config,setConfig] = useState<any>({recent:[]});
   const [settingsOpen,setSettingsOpen] = useState(false);
 const [historyOpen,setHistoryOpen] = useState(false);
+const [skillsOpen,setSkillsOpen] = useState(false);
+const [skillRows,setSkillRows] = useState<SkillRow[]|null>(null);
+const [skillMenu,setSkillMenu] = useState<{query:string;index:number}|null>(null);
+const [pickedSkills,setPickedSkills] = useState<SkillRow[]>([]);
   const [confirmFull,setConfirmFull] = useState(false);
   const [permissionChanging,setPermissionChanging] = useState(false);
   const [modeChanging,setModeChanging] = useState(false);
@@ -216,6 +222,25 @@ const [historyOpen,setHistoryOpen] = useState(false);
     promptInput.current?.focus();
     return result;
   };
+  // Typing "/" opens a skill picker. Choosing inserts a chip: a literal "/name"
+  // in the text would activate nothing, the run itself has to carry the skill.
+  const skillMatches=(skillRows||[]).filter(row=>{
+    const query=(skillMenu?.query||'').toLowerCase();
+    return !query||row.name.toLowerCase().includes(query)||String(row.description||'').toLowerCase().includes(query);
+  }).slice(0,8);
+  const openSkillMenu=async(query:string)=>{
+    if(!skillRows){
+      try {const result=await invoke('skills.list');setSkillRows(result?.skills||[]);}
+      catch {setSkillRows([]);}
+    }
+    setSkillMenu({query,index:0});
+  };
+  const chooseSkill=(row:SkillRow)=>{
+    setPickedSkills(old=>old.some(item=>item.name===row.name)?old:(old.length>=3?old:[...old,row]));
+    setPrompt('');
+    setSkillMenu(null);
+    promptInput.current?.focus();
+  };
   const start = async () => {
     if ((!prompt.trim()&&!attachments.items.length) || attachments.busy || startBusy.current || modelChanging || projectBusy.current) return;
     startBusy.current=true;setSending(true);bottom.current=true;setNotice('');
@@ -225,10 +250,13 @@ const [historyOpen,setHistoryOpen] = useState(false);
       const submitted=prompt, queued=!!state.busy;
       // A prompt that came back from "编辑这一轮" rewinds that turn when it is sent.
       const rewinding=rewindPending&&!queued&&!attachments.items.length;
-      const result=await perform(rewinding?'session.resend':(queued?'queue.add':'task.start'),{prompt:submitted,attachments:attachments.items});
+      const payload:any={prompt:submitted,attachments:attachments.items};
+      if(!rewinding&&!queued&&pickedSkills.length)payload.skills=pickedSkills.map(item=>item.name);
+      const result=await perform(rewinding?'session.resend':(queued?'queue.add':'task.start'),payload);
       if(result) {
         setPrompt(current=>current===submitted?'':current);
         await attachments.clear();
+        if(!queued)setPickedSkills([]);
         if(rewinding)setRewindPending(false);
         if(queued)setNotice('已排队；当前任务结束后按顺序发送。');
       }
@@ -401,7 +429,7 @@ const [historyOpen,setHistoryOpen] = useState(false);
   return <div className={'eca-app workspace'+(state.project&&detailsOpen?' with-inspector':'')+(navCollapsed?' nav-collapsed':'')}>
     <TitleBar title="ECA Desktop"/>
     <Sidebar state={state} config={config} blocked={sending||projectChanging||modelChanging||permissionChanging}
-      onPick={pick} onRecent={index=>void perform('project.recent',{index})} onSession={(id,project_id)=>void perform('session.switch',{id,project_id:project_id||state.project_id})} onClose={project_id=>void perform('project.close',{project_id})} onSettings={()=>setSettingsOpen(true)} onHistory={()=>setHistoryOpen(true)}/>
+      onPick={pick} onRecent={index=>void perform('project.recent',{index})} onSession={(id,project_id)=>void perform('session.switch',{id,project_id:project_id||state.project_id})} onClose={project_id=>void perform('project.close',{project_id})} onSettings={()=>setSettingsOpen(true)} onHistory={()=>setHistoryOpen(true)} onSkills={()=>setSkillsOpen(true)}/>
     <main className="conversation">
       <header className="conversation-header">
         <button className="icon-button nav-toggle" aria-label={navCollapsed?'展开导航':'收起导航'} aria-expanded={!navCollapsed} onClick={()=>setNavCollapsed(!navCollapsed)}><SidebarSimple size={18}/></button>
@@ -465,10 +493,38 @@ const [historyOpen,setHistoryOpen] = useState(false);
             <button type="button" onClick={()=>setRewindPending(false)}>只是发一条新消息</button>
           </div>}
           <div className="composer" {...attachments.events}>{attachments.preview}
-            <textarea rows={3} ref={promptInput} id="prompt" aria-label="任务指令" disabled={projectChanging} placeholder={state.project?'描述你想完成的事…':'写下想法，稍后选择项目…'} value={prompt} onChange={e=>setPrompt(e.target.value)}
+            {!!pickedSkills.length&&<div className="skill-chips" role="group" aria-label="本条消息启用的技能">
+              {pickedSkills.map(skill=><span className="skill-chip" key={skill.name}>{skill.name}
+                <button type="button" aria-label={'移除技能 '+skill.name} onClick={()=>setPickedSkills(old=>old.filter(item=>item.name!==skill.name))}>×</button></span>)}
+            </div>}
+            {skillMenu&&skillMatches.length>0&&<SkillMenu items={skillMatches} index={Math.min(skillMenu.index,skillMatches.length-1)}
+              onChoose={chooseSkill} onHover={index=>setSkillMenu(old=>old?{...old,index}:old)}/>}
+            <textarea rows={3} ref={promptInput} id="prompt" aria-label="任务指令" disabled={projectChanging} placeholder={state.project?'描述你想完成的事…（输入 / 选择技能）':'写下想法，稍后选择项目…'} value={prompt}
+              onChange={e=>{
+                const value=e.target.value;
+                setPrompt(value);
+                const command=/^\/(\S*)$/.exec(value);
+                if(command)void openSkillMenu(command[1]);
+                else setSkillMenu(null);
+              }}
               onCompositionStart={()=>{composing.current=true;}}
               onCompositionEnd={()=>{composing.current=false;compositionEndedAt.current=performance.now();}}
               onKeyDown={e=>{
+                if(skillMenu){
+                  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+                    e.preventDefault();
+                    const size=Math.max(1,skillMatches.length);
+                    setSkillMenu(old=>old?{...old,index:(old.index+(e.key==='ArrowDown'?1:size-1))%size}:old);
+                    return;
+                  }
+                  if((e.key==='Enter'||e.key==='Tab')&&skillMatches.length){
+                    e.preventDefault();
+                    chooseSkill(skillMatches[Math.min(skillMenu.index,skillMatches.length-1)]);
+                    return;
+                  }
+                  if(e.key==='Escape'){e.preventDefault();setSkillMenu(null);return;}
+                  if(e.key==='Enter'){e.preventDefault();setSkillMenu(null);return;}
+                }
                 if(e.key!=='Enter'||e.shiftKey||e.altKey)return;
                 if(composing.current||e.nativeEvent.isComposing||e.nativeEvent.keyCode===229||performance.now()-compositionEndedAt.current<50)return;
                 e.preventDefault();
@@ -498,6 +554,7 @@ const [historyOpen,setHistoryOpen] = useState(false);
     </main>
     {state.project&&<Workspace key={viewKey} agentView={agentView} state={state} config={config} review={inspector} open={detailsOpen} onOpen={setDetailsOpen} narrow={narrow} blocked={!!(settingsOpen||modelPickerOpen||confirmFull||diff||diagnostic||waiting)} onDraft={(text:string)=>{setPrompt(p=>p?p+'\n\n'+text:text);setNotice('已放入主对话草稿，确认后发送。');promptInput.current?.focus();}}/>}
     {modelPickerOpen&&<ModelMenu anchor={modelButton} label="选择模型" connections={config.connections||[]} recent={config.recentModels||[]} selectedId={state.project?state.model_selection?.connection_id:config.defaultId} reasoning={state.project?state.settings?.reasoning:config.model?.reasoning} busy={state.busy||modelChanging} error={modelSelectionError} onClose={()=>setModelPickerOpen(false)} onChoose={id=>chooseModel(id,true)} onEffort={chooseEffort} onManage={()=>{setModelPickerOpen(false);setSettingsOpen(true);}} special={state.project?[{id:'default',label:'跟随桌面默认',selected:state.model_selection?.choice==='default',disabled:!config.defaultId},{id:'project',label:'沿用项目配置',selected:state.model_selection?.choice==='project'}]:[]}/>}
+  {skillsOpen&&<SkillsPane onClose={()=>setSkillsOpen(false)}/>}
   {historyOpen&&<ExternalHistory projectId={state.project_id} onImported={async(sessionId:string)=>{setHistoryOpen(false);if(sessionId){await perform('session.switch',{id:sessionId});setNotice('已导入为一个新的 ECA 会话，可以接着聊。');}}} onClose={()=>setHistoryOpen(false)}/>}
     <ModelSettings open={settingsOpen} config={config} state={state} onConfig={setConfig} onClose={()=>setSettingsOpen(false)} onUse={chooseModel} onOpened={async()=>{setSettingsOpen(false);await loadConfig().catch(()=>{});await refresh();setNotice('仓库已克隆并打开。');}}/>
     {confirmFull&&<Dialog title="开启完全访问" closeLabel="取消完全访问" onClose={()=>setConfirmFull(false)}><p>在当前会话中自动批准文件修改、命令、联网及外部工具操作，也会放行本会话正在等待的授权。</p><p>命令按当前系统账户权限执行，可能访问项目外文件和网络；不会获得管理员权限。文件工具仍保留路径和冲突检查，已有沙箱及只读模式继续生效。</p><p className="fine-print">不会改变其他会话的审批模式。重新打开项目后恢复项目审批设置；已执行的操作不会因切回逐次确认而撤销。</p><div className="actions"><button onClick={()=>setConfirmFull(false)}>取消</button><button className="primary" disabled={permissionChanging} onClick={()=>choosePermission('full-access')}>开启完全访问</button></div></Dialog>}

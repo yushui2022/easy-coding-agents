@@ -106,6 +106,11 @@ class DesktopProjects(DesktopRPC):
         if method in {'model.capabilities', 'connection.check', 'connection.models',
                       'external.sessions', 'external.session'}:
             return await super().dispatch(method, params)
+        if method.startswith('skills.'):
+            # Browsable with or without an open project; when a project is open,
+            # its own .agents/skills is included as well.
+            hub = self.projects.get(self.active_project)
+            return await (hub.dispatch(method, params) if hub else super().dispatch(method, params))
         ident = params.get('project_id') or self.active_project
         hub = self.projects.get(ident)
         if not hub:

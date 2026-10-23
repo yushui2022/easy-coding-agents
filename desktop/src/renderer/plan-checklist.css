@@ -22,3 +22,15 @@
 .eca-app .plan-item.is-completed span {text-decoration:line-through;}
 .eca-app .plan-more {color:var(--muted);font-size:11.5px;padding-left:21px;}
 .eca-app .plan-hint {margin:8px 0 0;color:var(--muted);font-size:11px;line-height:1.5;}
+.eca-app .plan-count {flex:none;font-size:10.5px;line-height:16px;padding:0 6px;border-radius:999px;
+  border:1px solid var(--border);color:var(--muted);}
+.eca-app .plan-count.is-blocked {color:var(--secondary);border-color:color-mix(in srgb,var(--secondary) 30%,var(--border));}
+.eca-app .plan-count.is-failed {color:var(--danger,#b4462f);border-color:color-mix(in srgb,var(--danger,#b4462f) 34%,var(--border));}
+.eca-app .plan-item.is-blocked {color:var(--muted);}
+.eca-app .plan-item.is-blocked svg {color:var(--secondary);}
+.eca-app .plan-item.is-failed {color:var(--muted);}
+.eca-app .plan-item.is-failed svg {color:var(--danger,#b4462f);}
+.eca-app .plan-item.is-failed > span:not(.plan-badge) {text-decoration:line-through;}
+.eca-app .plan-badge {flex:none;margin-left:auto;font-size:10.5px;line-height:16px;padding:0 6px;border-radius:999px;
+  color:var(--muted);background:var(--hover);border:1px solid var(--border);}
+.eca-app .plan-badge.is-failed {color:var(--danger,#b4462f);}

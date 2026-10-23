@@ -1,0 +1,31 @@
+/* The panel sits inside .composer, so the global `.eca-app button` rule would
+   otherwise turn every row into a bordered card. Every selector here outranks it. */
+.eca-app .skill-menu {position:absolute;left:6px;right:6px;bottom:calc(100% + 8px);z-index:40;
+  max-height:min(44vh,320px);overflow:auto;padding:6px;border:1px solid var(--border);border-radius:16px;
+  background:var(--surface);box-shadow:0 16px 36px rgba(64,44,24,.16);}
+.eca-app .skill-menu .skill-menu-head {display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  padding:5px 9px 7px;color:var(--muted);font-size:11px;letter-spacing:.02em;}
+.eca-app .skill-menu .skill-menu-head small {color:var(--muted);font-size:10.5px;opacity:.8;}
+.eca-app .skill-menu .skill-option {display:flex;flex-direction:column;align-items:stretch;gap:2px;
+  width:100%;min-height:0;margin:0;padding:7px 9px;border:0;border-radius:10px;background:transparent;
+  box-shadow:none;text-align:left;font:inherit;color:inherit;cursor:pointer;}
+.eca-app .skill-menu .skill-option.is-active {background:var(--hover,rgba(90,60,30,.08));}
+.eca-app .skill-menu .skill-option-top {display:flex;align-items:center;gap:8px;min-width:0;}
+.eca-app .skill-menu .skill-name {font-size:13px;line-height:1.35;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;min-width:0;}
+.eca-app .skill-menu .skill-desc {display:block;color:var(--muted);font-size:11px;line-height:1.4;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+.eca-app .skill-menu .skill-badge {flex:none;font-size:10px;line-height:1.6;padding:0 6px;border-radius:999px;
+  border:1px solid var(--border);color:var(--muted);white-space:nowrap;}
+.eca-app .skill-menu .skill-badge[data-source='codex'] {color:#2f6f4f;border-color:#2f6f4f55;}
+.eca-app .skill-menu .skill-badge[data-source='claude'] {color:#8a5a2b;border-color:#8a5a2b55;}
+.eca-app .skill-menu .skill-badge[data-source='workbuddy'] {color:#3f5a86;border-color:#3f5a8655;}
+.eca-app .skill-menu .skill-badge[data-source='project'] {color:var(--accent);border-color:var(--accent);}
+
+.eca-app .composer .skill-chips {display:flex;flex-wrap:wrap;gap:6px;padding:9px 10px 0;}
+.eca-app .composer .skill-chip {display:inline-flex;align-items:center;gap:4px;border:1px solid var(--accent);
+  color:var(--accent);border-radius:999px;padding:2px 3px 2px 9px;font-size:12px;line-height:1.6;}
+.eca-app .composer .skill-chip button {display:inline-flex;align-items:center;justify-content:center;
+  min-height:0;min-width:0;padding:1px 5px;border:0;border-radius:999px;background:transparent;
+  box-shadow:none;color:inherit;font:inherit;line-height:1;cursor:pointer;}
+.eca-app .composer .skill-chip button:hover {background:rgba(0,0,0,.08);}

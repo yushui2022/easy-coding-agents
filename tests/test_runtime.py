@@ -51,12 +51,21 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         base.mkdir(parents=True, exist_ok=True)
         self.tmp = tempfile.TemporaryDirectory(dir=base)
         self.root = Path(self.tmp.name).resolve()
+        # Skills come from the developer's real ~/.codex, ~/.claude and ~/.workbuddy
+        # otherwise, which makes prompt-size assertions depend on this machine.
+        self.env = patch.dict(os.environ, {
+            'ECS_SKILLS_DIR': str(self.root / 'no-skills'),
+            'ECA_CODEX_HOME': str(self.root / 'no-codex'),
+            'ECA_CLAUDE_HOME': str(self.root / 'no-claude'),
+            'ECA_WORKBUDDY_HOME': str(self.root / 'no-buddy')})
+        self.env.start()
         self.settings = Settings(self.root)
         self.store = Store(self.root)
         self.state = self.store.create()
         self.tools = Tools(self.settings, self.state, yes, yes, lambda *_: None)
 
     def tearDown(self):
+        self.env.stop()
         self.store.close()
         self.tmp.cleanup()
 

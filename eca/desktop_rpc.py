@@ -395,8 +395,20 @@ class DesktopRPC:
                 return index
         raise ValueError('That queued message is no longer in the queue.')
 
-    async def begin_run(self, prompt, checks=(), repair_attempts=0, attachments=None):
+    async def begin_run(self, prompt, checks=(), repair_attempts=0, attachments=None, skills=None):
         runtime = self.idle()
+        if skills:
+            from .skills import Skills
+            catalog = Skills(runtime.agent.settings.root).catalog()
+            requested = [name for name in skills if isinstance(name, str) and name]
+            unknown = [name for name in requested if name not in catalog]
+            if unknown:
+                raise ValueError('未知技能：' + '、'.join(unknown[:3]))
+            chosen = requested[:3]
+            if len(requested) > 3:
+                raise ValueError('一次最多启用三个技能。')
+            runtime.agent.state['active_skills'] = chosen
+            runtime.agent.store.save(runtime.agent.state)
         task = runtime.start(prompt, checks, repair_attempts, attachments=attachments or [])
         self.run_id = uuid.uuid4().hex
         self.events.clear()
@@ -548,6 +560,18 @@ class DesktopRPC:
                                                   params.get('max_messages') or 200)
         if method == 'external.import':
             return await self.import_external(params)
+        if method == 'skills.list':
+            from .skills import Skills
+            root = self.runtime.agent.settings.root if self.runtime else None
+            rows = sorted(Skills(root).catalog().values(), key=lambda row: (row['source'], row['name']))
+            return {'skills': [{key: value for key, value in row.items() if key != 'path'} for row in rows]}
+        if method == 'skills.read':
+            from .skills import Skills
+            root = self.runtime.agent.settings.root if self.runtime else None
+            name = params.get('name')
+            if not isinstance(name, str) or not name:
+                raise ValueError('skills.read needs a skill name')
+            return Skills(root).read(name)
         if method == 'permissions.set':
             self.require()
             mode = params.get('mode')
@@ -707,7 +731,8 @@ class DesktopRPC:
             if method == 'task.start':
                 return await self.begin_run(params.get('prompt'), params.get('checks', []),
                                             params.get('repair_attempts', 0),
-                                            attachments=params.get('attachments', []))
+                                            attachments=params.get('attachments', []),
+                                            skills=params.get('skills', []))
             if method == 'queue.add':
                 self.require()
                 prompt = params.get('prompt')

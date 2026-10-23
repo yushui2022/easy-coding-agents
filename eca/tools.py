@@ -14,6 +14,7 @@ import subprocess
 import tempfile
 import time
 from .verification import no_tests_found
+from . import workgraph
 
 
 SKIP = {".git", ".eca", ".ssh", ".aws", ".kube", ".agent_memory", ".pytest_cache", "output", "node_modules", "venv", ".venv", "__pycache__", "dist", "build", ".next", "target"}
@@ -50,7 +51,11 @@ SCHEMAS = [
             "match_mode": {"type": "string", "enum": ["auto", "exact"]}}, ["path", "edits"]),
     schema("delete", "Delete one UTF-8 text file with diff approval and recoverable journal. No directories or binary files.", {"path": STR}, ["path"]),
     schema("shell", "Run the configured shell with approval: host PowerShell/sh, or /bin/sh in disposable Docker mode. Docker writes are discarded. Includes exit code.", {"command": STR, "timeout": INT}, ["command"]),
-    schema("todo", "Replace task plan. Completion is a planning label, not proof tests passed.", {"items": {"type": "array", "items": {"type": "object", "properties": {"content": STR, "status": {"type": "string", "enum": ["pending", "in_progress", "completed"]}}, "required": ["content", "status"], "additionalProperties": False}}}, ["items"]),
+    schema("todo", "Replace the task plan. Optional id plus depends_on makes it an ordered work graph: a task is blocked while a dependency is not completed, and a blocked task cannot be marked completed. Completion is a planning label, not proof tests passed.",
+           {"items": {"type": "array", "minItems": 1, "maxItems": 50, "items": {"type": "object", "properties": {
+               "content": STR, "status": {"type": "string", "enum": ["pending", "in_progress", "completed", "failed"]},
+               "id": {"type": "string", "description": "Short stable id, e.g. migrate-db: lowercase letters, digits, '.', '_', '-'"},
+               "depends_on": {"type": "array", "maxItems": 8, "items": STR}}, "required": ["content", "status"], "additionalProperties": False}}}, ["items"]),
     schema("goal_update", "Mark session-goal acceptance criteria done or open (1-based index as listed). A done label is a claim, not proof tests passed.", {"updates": {"type": "array", "items": {"type": "object", "properties": {"index": INT, "done": {"type": "boolean"}}, "required": ["index", "done"], "additionalProperties": False}}, "status": {"type": "string", "enum": ["active", "done", "abandoned"]}}, ["updates"]),
     schema("ask", "Ask for missing requirements; use only when needed.", {"question": STR}, ["question"]),
     schema("delegate", "Delegate a bounded subtask to an independent child agent. It shares files, not conversation. No recursive delegation. Default plan is read-only.",
@@ -570,14 +575,10 @@ class Tools:
         return result
 
     async def todo(self, items):
-        if len(items) > 50:
-            raise ValueError("At most 50 tasks")
-        for item in items:
-            if not isinstance(item, dict) or set(item) != {"content", "status"} or not isinstance(item["content"], str) or item["status"] not in {"pending", "in_progress", "completed"}:
-                raise ValueError("Each task requires content and a valid status")
-        self.state["tasks"] = items
-        self.emit("tasks", items)
-        return "Task plan updated."
+        tasks = workgraph.validate(items)
+        self.state["tasks"] = tasks
+        self.emit("tasks", tasks)
+        return json.dumps(workgraph.report(tasks), ensure_ascii=False)
 
     async def goal_update(self, updates, status=None):
         from . import goal as goals

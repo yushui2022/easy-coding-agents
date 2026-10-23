@@ -107,7 +107,10 @@ class WebTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn('private response body', result)
 
     async def test_search_configuration_and_credential_redaction(self):
-        self.assertIn('not configured', await self.tools.execute('web_search', {'query':'python'}))
+        # No configuration means the keyless default; patch it so the suite never
+        # depends on the public search endpoint being reachable.
+        with patch('eca.web.keyless_search', AsyncMock(return_value='keyless results')):
+            self.assertIn('keyless results', await self.tools.execute('web_search', {'query': 'python'}))
         self.settings.web = {'search_provider':'brave','search_api_key_env':'ECA_TEST_SEARCH_KEY'}
         payload = {'web':{'results':[{'title':'Docs','url':'https://example.com','description':'test-private-key'}]}}
         with patch.dict(os.environ, {'ECA_TEST_SEARCH_KEY':'test-private-key'}), self.client(lambda _:httpx.Response(200,json=payload)):

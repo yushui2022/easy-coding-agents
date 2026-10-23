@@ -166,7 +166,9 @@ class App:
             self.console.print(self.redact(data[:1500]), style="dim", markup=False)
         elif event == "tasks":
             for task in data:
-                self.console.print(f"  [{task['status']}] {task['content']}", markup=False)
+                waiting = task.get("blocked_by") or []
+                suffix = f"  (blocked by {', '.join(waiting)})" if waiting else ""
+                self.console.print(f"  [{task['status']}] {task['content']}{suffix}", markup=False)
         elif event == 'verification_suite':
             self.console.print(f"Verification suite: {data['status']} ({len(data.get('rounds', []))} round(s))", markup=False)
             if data.get('stop_reason'):
