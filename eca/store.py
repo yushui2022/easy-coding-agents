@@ -14,30 +14,63 @@ INTERRUPTED_SAFE = ("Interrupted: this read-only step was cancelled before it re
 SAFE_TOOLS = {"skills", "read", "glob", "grep", "code_search", "repo_map", "code_relations",
               "web_fetch", "web_search", "todo", "ask", "lsp"}
 
+# One OS lock per project. A second handle cannot take it, even in this process, so
+# an ordinary Store still means "one owner". A scheduled run has to open the project
+# the app already holds, and it says so: Store(root, shared=True) joins the owner
+# that this process already has instead of failing.
+_LOCKS = {}
+
+
+def _acquire(directory, shared=False):
+    key = Path(directory).resolve()
+    entry = _LOCKS.get(key)
+    if entry is not None:
+        if not shared:
+            raise ValueError("Another ECA process is using this project. Close it before starting another.")
+        entry["count"] += 1
+        return key
+    handle = open(key / "instance.lock", "a+b")
+    try:
+        if os.fstat(handle.fileno()).st_size == 0:
+            handle.write(b"0")
+            handle.flush()
+        handle.seek(0)
+        if os.name == "nt":
+            import msvcrt
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        raise ValueError("Another ECA process is using this project. Close it before starting another.") from None
+    _LOCKS[key] = {"handle": handle, "count": 1}
+    return key
+
+
+def _release(key):
+    entry = _LOCKS.get(key)
+    if entry is None:
+        return
+    entry["count"] -= 1
+    if entry["count"] > 0:
+        return
+    _LOCKS.pop(key, None)
+    try:
+        entry["handle"].close()
+    except OSError:
+        pass
+
 
 class Store:
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, shared: bool = False):
         self.resources = []
         self.root = root.resolve()
         directory = self.root / ".eca"
         if directory.is_symlink() or directory.resolve() != directory:
             raise ValueError(".eca must not be a symbolic link")
         directory.mkdir(exist_ok=True)
-        self.lock = open(directory / "instance.lock", "a+b")
-        try:
-            if os.fstat(self.lock.fileno()).st_size == 0:
-                self.lock.write(b"0")
-                self.lock.flush()
-            self.lock.seek(0)
-            if os.name == "nt":
-                import msvcrt
-                msvcrt.locking(self.lock.fileno(), msvcrt.LK_NBLCK, 1)
-            else:
-                import fcntl
-                fcntl.flock(self.lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            self.lock.close()
-            raise ValueError("Another ECA process is using this project. Close it before starting another.") from None
+        self.lock = _acquire(directory, shared)
         self.db = sqlite3.connect(directory / "sessions.sqlite3")
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA synchronous=FULL")
@@ -139,4 +172,4 @@ class Store:
         for resource in self.resources:
             resource.close()
         self.db.close()
-        self.lock.close()
+        _release(self.lock)

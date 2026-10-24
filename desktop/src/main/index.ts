@@ -81,6 +81,9 @@ const profileFile = path.join(home, 'profile.json');
 const globalAgentsFile = path.join(home, 'AGENTS.md');
 process.env.ECA_USER_PROFILE = profileFile;
 process.env.ECA_GLOBAL_AGENTS = globalAgentsFile;
+// Schedules live with the rest of the app data and only run when this is set:
+// the backend starts its scheduler for a host that asked for it, never on import.
+process.env.ECA_AUTOMATIONS_DIR = process.env.ECA_AUTOMATIONS_DIR || path.join(home, 'automations');
 type Personalization = {name:string; role:string; about:string; style:string; instructions:string};
 const limits = {name:80, role:120, about:2000, style:1000, instructions:20000};
 function readPersonalization(): Personalization {
@@ -210,7 +213,7 @@ async function openProject(folder: string) {
     return decorate(result);
   } finally {opening = false;}
 }
-const allowed = new Set(['snapshot', 'live', 'permissions.set', 'mode.set', 'goal.set', 'usage.stats', 'project.close', 'session.switch', 'session.messages', 'session.message', 'sessions.name-missing', 'session.regenerate', 'session.resend', 'queue.add', 'queue.update', 'queue.move', 'queue.priority', 'queue.send-now', 'queue.remove', 'subagent.snapshot', 'external.sessions', 'external.session', 'external.import', 'skills.list', 'skills.read', 'task.start', 'task.cancel', 'input.reply', 'changes.diff', 'changes.accept', 'changes.undo', 'diagnostics']);
+const allowed = new Set(['snapshot', 'live', 'permissions.set', 'mode.set', 'goal.set', 'usage.stats', 'project.close', 'session.switch', 'session.messages', 'session.message', 'sessions.name-missing', 'session.regenerate', 'session.resend', 'queue.add', 'queue.update', 'queue.move', 'queue.priority', 'queue.send-now', 'queue.remove', 'subagent.snapshot', 'external.sessions', 'external.session', 'external.import', 'skills.list', 'skills.read', 'automations.list', 'automations.rrule', 'automations.save', 'automations.delete', 'automations.run', 'automations.history', 'task.start', 'task.cancel', 'input.reply', 'changes.diff', 'changes.accept', 'changes.undo', 'diagnostics']);
 function trusted(event: Electron.IpcMainInvokeEvent) {
   try {return event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && path.resolve(fileURLToPath(event.senderFrame.url)) === html;}
   catch {return false;}

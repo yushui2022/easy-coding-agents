@@ -14,6 +14,7 @@ import {Sidebar} from './Sidebar';
 import {ExternalHistory} from './ExternalHistory';
 import {SkillsPane} from './SkillsPane';
 import {SkillMenu, type SkillRow} from './SkillMenu';
+import {AutomationsPane} from './AutomationsPane';
 import {ContextMeter} from './ContextMeter';
 import {PermissionControl,permissionLabels} from './PermissionMenu';
 import {ModeControl} from './ModeMenu';
@@ -50,6 +51,7 @@ function App() {
   const [settingsOpen,setSettingsOpen] = useState(false);
 const [historyOpen,setHistoryOpen] = useState(false);
 const [skillsOpen,setSkillsOpen] = useState(false);
+const [automationsOpen,setAutomationsOpen] = useState(false);
 const [skillRows,setSkillRows] = useState<SkillRow[]|null>(null);
 const [skillMenu,setSkillMenu] = useState<{query:string;index:number}|null>(null);
 const [pickedSkills,setPickedSkills] = useState<SkillRow[]>([]);
@@ -429,7 +431,7 @@ const [pickedSkills,setPickedSkills] = useState<SkillRow[]>([]);
   return <div className={'eca-app workspace'+(state.project&&detailsOpen?' with-inspector':'')+(navCollapsed?' nav-collapsed':'')}>
     <TitleBar title="ECA Desktop"/>
     <Sidebar state={state} config={config} blocked={sending||projectChanging||modelChanging||permissionChanging}
-      onPick={pick} onRecent={index=>void perform('project.recent',{index})} onSession={(id,project_id)=>void perform('session.switch',{id,project_id:project_id||state.project_id})} onClose={project_id=>void perform('project.close',{project_id})} onSettings={()=>setSettingsOpen(true)} onHistory={()=>setHistoryOpen(true)} onSkills={()=>setSkillsOpen(true)}/>
+      onPick={pick} onRecent={index=>void perform('project.recent',{index})} onSession={(id,project_id)=>void perform('session.switch',{id,project_id:project_id||state.project_id})} onClose={project_id=>void perform('project.close',{project_id})} onSettings={()=>setSettingsOpen(true)} onHistory={()=>setHistoryOpen(true)} onSkills={()=>setSkillsOpen(true)} onAutomations={()=>setAutomationsOpen(true)}/>
     <main className="conversation">
       <header className="conversation-header">
         <button className="icon-button nav-toggle" aria-label={navCollapsed?'展开导航':'收起导航'} aria-expanded={!navCollapsed} onClick={()=>setNavCollapsed(!navCollapsed)}><SidebarSimple size={18}/></button>
@@ -555,6 +557,10 @@ const [pickedSkills,setPickedSkills] = useState<SkillRow[]>([]);
     {state.project&&<Workspace key={viewKey} agentView={agentView} state={state} config={config} review={inspector} open={detailsOpen} onOpen={setDetailsOpen} narrow={narrow} blocked={!!(settingsOpen||modelPickerOpen||confirmFull||diff||diagnostic||waiting)} onDraft={(text:string)=>{setPrompt(p=>p?p+'\n\n'+text:text);setNotice('已放入主对话草稿，确认后发送。');promptInput.current?.focus();}}/>}
     {modelPickerOpen&&<ModelMenu anchor={modelButton} label="选择模型" connections={config.connections||[]} recent={config.recentModels||[]} selectedId={state.project?state.model_selection?.connection_id:config.defaultId} reasoning={state.project?state.settings?.reasoning:config.model?.reasoning} busy={state.busy||modelChanging} error={modelSelectionError} onClose={()=>setModelPickerOpen(false)} onChoose={id=>chooseModel(id,true)} onEffort={chooseEffort} onManage={()=>{setModelPickerOpen(false);setSettingsOpen(true);}} special={state.project?[{id:'default',label:'跟随桌面默认',selected:state.model_selection?.choice==='default',disabled:!config.defaultId},{id:'project',label:'沿用项目配置',selected:state.model_selection?.choice==='project'}]:[]}/>}
   {skillsOpen&&<SkillsPane onClose={()=>setSkillsOpen(false)}/>}
+  {automationsOpen&&<AutomationsPane project={state.project||null} onClose={()=>setAutomationsOpen(false)}
+    onOpenSession={(projectPath,sessionId)=>{const target=(state.projects||[]).find((item:any)=>String(item.path||'').toLowerCase()===projectPath.toLowerCase());
+      setAutomationsOpen(false);
+      void perform('session.switch',{id:sessionId,project_id:target?.id||state.project_id}).catch(()=>setNotice('这个项目还没在应用里打开，先打开项目再看这次运行的会话。'));}}/>}
   {historyOpen&&<ExternalHistory projectId={state.project_id} onImported={async(sessionId:string)=>{setHistoryOpen(false);if(sessionId){await perform('session.switch',{id:sessionId});setNotice('已导入为一个新的 ECA 会话，可以接着聊。');}}} onClose={()=>setHistoryOpen(false)}/>}
     <ModelSettings open={settingsOpen} config={config} state={state} onConfig={setConfig} onClose={()=>setSettingsOpen(false)} onUse={chooseModel} onOpened={async()=>{setSettingsOpen(false);await loadConfig().catch(()=>{});await refresh();setNotice('仓库已克隆并打开。');}}/>
     {confirmFull&&<Dialog title="开启完全访问" closeLabel="取消完全访问" onClose={()=>setConfirmFull(false)}><p>在当前会话中自动批准文件修改、命令、联网及外部工具操作，也会放行本会话正在等待的授权。</p><p>命令按当前系统账户权限执行，可能访问项目外文件和网络；不会获得管理员权限。文件工具仍保留路径和冲突检查，已有沙箱及只读模式继续生效。</p><p className="fine-print">不会改变其他会话的审批模式。重新打开项目后恢复项目审批设置；已执行的操作不会因切回逐次确认而撤销。</p><div className="actions"><button onClick={()=>setConfirmFull(false)}>取消</button><button className="primary" disabled={permissionChanging} onClick={()=>choosePermission('full-access')}>开启完全访问</button></div></Dialog>}

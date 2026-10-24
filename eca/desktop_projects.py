@@ -3,6 +3,7 @@ import asyncio
 import os
 from pathlib import Path
 
+from . import automations
 from .desktop_rpc import DesktopRPC
 from .desktop_sessions import DesktopSessions
 
@@ -13,11 +14,76 @@ class DesktopProjects(DesktopRPC):
         self.projects = {}
         self.active_project = None
         self.view_revision = 0
+        self.automation_library = automations.Library()
+        self.scheduler = automations.Scheduler(self.automation_library,
+                                               automations.Runner(self.automation_library, self.automation_event),
+                                               self.automation_event)
+        self.automation_tasks = set()
 
     @property
     def active(self):
         return self.projects.get(self.active_project)
 
+    # -- scheduled sessions -------------------------------------------------
+    def automation_event(self, event, data):
+        """Automation pushes are not session activity, so they skip self.events."""
+        self.send({'jsonrpc': '2.0', 'method': 'event', 'params': {
+            'event': event, 'data': self.safe(data), 'seq': None, 'run_id': None, 'session_id': None}})
+        if event == 'automation_run':
+            self.refresh_automation_project(data.get('automation_id'))
+
+    def refresh_automation_project(self, automation_id):
+        """A scheduled run adds a session, so its sidebar has to reload."""
+        try:
+            project = self.automation_library.load(automation_id)['project']
+        except (ValueError, OSError, KeyError):
+            return
+        ident = os.path.normcase(project)
+        if ident in self.projects:
+            self.forward(ident, {'jsonrpc': '2.0', 'method': 'event',
+                                 'params': {'event': 'sessions_changed'}})
+
+    def automation_view(self):
+        return {'automations': self.automation_library.list(),
+                'running': sorted(self.scheduler._inflight),
+                'permissions': [{'value': key, 'label': label}
+                                for key, label in automations.PERMISSION_TEXT.items()],
+                'notifications': list(automations.NOTIFICATIONS),
+                'enabled': automations.enabled()}
+
+    async def dispatch_automation(self, method, params):
+        library, scheduler = self.automation_library, self.scheduler
+        if method == 'automations.list':
+            return self.automation_view()
+        if method == 'automations.rrule':
+            start = params.get('start')
+            text = automations.build_rrule(params.get('freq') or 'DAILY', interval=params.get('interval') or 1,
+                                           at=params.get('time') or '09:00', weekdays=params.get('weekdays'),
+                                           start=datetime.fromisoformat(start) if start else None)
+            return {'rrule': text, 'schedule': automations.describe(automations.parse_rrule(text))}
+        if method == 'automations.save':
+            saved = library.save(params.get('automation') or {})
+            self.automation_event('automations', self.automation_view())
+            return {**self.automation_view(), 'saved': saved}
+        if method == 'automations.delete':
+            library.delete(params.get('id') or '')
+            self.automation_event('automations', self.automation_view())
+            return self.automation_view()
+        if method == 'automations.history':
+            return {'runs': library.history(params.get('id') or '', int(params.get('limit') or 20)),
+                    'memory': library.memory(params.get('id') or '', 4000)}
+        if method == 'automations.run':
+            automation_id = params.get('id') or ''
+            if automation_id in scheduler._inflight:
+                raise ValueError('这个任务正在运行，等它结束再试')
+            task = asyncio.create_task(scheduler.run_now(automation_id))
+            self.automation_tasks.add(task)
+            task.add_done_callback(self.automation_tasks.discard)
+            self.automation_event('automations', self.automation_view())
+            return {'started': True, **self.automation_view()}
+        raise ValueError(f'Unknown automation method: {method}')
+
+    # -- events and views ---------------------------------------------------
     def forward(self, project_id, message):
         params = message.get('params', {})
         if project_id != self.active_project:
@@ -59,9 +125,14 @@ class DesktopProjects(DesktopRPC):
         if method == 'initialize':
             result = await super().dispatch(method, params)
             result['capabilities'] += ['concurrent_sessions', 'concurrent_projects']
+            if automations.enabled():
+                self.scheduler.start()
             return result
         if not self.ready or self.closed:
             raise ValueError('Desktop connection is not initialized or is closed.')
+        if method.startswith('automations.'):
+            # Schedules outlive any single project, so these never require one.
+            return await self.dispatch_automation(method, params)
         if method in {'project.open', 'project.close', 'session.switch'}:
             async with self.lock:
                 if method == 'project.open':
@@ -120,6 +191,7 @@ class DesktopProjects(DesktopRPC):
 
     async def close(self):
         self.closed = True
+        await self.scheduler.stop()
         # Begin cancellation in every project before awaiting any cleanup.
         for hub in self.projects.values():
             for worker in hub.workers.values():

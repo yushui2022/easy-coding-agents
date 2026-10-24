@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import {CaretDown, ClockCounterClockwise, Desktop, FolderOpen, GearSix, MagnifyingGlass, Plus, Sparkle, X, Sun, Moon} from '@phosphor-icons/react';
+import {CalendarCheck, CaretDown, ClockCounterClockwise, Desktop, FolderOpen, GearSix, MagnifyingGlass, Plus, Sparkle, X, Sun, Moon} from '@phosphor-icons/react';
 import './sidebar.css';
 
 type Session = {id:string; title:string; busy?:boolean; side_busy?:boolean; pending_count?:number; status?:string};
@@ -11,11 +11,12 @@ type Props = {
   onSession:(id?:string,projectId?:string)=>void;onClose:(projectId:string)=>void;onSettings:()=>void;
   onHistory:()=>void;
   onSkills:()=>void;
+  onAutomations:()=>void;
 };
 const name=(session:Session)=>session.title==='New session'?'新会话':session.title;
 const folderName=(path:string)=>path.split(/[\\/]/).filter(Boolean).pop()||path;
 const samePath=(a:string,b:string)=>a.replaceAll('\\','/').toLowerCase()===b.replaceAll('\\','/').toLowerCase();
-export function Sidebar({state,config,blocked,onPick,onRecent,onSession,onClose,onSettings,onHistory,onSkills}:Props) {
+export function Sidebar({state,config,blocked,onPick,onRecent,onSession,onClose,onSettings,onHistory,onSkills,onAutomations}:Props) {
   const [search,setSearch]=useState('');
   const [collapsed,setCollapsed]=useState<string[]>(()=>{try{return JSON.parse(sessionStorage.getItem('eca.projects.collapsed')||'[]');}catch{return [];}});
   // The theme is a desktop preference: the main process owns the value and
@@ -66,6 +67,6 @@ export function Sidebar({state,config,blocked,onPick,onRecent,onSession,onClose,
         {!!recentMatches.length&&<div className="recent-projects"><div className="recent-label">最近项目</div>{recentMatches.map(folder=><button className="recent" key={folder} title={folder} disabled={blocked} onClick={()=>onRecent(config.recent.indexOf(folder))}><FolderOpen size={16}/><span>{folderName(folder)}</span></button>)}</div>}
       </nav>
     </section>
-    <div className="sidebar-bottom"><button className="settings-button" aria-label="技能" title="查看本机各工具的 SKILL.md（只读）" onClick={onSkills}><span className="settings-glyph"><Sparkle size={17}/></span><span className="settings-copy"><strong>技能</strong><small>ECA · Codex · Claude · WorkBuddy</small></span></button><button className="settings-button" aria-label="其他工具的历史" title="查看 Codex / Claude / WorkBuddy 的历史会话（只读）" onClick={onHistory}><span className="settings-glyph"><ClockCounterClockwise size={17}/></span><span className="settings-copy"><strong>其他工具的历史</strong><small>Codex · Claude · WorkBuddy</small></span></button><button className="settings-button" aria-label="模型与设置" title="模型与设置" onClick={onSettings}><span className="settings-glyph"><GearSix size={17}/></span><span className="settings-copy"><strong>模型与设置</strong><small>{connections?`${connections} 个模型连接`:'添加 API 与模型'}</small></span>{config.credential_configured&&<span className="connection-dot" title="已配置密钥"/>}</button><footer><span><Desktop size={12}/>本地工作空间</span><button className="theme-toggle" aria-label={'主题：'+themeLabel} title={'主题：'+themeLabel+'（点击切换）'} onClick={cycleTheme}>{themeSource==='dark'?<Moon size={13}/>:themeSource==='light'?<Sun size={13}/>:<Desktop size={13}/>}</button><span title="版本">{config.version||'本地构建'}</span></footer></div>
+    <div className="sidebar-bottom"><button className="settings-button" aria-label="技能" title="查看本机各工具的 SKILL.md（只读）" onClick={onSkills}><span className="settings-glyph"><Sparkle size={17}/></span><span className="settings-copy"><strong>技能</strong><small>ECA · Codex · Claude · WorkBuddy</small></span></button><button className="settings-button" aria-label="定时任务" title="按日程自动开会话执行任务" onClick={onAutomations}><span className="settings-glyph"><CalendarCheck size={17}/></span><span className="settings-copy"><strong>定时任务</strong><small>按日程自动执行</small></span></button><button className="settings-button" aria-label="其他工具的历史" title="查看 Codex / Claude / WorkBuddy 的历史会话（只读）" onClick={onHistory}><span className="settings-glyph"><ClockCounterClockwise size={17}/></span><span className="settings-copy"><strong>其他工具的历史</strong><small>Codex · Claude · WorkBuddy</small></span></button><button className="settings-button" aria-label="模型与设置" title="模型与设置" onClick={onSettings}><span className="settings-glyph"><GearSix size={17}/></span><span className="settings-copy"><strong>模型与设置</strong><small>{connections?`${connections} 个模型连接`:'添加 API 与模型'}</small></span>{config.credential_configured&&<span className="connection-dot" title="已配置密钥"/>}</button><footer><span><Desktop size={12}/>本地工作空间</span><button className="theme-toggle" aria-label={'主题：'+themeLabel} title={'主题：'+themeLabel+'（点击切换）'} onClick={cycleTheme}>{themeSource==='dark'?<Moon size={13}/>:themeSource==='light'?<Sun size={13}/>:<Desktop size={13}/>}</button><span title="版本">{config.version||'本地构建'}</span></footer></div>
   </aside>;
 }

@@ -1,0 +1,88 @@
+.eca-app .automations-pane {position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;
+  background:color-mix(in srgb,var(--bg) 94%,#000 6%);backdrop-filter:blur(6px);}
+.eca-app .automations-pane header {display:flex;align-items:center;gap:9px;padding:14px 18px;
+  border-bottom:1px solid var(--border);color:var(--text);}
+.eca-app .automations-pane header > svg {color:var(--accent);flex:none;}
+.eca-app .automations-pane h2 {font-size:14px;font-weight:600;margin:0;}
+.eca-app .automations-count {font-size:11.5px;color:var(--muted);}
+.eca-app .automations-refresh {margin-left:auto;display:inline-flex;align-items:center;justify-content:center;
+  width:26px;height:26px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);}
+.eca-app .automations-refresh:hover {color:var(--text);background:var(--hover);}
+.eca-app .automations-close {width:26px;height:26px;border:0;border-radius:8px;background:transparent;
+  color:var(--muted);font-size:18px;line-height:1;}
+.eca-app .automations-close:hover {background:var(--hover);color:var(--text);}
+.eca-app .automations-body {flex:1;overflow:auto;padding:16px 18px 32px;max-width:960px;width:100%;margin:0 auto;}
+.eca-app .automations-hint {margin:0 0 12px;font-size:11.5px;line-height:1.7;color:var(--muted);}
+.eca-app .automations-note {margin:0 0 10px;padding:8px 10px;border:1px solid color-mix(in srgb,var(--accent) 30%,var(--border));
+  border-radius:10px;font-size:11.5px;color:var(--secondary);}
+.eca-app .automations-error {margin:0 0 10px;padding:8px 10px;border-radius:10px;font-size:11.5px;
+  color:var(--danger,#b4462f);border:1px solid color-mix(in srgb,var(--danger,#b4462f) 32%,var(--border));}
+.eca-app .automations-empty {margin:18px 0;color:var(--muted);font-size:12px;}
+.eca-app .automations-create {display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:10px;
+  border:1px dashed var(--border);background:transparent;color:var(--secondary);font-size:12px;}
+.eca-app .automations-create:hover:not(:disabled) {border-color:var(--accent);color:var(--text);}
+.eca-app .automations-create:disabled {opacity:.55;}
+
+.eca-app .automation-form {margin:12px 0 18px;padding:14px;border:1px solid var(--border);border-radius:14px;
+  background:var(--surface);box-shadow:var(--material-raised);}
+.eca-app .automation-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+.eca-app .automation-form label {display:flex;flex-direction:column;gap:4px;font-size:11.5px;color:var(--muted);}
+.eca-app .automation-form input,.eca-app .automation-form select,.eca-app .automation-form textarea {
+  font:inherit;font-size:12.5px;color:var(--text);background:var(--context-surface,var(--bg));
+  border:1px solid var(--border);border-radius:9px;padding:6px 8px;}
+.eca-app .automation-form input:focus,.eca-app .automation-form select:focus,
+.eca-app .automation-form textarea:focus {outline:2px solid color-mix(in srgb,var(--accent) 45%,transparent);
+  outline-offset:-1px;}
+.eca-app .automation-weekdays {display:flex;gap:6px;margin:10px 0 0;}
+.eca-app .automation-weekdays button {width:30px;height:26px;border-radius:8px;border:1px solid var(--border);
+  background:transparent;color:var(--muted);font-size:12px;}
+.eca-app .automation-weekdays button.is-on {border-color:var(--accent);color:var(--text);
+  background:color-mix(in srgb,var(--accent) 14%,transparent);}
+.eca-app .automation-prompt {margin-top:10px;}
+.eca-app .automation-prompt textarea {resize:vertical;line-height:1.65;}
+.eca-app .automation-project,.eca-app .automation-preview {margin:10px 0 0;font-size:11.5px;color:var(--muted);
+  overflow-wrap:anywhere;}
+.eca-app .automation-preview {color:var(--secondary);}
+.eca-app .automation-actions {display:flex;justify-content:flex-end;gap:8px;margin-top:12px;}
+.eca-app .automation-actions button {padding:6px 14px;border-radius:9px;border:1px solid var(--border);
+  background:transparent;color:var(--text);font-size:12px;}
+.eca-app .automation-actions button.primary {border-color:transparent;background:var(--accent);color:var(--on-accent,#fff);}
+.eca-app .automation-actions button:disabled {opacity:.55;}
+
+.eca-app .automation-list {list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
+.eca-app .automation-row {padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);}
+.eca-app .automation-row.is-paused {opacity:.72;}
+.eca-app .automation-summary {display:flex;align-items:center;gap:9px;}
+.eca-app .automation-dot {width:7px;height:7px;border-radius:50%;flex:none;background:var(--muted);}
+.eca-app .automation-dot.is-active {background:var(--success);}
+.eca-app .automation-name {flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;text-align:left;
+  border:0;background:transparent;color:var(--text);padding:0;}
+.eca-app .automation-name strong {font-size:12.5px;font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.eca-app .automation-name small {font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.eca-app .automation-state em {font-size:11px;font-style:normal;color:var(--muted);white-space:nowrap;}
+.eca-app .automation-state em.is-known {color:var(--secondary);}
+.eca-app .automation-buttons {display:flex;gap:2px;}
+.eca-app .automation-buttons button {display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;
+  border:0;border-radius:8px;background:transparent;color:var(--muted);}
+.eca-app .automation-buttons button:hover:not(:disabled) {background:var(--hover);color:var(--text);}
+.eca-app .automation-buttons button:disabled {opacity:.4;}
+.eca-app .automation-error-line {margin:6px 0 0;font-size:11px;color:var(--danger,#b4462f);overflow-wrap:anywhere;}
+
+.eca-app .automation-history {margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);
+  display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:var(--muted);}
+.eca-app .automation-run {display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.eca-app .automation-run-status {color:var(--secondary);}
+.eca-app .automation-run.is-failed .automation-run-status {color:var(--danger,#b4462f);}
+.eca-app .automation-run.is-succeeded .automation-run-status {color:var(--success);}
+.eca-app .automation-run button {border:1px solid var(--border);background:transparent;color:var(--secondary);
+  border-radius:7px;padding:1px 7px;font-size:11px;}
+.eca-app .automation-run button:hover {color:var(--text);background:var(--hover);}
+.eca-app .automation-run-error {color:var(--danger,#b4462f);overflow-wrap:anywhere;}
+.eca-app .automation-memory summary {cursor:pointer;color:var(--secondary);}
+.eca-app .automation-memory pre {margin:6px 0 0;padding:8px;border-radius:9px;background:var(--bg);
+  max-height:220px;overflow:auto;white-space:pre-wrap;font-size:11px;line-height:1.6;color:var(--secondary);}
+
+@media (max-width:820px) {
+  .eca-app .automations-body {padding:12px 12px 24px;}
+  .eca-app .automation-state {display:none;}
+}
