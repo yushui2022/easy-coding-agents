@@ -44,6 +44,7 @@ const server = http.createServer(async (req, res) => {
 function jsonBefore(value) { try { return JSON.parse(value); } catch { return value; } }
 
 let app, page;
+const errors = [];
 const report = {version: null, toolbar_visible: false, toolbar_buttons: [], chip: '', sent_quote: false,
   sidechat_open: false, sidechat_answer: '', dismissed: false, paid_api_calls: 0};
 
@@ -73,12 +74,17 @@ const selectPhrase = phrase => page.evaluate(phrase => {
     ECA_BASE_URL: `http://127.0.0.1:${server.address().port}/v1`, ECA_MODEL: 'fixture-model',
     ECA_API_FORMAT: 'openai', PYTHONUTF8: '1', NO_PROXY: '127.0.0.1,localhost', no_proxy: '127.0.0.1,localhost'};
   delete env.ELECTRON_RUN_AS_NODE;
-  delete env.ECA_TEST_EXE;
-  app = await electron.launch({args: ['.'], env});
+  if (process.env.ECA_TEST_EXE) {
+    env.PATH = `${process.env.SystemRoot}/System32;${process.env.SystemRoot}/System32/WindowsPowerShell/v1.0;${process.env.SystemRoot}`;
+    delete env.Path; delete env.PYTHONPATH; delete env.PYTHONHOME;
+  }
+  app = await electron.launch(process.env.ECA_TEST_EXE
+    ? {executablePath: process.env.ECA_TEST_EXE, args: [], env}
+    : {args: ['.'], env});
   page = await app.firstWindow();
-  const errors = [];
   page.on('pageerror', error => errors.push(String(error)));
   report.version = await app.evaluate(({app}) => app.getVersion());
+  report.mode = process.env.ECA_TEST_EXE ? 'packaged' : 'development';
   const invoke = (method, params = {}) => page.evaluate(([method, params]) => window.eca.invoke(method, params), [method, params]);
   await app.evaluate(({BrowserWindow, dialog}, directory) => {
     BrowserWindow.getAllWindows()[0].setContentSize(1360, 900);
@@ -122,22 +128,25 @@ const selectPhrase = phrase => page.evaluate(phrase => {
   assert(report.sent_quote, 'the quoted excerpt must reach the model with the message');
   await expect(page.locator('.quote-chip')).toHaveCount(0);
 
-  // 在侧边聊天中提问: opens the read-only panel with the selection as context.
+  // 在侧边聊天中提问: the existing right-hand workspace panel opens with the
+  // selection as its task context (that panel already owns side conversations).
   await selectPhrase('选我这段做引用');
   await expect(page.locator('.selection-toolbar')).toBeVisible({timeout: 5000});
   await page.locator('.selection-toolbar button', {hasText: '在侧边聊天中提问'}).click();
-  await expect(page.locator('.sidechat-panel')).toBeVisible({timeout: 10000});
+  await expect(page.locator('.workspace-panel')).toBeVisible({timeout: 10000});
+  await expect(page.locator('.workspace-tabs')).toContainText('侧边聊天');
+  await expect(page.locator('.side-chat')).toContainText('任务上下文', {timeout: 10000});
   report.sidechat_open = true;
-  await expect(page.locator('.sidechat-panel')).toContainText('只读');
-  await expect(page.locator('.sidechat-context')).toContainText('选我这段做引用');
   const sideInput = page.getByLabel('侧边聊天输入');
+  await expect(sideInput).toBeVisible({timeout: 10000});
   await sideInput.fill('这段在说什么？');
   await sideInput.press('Enter');
-  await expect(page.locator('.sidechat-log')).toContainText(SIDE, {timeout: 30000});
+  await expect(page.locator('.side-chat')).toContainText(SIDE, {timeout: 30000});
   report.sidechat_answer = SIDE;
+  // The selection must be part of what the side conversation was told.
+  report.selection_in_side_context = prompts.some(entry => JSON.stringify(entry).includes('选我这段做引用'));
+  assert(report.selection_in_side_context, 'the side chat must receive the selected text as context');
   await page.screenshot({path: path.join(output, 'sidechat-panel.png'), animations: 'disabled'}).catch(() => {});
-  await page.getByRole('button', {name: '关闭侧边聊天'}).click();
-  await expect(page.locator('.sidechat-panel')).toHaveCount(0);
 
   // A collapsed selection takes the toolbar away again.
   await page.evaluate(() => window.getSelection()?.removeAllRanges());
@@ -153,6 +162,11 @@ const selectPhrase = phrase => page.evaluate(phrase => {
 })().catch(async error => {
   console.error(String(error && error.stack || error));
   try { console.error('prompts seen:', JSON.stringify(prompts).slice(0, 1200)); } catch {}
+  try {
+    const side = await page.locator('.side-chat').innerText();
+    console.error('side chat text:', JSON.stringify(side).slice(0, 1500));
+  } catch (err) { console.error('side chat text: <none>', String(err).slice(0, 200)); }
+  try { console.error('errors:', JSON.stringify(errors.slice(0, 5))); } catch {}
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   try { if (app) await Promise.race([app.close(), wait(8000)]); } catch {}
   server.close();

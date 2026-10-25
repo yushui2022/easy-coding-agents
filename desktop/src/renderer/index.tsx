@@ -16,7 +16,7 @@ import {SkillsPane} from './SkillsPane';
 import {SkillMenu, type SkillRow} from './SkillMenu';
 import {AutomationsPane} from './AutomationsPane';
 import {SelectionToolbar} from './SelectionToolbar';
-import {SideChatPanel} from './SideChatPanel';
+
 import {ContextMeter} from './ContextMeter';
 import {PermissionControl,permissionLabels} from './PermissionMenu';
 import {ModeControl} from './ModeMenu';
@@ -55,7 +55,7 @@ const [historyOpen,setHistoryOpen] = useState(false);
 const [skillsOpen,setSkillsOpen] = useState(false);
 const [automationsOpen,setAutomationsOpen] = useState(false);
 const [quotes,setQuotes] = useState<{id:string;text:string}[]>([]);
-const [sideChat,setSideChat] = useState<any|null>(null);
+
 const [skillRows,setSkillRows] = useState<SkillRow[]|null>(null);
 const [skillMenu,setSkillMenu] = useState<{query:string;index:number}|null>(null);
 const [pickedSkills,setPickedSkills] = useState<SkillRow[]>([]);
@@ -284,13 +284,11 @@ const [pickedSkills,setPickedSkills] = useState<SkillRow[]>([]);
     setRewindPending(true);
     requestAnimationFrame(()=>promptInput.current?.focus());
   };
-  // Opens the read-only side conversation with the selected text as context; the
-  // backend builds that context, so the panel never invents what was quoted.
-  const openSideChat = async (selection:string) => {
+  // The right-hand workspace already owns the side conversation; opening it is a
+  // request to that panel, so the selection travels as the event detail it reads.
+  const askSideChat = (selection:string) => {
     if(!state.session_id){setNotice('先打开一个会话，再就选中内容提问。');return;}
-    try{
-      setSideChat(await window.eca.invoke('sidechat.open',{session_id:state.session_id,selection:(selection||'').slice(0,12000)}));
-    }catch(err){setError(String(err));}
+    window.dispatchEvent(new CustomEvent('eca:sidechat',{detail:(selection||'').slice(0,12000)}));
   };
   const chooseModel = async (choice:string,keepOpen=false) => {
     if(modelChanging||state.busy||projectBusy.current)return false;
@@ -452,7 +450,7 @@ const [pickedSkills,setPickedSkills] = useState<SkillRow[]>([]);
         <div className="workspace-title" title={state.project||'选择项目后，ECA 将在该文件夹内工作'}><span>{projectName||'本地工作空间'}</span><strong>{state.project?sessionTitle:'开始工作'}</strong></div>
         <div className="header-actions">
           <div className="status"><span className={state.busy?'status-dot active':'status-dot'}/>{projectChanging?'正在打开项目…':state.busy?(stopping?'正在停止…':waiting?'等待确认':'执行中'):label(state.status||'idle')}</div>
-          {state.project&&<><button className="icon-button" aria-label="打开侧边聊天" title="在侧边聊天中询问选中内容" onClick={()=>void openSideChat(window.getSelection()?.toString()||'')}><ChatCircle size={19}/></button><button className="icon-button details-toggle" aria-label="任务详情" title="显示或收起工作区" aria-expanded={detailsOpen} onClick={()=>setDetailsOpen(!detailsOpen)}><SidebarSimple size={19}/></button></>}
+          {state.project&&<><button className="icon-button" aria-label="打开侧边聊天" title="在右侧侧边聊天中询问选中内容" onClick={()=>askSideChat(window.getSelection()?.toString()||'')}><ChatCircle size={19}/></button><button className="icon-button details-toggle" aria-label="任务详情" title="显示或收起工作区" aria-expanded={detailsOpen} onClick={()=>setDetailsOpen(!detailsOpen)}><SidebarSimple size={19}/></button></>}
         </div>
       </header>
       {error&&<div role="alert" className="error-banner"><span>{error}</span><button className="icon-button" aria-label="关闭错误" onClick={()=>setError('')}><X size={17}/></button></div>}
@@ -579,8 +577,7 @@ const [pickedSkills,setPickedSkills] = useState<SkillRow[]>([]);
   {!!state.project&&<SelectionToolbar scope=".messages" disabled={!state.session_id}
     onAdd={text=>{setQuotes(old=>[...old,{id:(crypto.randomUUID?.()||String(Date.now())+Math.random()).slice(0,12),text}].slice(0,3));
       setNotice('已加入引用；它会随下一条消息一起发出。');promptInput.current?.focus();}}
-    onAsk={text=>void openSideChat(text)}/>}
-  {!!sideChat&&!!state.session_id&&<SideChatPanel session={state.session_id} initial={sideChat} onClose={()=>setSideChat(null)}/>}
+    onAsk={askSideChat}/>}
   {automationsOpen&&<AutomationsPane project={state.project||null} onClose={()=>setAutomationsOpen(false)}
     onOpenSession={(projectPath,sessionId)=>{const target=(state.projects||[]).find((item:any)=>String(item.path||'').toLowerCase()===projectPath.toLowerCase());
       setAutomationsOpen(false);

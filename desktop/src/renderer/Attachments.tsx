@@ -48,7 +48,7 @@ export function useAttachments(scope:string,disabled=false){
     finally{lock.current=false;setReading(false);}
   };
   const busy=disabled||loading||reading;
-  return {items,busy,clear:()=>save([]),moveTo:async(key:string)=>{await save(items,key);await stored(scope,[]);},
+  return {items,busy,reading,clear:()=>save([]),moveTo:async(key:string)=>{await save(items,key);await stored(scope,[]);},
     events:{
       onDragOver:(e:React.DragEvent)=>{if(e.dataTransfer.types.includes('Files'))e.preventDefault();},
       onDrop:(e:React.DragEvent)=>{if(e.dataTransfer.files.length){e.preventDefault();void add(Array.from(e.dataTransfer.files));}},
