@@ -674,6 +674,11 @@ class DesktopRPC:
                         self.secrets.add(settings.api_key)
                     self.runtime = Runtime(Agent(settings, store, state, self.approve, self.question, self.emit,
                                                  child=bool(state.get('parent_id'))))
+                    # Build the SDK client now, so the first message does not pay
+                    # for it. Nothing is sent to the provider.
+                    warm = asyncio.create_task(self.runtime.agent.provider.warm())
+                    warm.add_done_callback(lambda task: task.exception() if not task.cancelled() else None)
+                    self.warm_task = warm
                 except BaseException:
                     store.close()
                     raise
@@ -862,6 +867,12 @@ class DesktopRPC:
             self.runtime = None
 
 
+
+def prepare_model_imports():
+    from .provider import prepare_imports
+    prepare_imports('responses')
+
+
 async def serve():
     # A daemon reader avoids asyncio's executor waiting forever on Windows stdin.
     loop = asyncio.get_running_loop()
@@ -879,6 +890,9 @@ async def serve():
     sys.stdout.reconfigure(encoding='utf-8')
     from .desktop_projects import DesktopProjects
     server = DesktopProjects(lambda value: print(json.dumps(value, ensure_ascii=False), flush=True))
+    # The SDK's resource modules cost several hundred milliseconds on first touch.
+    # Pay that while the window is still opening, in a thread off the RPC loop.
+    threading.Thread(target=prepare_model_imports, daemon=True).start()
     threading.Thread(target=reader, daemon=True).start()
     requests = set()
     try:

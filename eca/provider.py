@@ -12,12 +12,60 @@ from .errors import OutputLimitError, ContextLimitError, StalledStreamError, con
 from .activity import StreamActivity
 
 
+def prepare_imports(api_format='openai'):
+    """Import the SDK resources the first request would otherwise import.
+
+    Importing ``openai`` itself costs about a second, and ``openai.resources.chat``
+    several hundred milliseconds more on first touch. Both are one-time process
+    costs, so the host can pay them before anyone sends a message.
+    """
+    try:
+        import openai.resources.chat.completions  # noqa: F401
+        if api_format == 'responses':
+            import openai.resources.responses  # noqa: F401
+    except Exception:
+        pass
+
+
 class Provider:
     def __init__(self, settings):
         self.settings = settings
         self.client = None
         self.native = None
         self.last_metrics = {}
+        self.prepared = False
+
+
+    def prepare(self):
+        """Pay the SDK's lazy import cost off the user's first message.
+
+        ``import openai`` costs about a second at process start, and the chat
+        resource module costs several hundred more milliseconds the first time
+        ``client.chat.completions`` is touched. That second cost used to land on the
+        first message of a session; warm() moves it to project open. Imports are
+        thread-safe and loop-free, so this can run in a worker thread.
+        """
+        if self.prepared:
+            return
+        prepare_imports(self.settings.api_format)
+        self.prepared = True
+
+    def _build_client(self):
+        # Loopback model servers must not be routed through an OS HTTP proxy.
+        local = urlsplit(self.settings.base_url).hostname in {"localhost", "127.0.0.1", "::1"}
+        return AsyncOpenAI(api_key=self.settings.api_key, base_url=self.settings.base_url,
+                           timeout=self.settings.request_timeout, max_retries=0,
+                           http_client=httpx.AsyncClient(trust_env=not local))
+
+    async def warm(self):
+        """Build the HTTP client before the first request needs it. Sends nothing."""
+        if self.client is not None or not self.settings.api_key:
+            return self.client
+        if not self.prepared:
+            await asyncio.to_thread(self.prepare)
+        if self.client is None:
+            self.client = self._build_client()
+        return self.client
 
     async def complete(self, messages, tools, emit):
         for attempt in range(self.settings.network_retries + 1):
@@ -74,11 +122,9 @@ class Provider:
         if not self.settings.api_key:
             raise ValueError("Missing API key. Set ECA_API_KEY, OPENAI_API_KEY or MODELSCOPE_API_KEY in the environment/.env.")
         if self.client is None:
-            # Loopback model servers must not be routed through an OS HTTP proxy.
-            local = urlsplit(self.settings.base_url).hostname in {"localhost", "127.0.0.1", "::1"}
-            self.client = AsyncOpenAI(api_key=self.settings.api_key, base_url=self.settings.base_url,
-                                      timeout=self.settings.request_timeout, max_retries=0,
-                                      http_client=httpx.AsyncClient(trust_env=not local))
+            if not self.prepared:
+                self.prepare()
+            self.client = self._build_client()
         if self.settings.api_format == "responses":
             from .responses import complete
             return await complete(self.client, self.settings, messages, tools, emit,

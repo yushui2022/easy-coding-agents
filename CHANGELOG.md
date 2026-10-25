@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.13.1 — 第一条消息不再等 SDK 初始化
+
+以前点发送到请求真正发出去要 1.1–2.7 秒，而且只有**每条会话的第一条消息**最慢。分段量出来的事实：
+
+| 阶段 | 修复前 |
+|---|---|
+| 裸 TCP 连接 | 0.6 ms（不是网络） |
+| `import openai` | 1394 ms（进程启动时已付） |
+| `import openai.resources.chat.completions` | **574 ms**，首次访问 `client.chat.completions` 才付 |
+| `AsyncOpenAI(...)` 首次构造 | **157 ms**（之后 7 ms） |
+| `Skills.catalog()`（每请求都跑） | 67 ms（46 个 SKILL.md 的 read + stat） |
+
+也就是说：两笔一次性初始化（SDK 的懒加载导入 + HTTP 客户端），全砸在用户按回车的那一下。
+
+改法：
+
+- **把 SDK 预热挪到启动**：`prepare_imports()` 在后台线程里导入 chat（以及 responses）资源；项目一打开就在事件循环上 `provider.warm()` 把 HTTP 客户端建好。**不发任何请求**，不消耗 token。
+- **`Provider` 抽出 `_build_client()`**，`complete()` 复用它；`warm()` 已有客户端时直接返回。
+- **技能目录按目录 mtime 缓存**：命中时只 stat 5 个目录（约 4 ms），新增/删除/改名技能立刻失效；`load()` 仍然读当前正文。改 SKILL.md 里的一行描述要重启才生效，这一点写在代码注释里。
+
+结果（同一台机器，本地 fixture 模型，不花钱）：
+
+| 指标 | 修复前 | 修复后 |
+|---|---|---|
+| 第一条消息：点击 → 服务端收到 | 2207–2852 ms | **189–229 ms** |
+| 后续消息 | 323–405 ms | **35 ms**（中位） |
+| 渲染端 + IPC（click → backend preparing） | 146 ms | 18–29 ms |
+| 后端准备（preparing → dispatch） | 111–161 ms | 15–21 ms |
+| `Skills.catalog()` / `system_prompt()` | 67 / 58 ms | **4.7 / 3.5 ms** |
+
+新增回归测试，防止这两笔成本偷偷搬回来：
+
+- `desktop/tests/send-latency.cjs`：四段打点（click / preparing / waiting_model / 服务端首字节），断言**第一条消息 < 900 ms**、稳态 < 200 ms、且发送消息不会顺带去拉模型列表。
+- `tests/test_provider_warmup.py` 7 项：`warm()` 建客户端但不连不发、已有客户端不重建、无 key 时跳过、`prepare()` 幂等且导入失败不影响请求、`complete()` 复用预热客户端。
+- `tests/test_skills_catalog.py` 新增 3 项：第二次读取**零文件读**、新增技能让缓存失效、缓存后项目技能仍优先。
+
+验证：`pytest tests` → 551 passed, 7 skipped；`npm test` → 28 passed；`automations-e2e` 与 `work-graph-e2e` 通过；`send-latency` 通过（首条 189 ms、稳态 35/18 ms）。
+
+边界：首次真实请求仍比后续多约 150 ms（首个请求要现场构建一次请求体），已经不再影响手感；其余优化属于渲染端之外的领域。
+
 ## 1.13.0 — 定时任务：到点自己开会话干活
 
 照 Codex 的 Automations 做的，但落在 ECA 的会话模型上：每个计划是一份本机文件，到点在**它绑定的项目里新开一个真会话**执行，跑完的结论写进它自己的记忆文件。

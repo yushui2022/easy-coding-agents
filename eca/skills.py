@@ -28,18 +28,40 @@ def folders(root=None):
     }
 
 
+# Stat key -> catalog. Reading the files is the expensive part, so an unchanged
+# set of (path, size, mtime) reuses the previous result.
+_CACHE = {}
+
 class Skills:
     def __init__(self, root=None):
         self.root = Path(root) if root else None
 
     def catalog(self):
-        found = {}
+        """Metadata for every readable skill, cached until the folders change.
+
+        Reading and even statting 46 small files costs about 60 ms on this machine
+        and this runs on every request, so the key is the set of skill-folder mtimes:
+        adding, removing or renaming a skill invalidates it immediately. Editing the
+        description inside an existing SKILL.md is picked up after a restart, while
+        load() below always reads the current body.
+        """
         base = self.root.resolve() if self.root else None
+        usable = []
         for source, folder in folders(self.root).items():
             if folder is None or not folder.is_dir() or folder.is_symlink():
                 continue
             if source == 'project' and (base is None or not folder.resolve().is_relative_to(base)):
                 continue
+            try:
+                usable.append((source, folder, folder.stat().st_mtime_ns))
+            except OSError:
+                continue
+        key = tuple((source, str(folder), stamp) for source, folder, stamp in usable)
+        cached = _CACHE.get(key)
+        if cached is not None:
+            return {name: dict(entry) for name, entry in cached.items()}
+        found = {}
+        for source, folder, _ in usable:
             try:
                 items = sorted(folder.iterdir())[:MAX_PER_FOLDER]
             except OSError:
@@ -59,7 +81,10 @@ class Skills:
                 found[item.name] = {'name': item.name, 'source': source,
                                     'scope': 'project' if source == 'project' else 'user',
                                     'description': description[:300], 'path': str(path)}
-        return found
+        if len(_CACHE) >= 8:
+            _CACHE.clear()
+        _CACHE[key] = found
+        return {name: dict(entry) for name, entry in found.items()}
 
     def load(self, name):
         entry = self.catalog().get(name)

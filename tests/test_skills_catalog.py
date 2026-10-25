@@ -109,5 +109,55 @@ class PromptBudget(unittest.TestCase):
         self.assertLessEqual(len(listing), SKILL_CATALOG_CHARS + 200)
         self.assertIn('"skill-0"', prompt)
 
+class CatalogCache(unittest.TestCase):
+    """The catalog runs on every request, so it must not re-read the files."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(dir=os.environ.get('ECA_TEST_TMP', tempfile.gettempdir()))
+        root = Path(self.tmp.name)
+        self.project = root / 'project'
+        self.codex = root / 'codex'
+        self.env = patch.dict(os.environ, {
+            'ECS_SKILLS_DIR': str(root / 'eca'), 'ECA_CODEX_HOME': str(self.codex),
+            'ECA_CLAUDE_HOME': str(root / 'none-claude'), 'ECA_WORKBUDDY_HOME': str(root / 'none-buddy')})
+        self.env.start()
+        skills._CACHE.clear()
+        make(self.codex / 'skills', 'cached-skill', 'from codex')
+
+    def tearDown(self):
+        skills._CACHE.clear()
+        self.env.stop()
+        self.tmp.cleanup()
+
+    def test_second_read_does_not_touch_the_files(self):
+        original = Path.read_text
+        reads = []
+
+        def counting(path, *args, **kwargs):
+            reads.append(path)
+            return original(path, *args, **kwargs)
+
+        with patch.object(Path, 'read_text', counting):
+            first = skills.Skills(self.project).catalog()
+            after_first = len(reads)
+            second = skills.Skills(self.project).catalog()
+            after_second = len(reads)
+        self.assertEqual(after_first, 1)
+        self.assertEqual(after_second, after_first, 'a cached catalog must not re-read SKILL.md')
+        self.assertEqual(set(first), set(second))
+        self.assertEqual(first['cached-skill']['description'], 'from codex')
+
+    def test_a_new_skill_invalidates_the_cache(self):
+        first = skills.Skills(self.project).catalog()
+        self.assertNotIn('fresh-skill', first)
+        make(self.codex / 'skills', 'fresh-skill', 'added later')
+        self.assertIn('fresh-skill', skills.Skills(self.project).catalog())
+
+    def test_a_project_skill_still_wins_after_caching(self):
+        skills.Skills(self.project).catalog()
+        make(self.project / '.agents' / 'skills', 'cached-skill', 'from project')
+        self.assertEqual(skills.Skills(self.project).catalog()['cached-skill']['source'], 'project')
+
+
 if __name__ == '__main__':
     unittest.main()
