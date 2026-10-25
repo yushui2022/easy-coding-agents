@@ -1,0 +1,24 @@
+.eca-app .selection-toolbar {position:fixed;z-index:60;display:flex;align-items:center;justify-content:center;
+  gap:2px;height:38px;padding:0 6px;border-radius:11px;border:1px solid var(--border);
+  background:var(--surface);box-shadow:var(--material-raised),0 6px 20px rgba(0,0,0,.16);
+  font-size:12.5px;animation:selection-in .09s ease-out;}
+@keyframes selection-in {from {opacity:0;transform:translateY(3px);} to {opacity:1;transform:none;}}
+.eca-app .selection-toolbar button {border:0;background:transparent;color:var(--text);font:inherit;
+  padding:4px 9px;border-radius:8px;white-space:nowrap;}
+.eca-app .selection-toolbar button:hover {background:var(--hover);}
+.eca-app .selection-toolbar button:focus-visible {outline:2px solid color-mix(in srgb,var(--accent) 55%,transparent);
+  outline-offset:1px;}
+.eca-app .selection-separator {width:1px;height:16px;background:var(--border);flex:none;}
+
+.eca-app .quote-chips {display:flex;flex-wrap:wrap;gap:6px;padding:0 2px 6px;}
+.eca-app .quote-chip {display:inline-flex;align-items:center;gap:6px;max-width:100%;
+  padding:3px 6px 3px 8px;border-radius:9px;border:1px solid var(--border);background:var(--surface);
+  font-size:11.5px;color:var(--secondary);}
+.eca-app .quote-chip span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px;}
+.eca-app .quote-chip button {border:0;background:transparent;color:var(--muted);padding:0 2px;
+  font-size:14px;line-height:1;border-radius:6px;}
+.eca-app .quote-chip button:hover {color:var(--text);background:var(--hover);}
+
+@media (max-width:820px) {
+  .eca-app .quote-chip span {max-width:160px;}
+}

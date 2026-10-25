@@ -15,6 +15,8 @@ import {ExternalHistory} from './ExternalHistory';
 import {SkillsPane} from './SkillsPane';
 import {SkillMenu, type SkillRow} from './SkillMenu';
 import {AutomationsPane} from './AutomationsPane';
+import {SelectionToolbar} from './SelectionToolbar';
+import {SideChatPanel} from './SideChatPanel';
 import {ContextMeter} from './ContextMeter';
 import {PermissionControl,permissionLabels} from './PermissionMenu';
 import {ModeControl} from './ModeMenu';
@@ -52,6 +54,8 @@ function App() {
 const [historyOpen,setHistoryOpen] = useState(false);
 const [skillsOpen,setSkillsOpen] = useState(false);
 const [automationsOpen,setAutomationsOpen] = useState(false);
+const [quotes,setQuotes] = useState<{id:string;text:string}[]>([]);
+const [sideChat,setSideChat] = useState<any|null>(null);
 const [skillRows,setSkillRows] = useState<SkillRow[]|null>(null);
 const [skillMenu,setSkillMenu] = useState<{query:string;index:number}|null>(null);
 const [pickedSkills,setPickedSkills] = useState<SkillRow[]>([]);
@@ -254,11 +258,13 @@ const [pickedSkills,setPickedSkills] = useState<SkillRow[]>([]);
       const rewinding=rewindPending&&!queued&&!attachments.items.length;
       const payload:any={prompt:submitted,attachments:attachments.items};
       if(!rewinding&&!queued&&pickedSkills.length)payload.skills=pickedSkills.map(item=>item.name);
+      if(!rewinding&&quotes.length)payload.quotes=quotes.map(item=>item.text);
       const result=await perform(rewinding?'session.resend':(queued?'queue.add':'task.start'),payload);
       if(result) {
         setPrompt(current=>current===submitted?'':current);
         await attachments.clear();
         if(!queued)setPickedSkills([]);
+        if(!rewinding)setQuotes([]);
         if(rewinding)setRewindPending(false);
         if(queued)setNotice('已排队；当前任务结束后按顺序发送。');
       }
@@ -277,6 +283,14 @@ const [pickedSkills,setPickedSkills] = useState<SkillRow[]>([]);
     setPrompt(value);
     setRewindPending(true);
     requestAnimationFrame(()=>promptInput.current?.focus());
+  };
+  // Opens the read-only side conversation with the selected text as context; the
+  // backend builds that context, so the panel never invents what was quoted.
+  const openSideChat = async (selection:string) => {
+    if(!state.session_id){setNotice('先打开一个会话，再就选中内容提问。');return;}
+    try{
+      setSideChat(await window.eca.invoke('sidechat.open',{session_id:state.session_id,selection:(selection||'').slice(0,12000)}));
+    }catch(err){setError(String(err));}
   };
   const chooseModel = async (choice:string,keepOpen=false) => {
     if(modelChanging||state.busy||projectBusy.current)return false;
@@ -438,7 +452,7 @@ const [pickedSkills,setPickedSkills] = useState<SkillRow[]>([]);
         <div className="workspace-title" title={state.project||'选择项目后，ECA 将在该文件夹内工作'}><span>{projectName||'本地工作空间'}</span><strong>{state.project?sessionTitle:'开始工作'}</strong></div>
         <div className="header-actions">
           <div className="status"><span className={state.busy?'status-dot active':'status-dot'}/>{projectChanging?'正在打开项目…':state.busy?(stopping?'正在停止…':waiting?'等待确认':'执行中'):label(state.status||'idle')}</div>
-          {state.project&&<><button className="icon-button" aria-label="打开侧边聊天" title="在侧边聊天中询问选中内容" onClick={()=>{setDetailsOpen(true);window.dispatchEvent(new CustomEvent('eca:sidechat',{detail:window.getSelection()?.toString()||''}));}}><ChatCircle size={19}/></button><button className="icon-button details-toggle" aria-label="任务详情" title="显示或收起工作区" aria-expanded={detailsOpen} onClick={()=>setDetailsOpen(!detailsOpen)}><SidebarSimple size={19}/></button></>}
+          {state.project&&<><button className="icon-button" aria-label="打开侧边聊天" title="在侧边聊天中询问选中内容" onClick={()=>void openSideChat(window.getSelection()?.toString()||'')}><ChatCircle size={19}/></button><button className="icon-button details-toggle" aria-label="任务详情" title="显示或收起工作区" aria-expanded={detailsOpen} onClick={()=>setDetailsOpen(!detailsOpen)}><SidebarSimple size={19}/></button></>}
         </div>
       </header>
       {error&&<div role="alert" className="error-banner"><span>{error}</span><button className="icon-button" aria-label="关闭错误" onClick={()=>setError('')}><X size={17}/></button></div>}
@@ -495,6 +509,11 @@ const [pickedSkills,setPickedSkills] = useState<SkillRow[]>([]);
             <button type="button" onClick={()=>setRewindPending(false)}>只是发一条新消息</button>
           </div>}
           <div className="composer" {...attachments.events}>{attachments.preview}
+            {!!quotes.length&&<div className="quote-chips" role="group" aria-label="随本条消息发送的引用">
+              {quotes.map(quote=><span className="quote-chip" key={quote.id} title={quote.text}>
+                <span>「{quote.text.length>40?quote.text.slice(0,40)+'…':quote.text}」</span>
+                <button type="button" aria-label="移除引用" onClick={()=>setQuotes(old=>old.filter(item=>item.id!==quote.id))}>×</button></span>)}
+            </div>}
             {!!pickedSkills.length&&<div className="skill-chips" role="group" aria-label="本条消息启用的技能">
               {pickedSkills.map(skill=><span className="skill-chip" key={skill.name}>{skill.name}
                 <button type="button" aria-label={'移除技能 '+skill.name} onClick={()=>setPickedSkills(old=>old.filter(item=>item.name!==skill.name))}>×</button></span>)}
@@ -557,6 +576,11 @@ const [pickedSkills,setPickedSkills] = useState<SkillRow[]>([]);
     {state.project&&<Workspace key={viewKey} agentView={agentView} state={state} config={config} review={inspector} open={detailsOpen} onOpen={setDetailsOpen} narrow={narrow} blocked={!!(settingsOpen||modelPickerOpen||confirmFull||diff||diagnostic||waiting)} onDraft={(text:string)=>{setPrompt(p=>p?p+'\n\n'+text:text);setNotice('已放入主对话草稿，确认后发送。');promptInput.current?.focus();}}/>}
     {modelPickerOpen&&<ModelMenu anchor={modelButton} label="选择模型" connections={config.connections||[]} recent={config.recentModels||[]} selectedId={state.project?state.model_selection?.connection_id:config.defaultId} reasoning={state.project?state.settings?.reasoning:config.model?.reasoning} busy={state.busy||modelChanging} error={modelSelectionError} onClose={()=>setModelPickerOpen(false)} onChoose={id=>chooseModel(id,true)} onEffort={chooseEffort} onManage={()=>{setModelPickerOpen(false);setSettingsOpen(true);}} special={state.project?[{id:'default',label:'跟随桌面默认',selected:state.model_selection?.choice==='default',disabled:!config.defaultId},{id:'project',label:'沿用项目配置',selected:state.model_selection?.choice==='project'}]:[]}/>}
   {skillsOpen&&<SkillsPane onClose={()=>setSkillsOpen(false)}/>}
+  {!!state.project&&<SelectionToolbar scope=".messages" disabled={!state.session_id}
+    onAdd={text=>{setQuotes(old=>[...old,{id:(crypto.randomUUID?.()||String(Date.now())+Math.random()).slice(0,12),text}].slice(0,3));
+      setNotice('已加入引用；它会随下一条消息一起发出。');promptInput.current?.focus();}}
+    onAsk={text=>void openSideChat(text)}/>}
+  {!!sideChat&&!!state.session_id&&<SideChatPanel session={state.session_id} initial={sideChat} onClose={()=>setSideChat(null)}/>}
   {automationsOpen&&<AutomationsPane project={state.project||null} onClose={()=>setAutomationsOpen(false)}
     onOpenSession={(projectPath,sessionId)=>{const target=(state.projects||[]).find((item:any)=>String(item.path||'').toLowerCase()===projectPath.toLowerCase());
       setAutomationsOpen(false);

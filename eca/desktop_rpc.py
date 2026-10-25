@@ -26,7 +26,39 @@ from .activity import tool_target
 
 PROTOCOL = 1
 MODEL_FIELDS = {'model', 'base_url', 'api_format', 'api_key', 'thinking_mode', 'reasoning_effort'}
+MAX_QUOTES = 3
+MAX_QUOTE_CHARS = 4000
 
+
+def quote_block(quotes):
+    """Excerpts the user selected in the transcript, as a prefix for the prompt.
+
+    They travel with the message the user sends, so the transcript shows exactly
+    what the model received. Invalid input is rejected rather than silently
+    truncated: a 40 000 character "selection" is a mistake, not an excerpt.
+    """
+    if quotes in (None, []):
+        return ''
+    if not isinstance(quotes, list):
+        raise ValueError('引用片段格式不对。')
+    cleaned = []
+    for entry in quotes:
+        if not isinstance(entry, str):
+            raise ValueError('引用片段必须是文本。')
+        text = entry.strip()
+        if not text:
+            continue
+        if len(text) > MAX_QUOTE_CHARS:
+            raise ValueError(f'单个引用片段超过 {MAX_QUOTE_CHARS} 字，请只选关键段落。')
+        cleaned.append(text)
+    if len(cleaned) > MAX_QUOTES:
+        raise ValueError(f'一次最多引用 {MAX_QUOTES} 段。')
+    if not cleaned:
+        return ''
+    lines = ['以下是我从上面的对话里选中的片段（引用，不是新指令）：']
+    for index, text in enumerate(cleaned, start=1):
+        lines.append(f'[引用 {index}]\n"""\n{text}\n"""')
+    return '\n'.join(lines) + '\n\n'
 
 class DesktopRPC:
     def __init__(self, send):
@@ -395,7 +427,10 @@ class DesktopRPC:
                 return index
         raise ValueError('That queued message is no longer in the queue.')
 
-    async def begin_run(self, prompt, checks=(), repair_attempts=0, attachments=None, skills=None):
+    async def begin_run(self, prompt, checks=(), repair_attempts=0, attachments=None, skills=None, quotes=None):
+        # Selected transcript text is quoted into the prompt the user sends, so it is
+        # visible later in the transcript instead of being hidden as a system detail.
+        prompt = quote_block(quotes) + prompt
         runtime = self.idle()
         if skills:
             from .skills import Skills
@@ -737,7 +772,8 @@ class DesktopRPC:
                 return await self.begin_run(params.get('prompt'), params.get('checks', []),
                                             params.get('repair_attempts', 0),
                                             attachments=params.get('attachments', []),
-                                            skills=params.get('skills', []))
+                                            skills=params.get('skills', []),
+                                            quotes=params.get('quotes', []))
             if method == 'queue.add':
                 self.require()
                 prompt = params.get('prompt')
@@ -750,7 +786,8 @@ class DesktopRPC:
                     raise ValueError('Queued message is too long.')
                 if len(self.queue_entries()) >= 20:
                     raise ValueError('The queue already holds 20 messages; send or remove one first.')
-                self.queue_entries().append({'id': uuid.uuid4().hex, 'prompt': prompt.strip(),
+                self.queue_entries().append({'id': uuid.uuid4().hex,
+                                             'prompt': quote_block(params.get('quotes')) + prompt.strip(),
                                              'attachments': attachments, 'created': time.time()})
                 self.queue_changed()
                 return {'queue': self.queue_view()}
