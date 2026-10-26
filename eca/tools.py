@@ -27,6 +27,9 @@ def schema(name, description, properties, required):
 
 STR = {"type": "string"}
 INT = {"type": "integer"}
+# Kept as a literal so the schema does not import the research module at startup.
+STAGE_NAMES = ("proposal", "search", "reading", "reproduction", "experiment", "writing", "presentation")
+
 SCHEMAS = [
     schema('lsp_rename', 'Preview cross-file semantic rename; no file writes. Line 1-based, character UTF-16 0-based.', {'server': STR, 'path': STR, 'new_name': STR, 'line': INT, 'character': INT}, ['server', 'path', 'new_name']),
     schema('lsp_apply', 'Apply a saved rename preview after conflict checks and normal edit approval, then request diagnostics.', {'preview_id': STR}, ['preview_id']),
@@ -58,6 +61,12 @@ SCHEMAS = [
                "depends_on": {"type": "array", "maxItems": 8, "items": STR}}, "required": ["content", "status"], "additionalProperties": False}}}, ["items"]),
     schema("goal_update", "Mark session-goal acceptance criteria done or open (1-based index as listed). A done label is a claim, not proof tests passed.", {"updates": {"type": "array", "items": {"type": "object", "properties": {"index": INT, "done": {"type": "boolean"}}, "required": ["index", "done"], "additionalProperties": False}}, "status": {"type": "string", "enum": ["active", "done", "abandoned"]}}, ["updates"]),
     schema("ask", "Ask for missing requirements; use only when needed.", {"question": STR}, ["question"]),
+    schema("research_stage", "Seven-stage research workflow (proposal, search, reading, reproduction, experiment, writing, presentation). Moving forward requires the previous stage's artifacts on disk; moving back requires a note explaining why.", {'stage': {'type': 'string', 'enum': list(STAGE_NAMES)}, 'note': STR}, ['stage']),
+    schema("research_source", "Register one research source under .eca/research/sources.jsonl. verify=true resolves a doi/arxiv id against the public metadata API; a source registered without it cannot back a verified claim.", {'id': STR, 'kind': {'type': 'string', 'enum': ['doi', 'arxiv', 'url']}, 'url': STR, 'title': STR, 'verify': {'type': 'boolean'}, 'year': STR, 'authors': STR, 'note': STR}, ['id', 'kind', 'url', 'title']),
+    schema("research_claim", "Record one claim in the claim ledger. 'verified' needs a registered source id or a run id; an unregistered source id is refused.", {'id': STR, 'claim': STR, 'status': {'type': 'string', 'enum': ['asserted', 'verified', 'contradicted', 'unverified']}, 'sources': {'type': 'array', 'items': STR}, 'runs': {'type': 'array', 'items': STR}, 'note': STR}, ['id', 'claim']),
+    schema("research_run", "Record one experiment or reproduction run as runs/<id>.json: command, exit code, metrics and whether the numbers matched the paper. A mismatch requires a note and a deviations.md entry later.", {'id': STR, 'label': STR, 'command': STR, 'outcome': {'type': 'string', 'enum': ['reproduced', 'partial', 'incomparable', 'uncertain']}, 'matches_paper': {'type': 'boolean'}, 'exit_code': INT, 'metrics': {'type': 'object'}, 'claims': {'type': 'array', 'items': STR}, 'note': STR}, ['id', 'label', 'command', 'outcome', 'matches_paper']),
+    schema("research_report", "Validate report.md (or slides/outline.md) against the artifacts: unregistered [src:ID] citations, unevidenced verified claims, still-asserted claims and unrecorded deviations are refused.", {'kind': {'type': 'string', 'enum': ['paper', 'slides']}}, []),
+    schema("research_doc", "Write one research artifact: proposal.md, deviations.md, report.md, evidence-matrix.csv, claim-to-artifact.json, search-log.jsonl, slides/outline.md, or reading/<source-id>.md (the source must be registered). This is the only way to write under .eca/research; write/edit cannot touch .eca.", {'name': STR, 'content': STR, 'append': {'type': 'boolean'}}, ['name', 'content']),
     schema("delegate", "Delegate a bounded subtask to an independent child agent. It shares files, not conversation. No recursive delegation. Default plan is read-only.",
            {"task":STR,"mode":{"type":"string","enum":["plan","code"]}, 'verify_commands': {'type': 'array', 'items': STR}}, ["task"]),
     schema("delegate_parallel", "Run independent tasks concurrently in isolated source snapshots. No shell/MCP/LSP; merge selected files afterwards.",
@@ -574,6 +583,66 @@ class Tools:
             return json.dumps(output, ensure_ascii=False)
         return result
 
+    # Research mode tools. Every write goes through eca/research.py so the gates
+    # (unregistered citation, unevidenced claim, unrecorded deviation) apply to
+    # the files on disk rather than to what the model says about them.
+    def research_public(self):
+        from . import research
+        return research.public(self.state.get("research"), self.settings.root)
+
+    async def research_stage(self, stage, note=""):
+        from . import research
+        self.state["research"] = research.enter(self.settings.root, self.state.get("research"), stage, note)
+        value = self.research_public()
+        self.emit("research", value)
+        return json.dumps({"stage": value["stage"], "label": value["label"], "counts": value["counts"],
+                           "next": research.missing(self.settings.root, value["stage"])},
+                          ensure_ascii=False)
+
+    async def research_source(self, id, kind, url, title, verify=False, year="", authors="", note=""):
+        from . import research
+        checked = None
+        if verify:
+            checked = await research.verify(self, kind, url.split(f"{kind}:")[-1].strip()
+                                            if f"{kind}:" in url else url)
+        row = research.add_source(self.settings.root, {
+            "id": id, "kind": kind, "url": (checked or {}).get("url") or url,
+            "title": (checked or {}).get("title") or title,
+            "year": (checked or {}).get("year") or year,
+            "authors": (checked or {}).get("authors") or authors,
+            "verified": bool(checked), "note": note})
+        self.emit("research", self.research_public())
+        return json.dumps({"source": row, "note": "verified online" if checked else
+                           "registered without an online check: claims citing it cannot be marked verified"},
+                          ensure_ascii=False)
+
+    async def research_doc(self, name, content, append=False):
+        from . import research
+        row = research.write_doc(self.settings.root, name, content, append)
+        self.emit("research", self.research_public())
+        return json.dumps({"doc": row}, ensure_ascii=False)
+
+    async def research_claim(self, id, claim, status="asserted", sources=None, runs=None, note=""):
+        from . import research
+        row = research.add_claim(self.settings.root, {"id": id, "claim": claim, "status": status,
+                                                      "sources": sources or [], "runs": runs or [], "note": note})
+        self.emit("research", self.research_public())
+        return json.dumps({"claim": row, "note": "A verified claim is a record with evidence, not proof "
+                           "that the evidence supports it."}, ensure_ascii=False)
+
+    async def research_run(self, id, label, command, outcome, matches_paper, exit_code=None,
+                           metrics=None, claims=None, note=""):
+        from . import research
+        row = research.add_run(self.settings.root, {"id": id, "label": label, "command": command,
+                                                    "outcome": outcome, "matches_paper": matches_paper,
+                                                    "exit_code": exit_code, "metrics": metrics or {},
+                                                    "claims": claims or [], "note": note})
+        self.emit("research", self.research_public())
+        return json.dumps({"run": row}, ensure_ascii=False)
+
+    async def research_report(self, kind="paper"):
+        from . import research
+        return json.dumps(research.check_report(self.settings.root, kind), ensure_ascii=False)
     async def todo(self, items):
         tasks = workgraph.validate(items)
         self.state["tasks"] = tasks

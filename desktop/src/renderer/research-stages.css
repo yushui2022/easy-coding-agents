@@ -1,0 +1,35 @@
+/* Research stage strip: compact state, clay surfaces, no animation. */
+.eca-app .research-stages {margin:0 0 8px;padding:9px 11px;border-radius:12px;
+  background:var(--clay-raised);box-shadow:0 1px 2px var(--clay-shadow);border:1px solid var(--clay-line);}
+.eca-app .research-head {display:flex;align-items:center;gap:7px;font-size:11px;color:var(--muted);min-width:0;}
+.eca-app .research-head strong {color:var(--text);font-weight:600;font-size:11.5px;}
+.eca-app .research-mark {display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;
+  border-radius:6px;background:color-mix(in srgb,var(--clay-accent) 12%,transparent);color:var(--clay-accent);flex:none;}
+.eca-app .research-now {padding:1px 7px;border-radius:999px;font-size:10.5px;
+  color:var(--clay-accent);background:color-mix(in srgb,var(--clay-accent) 12%,transparent);}
+.eca-app .research-back {max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:10.5px;color:var(--secondary);}
+.eca-app .research-quiet {font-size:10.5px;color:var(--muted);}
+.eca-app .research-counts {margin-left:auto;display:flex;gap:9px;font-size:10.5px;color:var(--secondary);
+  font-variant-numeric:tabular-nums;}
+.eca-app .research-counts i {font-style:normal;color:var(--muted);}
+.eca-app .research-toggle {display:inline-flex;align-items:center;gap:3px;padding:2px 6px;margin-left:2px;
+  border-radius:7px;border:1px solid var(--clay-line);background:transparent;color:var(--muted);
+  font-size:10.5px;cursor:pointer;}
+.eca-app .research-toggle:hover {color:var(--text);background:var(--hover);}
+.eca-app .research-track {display:flex;align-items:center;gap:4px;margin:8px 0 0;padding:0;list-style:none;
+  flex-wrap:wrap;}
+.eca-app .research-step {flex:none;padding:2px 7px;border-radius:999px;font-size:10.5px;line-height:16px;
+  color:var(--muted);border:1px solid transparent;}
+.eca-app .research-step.is-done {color:var(--secondary);}
+.eca-app .research-step.is-done::before {content:'✓ ';font-size:10px;}
+.eca-app .research-step.is-current {color:var(--text);font-weight:600;
+  background:color-mix(in srgb,var(--clay-accent) 14%,transparent);
+  border-color:color-mix(in srgb,var(--clay-accent) 30%,transparent);}
+.eca-app .research-step.is-ahead {color:color-mix(in srgb,var(--muted) 70%,transparent);}
+.eca-app .research-artifacts {margin-top:8px;padding-top:7px;border-top:1px solid var(--clay-line);
+  font-size:10.5px;color:var(--muted);max-height:170px;overflow:auto;}
+.eca-app .research-artifacts p {margin:0;}
+.eca-app .research-artifacts ul {margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:3px;}
+.eca-app .research-artifacts li {display:flex;align-items:baseline;gap:8px;justify-content:space-between;}
+.eca-app .research-artifacts code {font-size:10.5px;color:var(--secondary);}

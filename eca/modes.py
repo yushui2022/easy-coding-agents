@@ -10,8 +10,11 @@ goal      full tool set plus an agreed objective: still a working mode, so verif
           repair and code children stay available exactly as in code mode.
 """
 
-MODES = ("code", "plan", "goal", "research", "chat")
-WORKING = frozenset({"code", "goal"})
+MODES = ("code", "plan", "goal", "research", "scholar", "chat")
+# scholar is a working mode: reproduction and experiments need to run commands,
+# and the research artifacts are files the user can read. The gates that keep it
+# honest live in eca/research.py, not in the tool list.
+WORKING = frozenset({"code", "goal", "scholar"})
 READING = frozenset({"plan", "research"})
 
 

@@ -268,11 +268,19 @@ If execution was interrupted, inspect the actual state before repeating mutation
                        "5. Close with the URLs you used, how recent they are, where sources conflict, and what you "
                        "could not verify.\n"
                        "This mode cannot modify files or run commands.\n")
+        if self.settings.mode == "scholar":
+            from . import research as research_workflow
+            prompt += research_workflow.prompt(self.state.get("research"), self.settings.root)
         if self.state["tasks"]:
             prompt += "\nCurrent task plan:\n" + json.dumps(self.state["tasks"], ensure_ascii=False)
             if any(task.get("blocked") for task in self.state["tasks"]):
                 prompt += ("\nA task marked blocked has an unfinished dependency: do that prerequisite first, "
                            "or repair it if it failed. Do not report a blocked task as completed.")
+            if self.settings.mode != "plan":
+                prompt += ("\nBefore your final answer, bring that list up to date with the todo tool: mark every step "
+                           "you actually finished as completed, keep nothing sitting in_progress once you stop working, "
+                           "and if a step stays pending, say in the final answer which one and why. A list left half "
+                           "checked after the work is done misreports the run.")
         from . import goal as goals
         prompt += goals.prompt(self.state.get("goal"))
         if self.settings.mode == "goal":

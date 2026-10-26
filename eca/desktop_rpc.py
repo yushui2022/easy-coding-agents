@@ -24,6 +24,18 @@ from .modes import MODES
 from . import reasoning
 from .activity import tool_target
 
+from . import research as research_workflow
+
+
+def agent_research(agent):
+    """Stage, counts and artifact names only; file contents stay on disk."""
+    if not agent:
+        return None
+    try:
+        return research_workflow.public(agent.state.get('research'), agent.settings.root)
+    except (OSError, ValueError):
+        return None
+
 PROTOCOL = 1
 MODEL_FIELDS = {'model', 'base_url', 'api_format', 'api_key', 'thinking_mode', 'reasoning_effort'}
 MAX_QUOTES = 3
@@ -286,6 +298,7 @@ class DesktopRPC:
             'queue': self.queue_view() if self.runtime else [],
             'side_busy': self.side_chats.busy,
             'goal': goals.public(agent.state.get('goal')) if agent else None,
+            'research': agent_research(agent),
             'pending': [entry for entry, future in self.pending.values() if not future.done()], 'seq': self.sequence}
         params = params or {}
         offset = params.get('stream_offset')

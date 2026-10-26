@@ -34,3 +34,7 @@
 .eca-app .plan-badge {flex:none;margin-left:auto;font-size:10.5px;line-height:16px;padding:0 6px;border-radius:999px;
   color:var(--muted);background:var(--hover);border:1px solid var(--border);}
 .eca-app .plan-badge.is-failed {color:var(--danger,#b4462f);}
+/* The turn is over: unfinished steps stop looking "in flight" but stay visible. */
+.eca-app .plan-count.is-unfinished {color:var(--secondary);
+  border-color:color-mix(in srgb,var(--secondary) 26%,var(--border));}
+.eca-app .plan-item.is-stale.is-in_progress,.eca-app .plan-item.is-stale.is-pending {color:var(--muted);}

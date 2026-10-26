@@ -193,14 +193,18 @@ class DesktopGoalRPCTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_modes_helper_treats_goal_as_a_working_mode(self):
         from eca.modes import MODES, reading, working
-        self.assertEqual(MODES, ('code', 'plan', 'goal', 'research', 'chat'))
+        self.assertEqual(MODES, ('code', 'plan', 'goal', 'research', 'scholar', 'chat'))
         self.assertTrue(working('goal'))
         self.assertTrue(working('code'))
         self.assertFalse(working('plan'))
         self.assertFalse(working('chat'))
         # Research reads the project and the web but never writes.
         self.assertFalse(working('research'))
-        self.assertTrue(reading('research'))
+        self.assertTrue(reading('plan'))
+        # Scholar runs the research workflow: it writes artifacts and runs experiments,
+        # so it is a working mode, not a read-only one.
+        self.assertTrue(working('scholar'))
+        self.assertFalse(reading('scholar'))
         self.assertTrue(reading('plan'))
         self.assertFalse(reading('code'))
 

@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {CalendarCheck, CaretDown, ClockCounterClockwise, Desktop, FolderOpen, GearSix, MagnifyingGlass, Plus, Sparkle, X, Sun, Moon} from '@phosphor-icons/react';
 import './sidebar.css';
 
@@ -35,6 +35,32 @@ export function Sidebar({state,config,blocked,onPick,onRecent,onSession,onClose,
     setThemeSource(String(applied||next));
   };
   const toggle=(id:string)=>setCollapsed(old=>{const next=old.includes(id)?old.filter(x=>x!==id):[...old,id];sessionStorage.setItem('eca.projects.collapsed',JSON.stringify(next));return next;});
+  // Running → finished. Without this a session that just completed looks exactly
+  // like one that never ran; the green dot clears as soon as it is opened.
+  const previous = useRef<Record<string,boolean>>({});
+  const finished = useRef<Map<string,'done'|'failed'>>(new Map());
+  const [, redraw] = useState(0);
+  const openSession = (id?:string, projectId?:string) => {
+    if (id) finished.current.delete(id);
+    onSession(id, projectId);
+  };
+  useEffect(()=>{
+    const sessions = (state.projects||[]).flatMap(project=>project.sessions);
+    if (!sessions.length) sessions.push(...state.sessions);
+    let changed = false;
+    for (const session of sessions) {
+      const running = !!(session.busy||session.side_busy);
+      const was = previous.current[session.id];
+      if (was && !running) {
+        // A run that ended in error/interrupt/timeout is not "finished".
+        finished.current.set(session.id, ['error','interrupted','limit'].includes(String(session.status||''))?'failed':'done');
+        changed = true;
+      }
+      if (running) finished.current.delete(session.id);
+      previous.current[session.id] = running;
+    }
+    if (changed) redraw(n=>n+1);
+  }, [state.projects, state.sessions]);
   const projects=state.projects||[];
   const recent=config.recent.filter(path=>!projects.some(p=>samePath(p.path,path)));
   const query=search.trim().toLowerCase(),connections=config.connections?.length||0;
@@ -59,7 +85,7 @@ export function Sidebar({state,config,blocked,onPick,onRecent,onSession,onClose,
               <div className="project-actions"><button aria-label={'在 '+title+' 新建会话'} title="新建会话" disabled={blocked} onClick={()=>{setCollapsed(old=>old.filter(x=>x!==project.id));onSession(undefined,project.id);}}><Plus size={14}/></button><button aria-label={'关闭项目 '+title} title={project.running_count?'请先停止此项目的任务':'关闭项目，保留历史记录'} disabled={blocked||project.running_count>0} onClick={()=>onClose(project.id)}><X size={12}/></button></div>
             </div>
             {expanded&&<div className="session-list project-session-list">
-              {project.sessions.map(session=><button key={session.id} data-session-id={session.id} title={name(session)} className={selected&&session.id===state.session_id?'selected':''} aria-current={selected&&session.id===state.session_id?'page':undefined} disabled={blocked} onClick={()=>onSession(session.id,project.id)}><span>{name(session)}</span>{(session.busy||session.side_busy)&&<small className={'session-state'+(session.pending_count?' waiting':'')} aria-label={session.pending_count?'等待确认':'正在执行'}><i/>{session.pending_count?'待确认':session.busy?'运行中':'侧聊中'}</small>}</button>)}
+              {project.sessions.map(session=>{const running=!!(session.busy||session.side_busy),outcome=running?undefined:finished.current.get(session.id);return <button key={session.id} data-session-id={session.id} title={name(session)} className={selected&&session.id===state.session_id?'selected':''} aria-current={selected&&session.id===state.session_id?'page':undefined} disabled={blocked} onClick={()=>openSession(session.id,project.id)}><span>{name(session)}</span>{running?<small className={'session-state'+(session.pending_count?' waiting':'')} aria-label={session.pending_count?'等待确认':'正在执行'}><i/>{session.pending_count?'待确认':session.busy?'运行中':'侧聊中'}</small>:outcome?<small className={'session-state '+outcome} title={outcome==='done'?'本轮已完成':'本轮出错或已中断'} aria-label={outcome==='done'?'本轮已完成':'本轮出错或已中断'}><i/></small>:null}</button>;})}
               {!project.sessions.length&&<button className="new-project-session" disabled={blocked} onClick={()=>onSession(undefined,project.id)}>开始一个新会话</button>}
             </div>}
           </section>;

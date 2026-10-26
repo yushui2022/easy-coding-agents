@@ -62,6 +62,12 @@
 .eca-app .clay-sidebar .session-state {margin-left:auto;flex-shrink:0;display:flex;align-items:center;gap:4px;font-size:9px;font-weight:400;color:var(--clay-accent);}
 .eca-app .clay-sidebar .session-state i,.eca-app .clay-sidebar .session-concurrency i {width:4px;height:4px;border-radius:50%;background:currentColor;flex-shrink:0;}
 .eca-app .clay-sidebar .session-state.waiting {padding:3px 5px;border-radius:5px;background:var(--clay-raised);box-shadow:0 1px 3px var(--clay-shadow);}
+/* A finished run used to look identical to a session that never started, so a
+   green dot marks "this session has a new answer you have not opened yet". */
+.eca-app .clay-sidebar .session-state.done {color:var(--success);}
+.eca-app .clay-sidebar .session-state.failed {color:var(--danger);}
+.eca-app .clay-sidebar .session-state.failed i {width:6px;height:6px;box-shadow:0 0 0 3px color-mix(in srgb,var(--danger) 14%,transparent);}
+.eca-app .clay-sidebar .session-state.done i {width:6px;height:6px;box-shadow:0 0 0 3px color-mix(in srgb,var(--success) 16%,transparent);}
 .eca-app .clay-sidebar .session-concurrency {display:flex;align-items:center;gap:5px;margin:0 9px 9px;font-size:9px;line-height:1.5;color:var(--clay-accent);}
 .eca-app .clay-sidebar .session-concurrency span {margin-left:auto;color:var(--clay-muted);}
 .eca-app .clay-sidebar .nav-empty {font-size:10px;line-height:1.9;margin:8px 9px;color:var(--clay-muted);}
