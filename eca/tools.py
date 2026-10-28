@@ -31,6 +31,8 @@ INT = {"type": "integer"}
 # Kept as a literal so the schema does not import the research module at startup.
 STAGE_NAMES = ("proposal", "search", "reading", "reproduction", "experiment", "writing", "presentation")
 
+# Business workflow stages, also a literal so the schema avoids an import.
+BIZ_STAGE_NAMES = ("brief", "market", "competition", "economics", "diligence", "verdict")
 SCHEMAS = [
     schema('lsp_rename', 'Preview cross-file semantic rename; no file writes. Line 1-based, character UTF-16 0-based.', {'server': STR, 'path': STR, 'new_name': STR, 'line': INT, 'character': INT}, ['server', 'path', 'new_name']),
     schema('lsp_apply', 'Apply a saved rename preview after conflict checks and normal edit approval, then request diagnostics.', {'preview_id': STR}, ['preview_id']),
@@ -67,6 +69,11 @@ SCHEMAS = [
     schema("research_claim", "Record one claim in the claim ledger. 'verified' needs a registered source id or a run id; an unregistered source id is refused.", {'id': STR, 'claim': STR, 'status': {'type': 'string', 'enum': ['asserted', 'verified', 'contradicted', 'unverified']}, 'sources': {'type': 'array', 'items': STR}, 'runs': {'type': 'array', 'items': STR}, 'note': STR}, ['id', 'claim']),
     schema("research_run", "Record one experiment or reproduction run as runs/<id>.json: command, exit code, metrics and whether the numbers matched the paper. A mismatch requires a note and a deviations.md entry later.", {'id': STR, 'label': STR, 'command': STR, 'outcome': {'type': 'string', 'enum': ['reproduced', 'partial', 'incomparable', 'uncertain']}, 'matches_paper': {'type': 'boolean'}, 'exit_code': INT, 'metrics': {'type': 'object'}, 'claims': {'type': 'array', 'items': STR}, 'note': STR}, ['id', 'label', 'command', 'outcome', 'matches_paper']),
     schema("research_report", "Validate report.md (or slides/outline.md) against the artifacts: unregistered [src:ID] citations, unevidenced verified claims, still-asserted claims and unrecorded deviations are refused.", {'kind': {'type': 'string', 'enum': ['paper', 'slides']}}, []),
+    schema("business_stage", "Six-stage business feasibility workflow (brief, market, competition, economics, diligence, verdict). Moving forward needs the previous stage's artifacts on disk; moving back needs a note explaining why.", {'stage': {'type': 'string', 'enum': list(BIZ_STAGE_NAMES)}, 'note': STR}, ['stage']),
+    schema("business_source", "Register one public source under .eca/business/sources.jsonl: a competitor page, a pricing page, a community thread or a market figure. A claim cannot cite an unregistered id.", {'id': STR, 'kind': {'type': 'string', 'enum': ['competitor', 'community', 'search', 'pricing', 'official', 'report', 'other']}, 'url': STR, 'title': STR, 'published': STR, 'note': STR}, ['id', 'kind', 'url', 'title']),
+    schema("business_claim", "Record one claim in .eca/business/claims.jsonl. 'verified' needs at least one registered source id; counter-evidence belongs in the ledger too.", {'id': STR, 'claim': STR, 'status': {'type': 'string', 'enum': ['asserted', 'verified', 'contradicted', 'unverified']}, 'sources': {'type': 'array', 'items': STR}, 'note': STR}, ['id', 'claim']),
+    schema("business_doc", "Write one business artifact: brief.md, competitors.md, unit.md, diligence.md or evidence.md. This is the only way to write under .eca/business; verdict.md is written by business_verdict.", {'name': STR, 'content': STR, 'append': {'type': 'boolean'}}, ['name', 'content']),
+    schema("business_verdict", "Write the feasibility verdict (verdict.md + verdict.json). Refused while a claim is still 'asserted', unit.md or diligence.md is missing, or fewer than 3 sources/claims are registered. Answer the four questions: why buy once, why return, why stay when copied, what each delivery earns.", {'verdict': {'type': 'string', 'enum': ['validate', 'build_small', 'narrow', 'pause', 'misfit', 'stop']}, 'confidence': {'type': 'string', 'enum': ['low', 'medium', 'high']}, 'summary': STR, 'why_buy': STR, 'why_return': STR, 'why_stay': STR, 'margin': STR, 'falsifier': STR, 'risks': {'type': 'array', 'items': STR}, 'next_steps': {'type': 'array', 'items': STR}}, ['verdict', 'confidence', 'summary', 'why_buy', 'why_return', 'why_stay', 'margin', 'falsifier', 'risks', 'next_steps']),
     schema("research_doc", "Write one research artifact: proposal.md, deviations.md, report.md, evidence-matrix.csv, claim-to-artifact.json, search-log.jsonl, slides/outline.md, or reading/<source-id>.md (the source must be registered). This is the only way to write under .eca/research; write/edit cannot touch .eca.", {'name': STR, 'content': STR, 'append': {'type': 'boolean'}}, ['name', 'content']),
     schema("delegate", "Delegate a bounded subtask to an independent child agent. It shares files, not conversation. No recursive delegation. Default plan is read-only.",
            {"task":STR,"mode":{"type":"string","enum":["plan","code"]}, 'verify_commands': {'type': 'array', 'items': STR}}, ["task"]),
@@ -90,9 +97,16 @@ READ_ONLY = {"skills", "lsp_rename", "web_fetch", "web_search", "read", "glob", 
              "repo_map", "code_relations", "todo", "ask", "delegate", "delegate_parallel", "lsp", "goal_update"}
 
 
+# The business workflow writes only its own artifacts, so its tools are the one
+# thing venture mode adds to the read-only set.
+VENTURE_TOOLS = {"business_stage", "business_source", "business_claim", "business_doc", "business_verdict"}
+
+
 def allowed(mode):
     # Modes restrict the tool set, never the approval requirements: the permission
     # layer still asks for every write, command and network call it normally would.
+    if mode == "venture":
+        return READ_ONLY | VENTURE_TOOLS
     return READ_ONLY if mode in {"plan", "research"} else (set() if mode == "chat" else {s["function"]["name"] for s in SCHEMAS})
 
 
@@ -229,7 +243,7 @@ class Tools:
         so the choice of mode covers network reads. Everything else, this mode
         cannot even attempt: its tool set stops at read-only.
         """
-        if self.settings.mode != 'research':
+        if self.settings.mode not in {'research', 'venture'}:
             return await self.approve(message, detail)
         if not self.web_auto_noted:
             self.web_auto_noted = True
@@ -652,6 +666,54 @@ class Tools:
     async def research_report(self, kind="paper"):
         from . import research
         return json.dumps(research.check_report(self.settings.root, kind), ensure_ascii=False)
+
+    # Business mode tools. Same discipline as the research ones: the gates live in
+    # eca/venture.py and read the artifacts, so they cannot be talked around.
+    def business_public(self):
+        from . import venture
+        return venture.public(self.state.get("business"), self.settings.root)
+
+    async def business_stage(self, stage, note=""):
+        from . import venture
+        self.state["business"] = venture.enter(self.settings.root, self.state.get("business"), stage, note)
+        value = self.business_public()
+        self.emit("business", value)
+        return json.dumps({"stage": value["stage"], "label": value["label"], "counts": value["counts"],
+                           "next": venture.missing(self.settings.root, value["stage"])}, ensure_ascii=False)
+
+    async def business_source(self, id, kind, url, title, published="", note=""):
+        from . import venture
+        row = venture.add_source(self.settings.root, {"id": id, "kind": kind, "url": url, "title": title,
+                                                     "published": published, "note": note})
+        self.emit("business", self.business_public())
+        return json.dumps({"source": row, "note": "Registered, not verified: the page is recorded, whether it "
+                           "supports the claim is still your judgement to defend."}, ensure_ascii=False)
+
+    async def business_claim(self, id, claim, status="asserted", sources=None, note=""):
+        from . import venture
+        row = venture.add_claim(self.settings.root, {"id": id, "claim": claim, "status": status,
+                                                    "sources": sources or [], "note": note})
+        self.emit("business", self.business_public())
+        return json.dumps({"claim": row, "note": "A verified claim is a record with a source, not proof that the "
+                           "source says what you think it says."}, ensure_ascii=False)
+
+    async def business_doc(self, name, content, append=False):
+        from . import venture
+        row = venture.write_doc(self.settings.root, name, content, append)
+        self.emit("business", self.business_public())
+        return json.dumps({"doc": row}, ensure_ascii=False)
+
+    async def business_verdict(self, verdict, confidence, summary, why_buy, why_return, why_stay, margin,
+                               falsifier, risks=None, next_steps=None):
+        from . import venture
+        value = venture.verdict(self.settings.root, {
+            "verdict": verdict, "confidence": confidence, "summary": summary, "why_buy": why_buy,
+            "why_return": why_return, "why_stay": why_stay, "margin": margin, "falsifier": falsifier,
+            "risks": risks or [], "next_steps": next_steps or []})
+        self.emit("business", self.business_public())
+        return json.dumps({"verdict": value, "file": ".eca/business/verdict.md",
+                           "note": "A verdict is a decision record, not a prediction: the falsifier says what "
+                                   "would change it."}, ensure_ascii=False)
     async def todo(self, items):
         tasks = workgraph.validate(items)
         self.state["tasks"] = tasks

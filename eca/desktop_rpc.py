@@ -36,6 +36,17 @@ def agent_research(agent):
     except (OSError, ValueError):
         return None
 
+
+def agent_business(agent):
+    """Stage, counts and artifact names only; file contents stay on disk."""
+    if not agent:
+        return None
+    try:
+        from . import venture
+        return venture.public(agent.state.get('business'), agent.settings.root)
+    except (OSError, ValueError):
+        return None
+
 PROTOCOL = 1
 MODEL_FIELDS = {'model', 'base_url', 'api_format', 'api_key', 'thinking_mode', 'reasoning_effort'}
 MAX_QUOTES = 3
@@ -299,6 +310,7 @@ class DesktopRPC:
             'side_busy': self.side_chats.busy,
             'goal': goals.public(agent.state.get('goal')) if agent else None,
             'research': agent_research(agent),
+            'business': agent_business(agent),
             'pending': [entry for entry, future in self.pending.values() if not future.done()], 'seq': self.sequence}
         params = params or {}
         offset = params.get('stream_offset')

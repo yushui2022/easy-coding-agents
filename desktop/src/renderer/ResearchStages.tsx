@@ -1,5 +1,5 @@
 import React,{useState} from 'react';
-import {CaretDown, FileText, Flask} from '@phosphor-icons/react';
+import {CaretDown, ChartLineUp, FileText, Flask} from '@phosphor-icons/react';
 import './research-stages.css';
 
 type Stage={id:string;label:string};
@@ -10,47 +10,87 @@ export type Research={
           runs:number;reading:number;report:boolean;deviations:boolean};
   history:{from:string|null;to:string|null;at:string;note:string}[];
 };
+export type Business={
+  stage:string;label:string;stages:Stage[];artifacts:Artifact[];
+  counts:{sources:number;claims:number;verified_claims:number;contradicted_claims:number;
+          unit:boolean;verdict:boolean};
+  history:{from:string|null;to:string|null;at:string;note:string}[];
+  verdict?:{key:string|null;label:string|null;confidence:string|null}|null;
+};
 
-const size=(bytes:number)=>bytes<1024?`${bytes} B`:bytes<1024*1024?`${(bytes/1024).toFixed(1)} KB`:`${(bytes/1048576).toFixed(1)} MB`;
+const size=(bytes:number)=>bytes<1024?`${bytes} B`:`${(bytes/1024).toFixed(1)} KB`;
+
+type Metric={label:string;value:string|number;detail?:string;title?:string};
 
 // The stage strip is state, not decoration: it shows where the workflow actually
 // is and how much evidence is on disk. It never offers to tick a stage forward —
-// that is the model's call through research_stage, and the gates are on disk.
-export function ResearchStages({research,busy}:{research?:Research|null;busy?:boolean}) {
+// that is the model's call through the workflow tools, and the gates are on disk.
+function StageStrip({workflow,title,folder,mark,busy,metrics,empty,hint}:{
+  workflow:{stage:string;label:string;stages:Stage[];artifacts:Artifact[];
+            history:{from:string|null;to:string|null;at:string;note:string}[]};
+  title:string;folder:string;mark:React.ReactNode;busy?:boolean;metrics:Metric[];empty:string;hint:string;
+}) {
   const [open,setOpen]=useState(false);
-  if(!research||!research.stages?.length)return null;
-  const index=research.stages.findIndex(item=>item.id===research.stage);
-  const counts=research.counts;
-  const last=research.history?.[research.history.length-1];
-  const back=last&&last.to===research.stage&&last.from&&research.stages.findIndex(item=>item.id===last.from)>index;
-  return <section className="research-stages" aria-label="科研阶段">
+  if(!workflow||!workflow.stages?.length)return null;
+  const index=workflow.stages.findIndex(item=>item.id===workflow.stage);
+  const last=workflow.history?.[workflow.history.length-1];
+  const back=last&&last.to===workflow.stage&&last.from&&workflow.stages.findIndex(item=>item.id===last.from)>index;
+  return <section className="research-stages" aria-label={`${title}阶段`}>
     <div className="research-head">
-      <span className="research-mark"><Flask size={14} weight="bold"/></span>
-      <strong>科研</strong>
-      <span className="research-now">{research.label}</span>
+      <span className="research-mark">{mark}</span>
+      <strong>{title}</strong>
+      <span className="research-now">{workflow.label}</span>
       {back&&<span className="research-back" title={last?.note||''}>回退{last?.note?`：${last.note}`:''}</span>}
       {!busy&&<span className="research-quiet">未在运行</span>}
-      <span className="research-counts" title="已登记来源 / 其中在线核验过 · 断言 / 其中已验证 · 运行次数">
-        <span>源 {counts.sources}<i>/{counts.verified_sources}核</i></span>
-        <span>断言 {counts.claims}<i>/{counts.verified_claims}核</i></span>
-        <span>运行 {counts.runs}</span>
+      <span className="research-counts" title={hint}>
+        {metrics.map(item=><span key={item.label} title={item.title}>
+          {item.label} {item.value}{item.detail&&<i>{item.detail}</i>}
+        </span>)}
       </span>
       <button type="button" className="research-toggle" aria-expanded={open}
-        onClick={()=>setOpen(value=>!value)} title={open?'收起制品':'查看 .eca/research 制品'}>
-        <FileText size={13}/><span>{research.artifacts.length}</span><CaretDown size={11}/>
+        onClick={()=>setOpen(value=>!value)} title={open?'收起制品':`查看 ${folder} 制品`}>
+        <FileText size={13}/><span>{workflow.artifacts.length}</span><CaretDown size={11}/>
       </button>
     </div>
     <ol className="research-track">
-      {research.stages.map((item,position)=><li key={item.id}
+      {workflow.stages.map((item,position)=><li key={item.id}
         className={'research-step'+(position===index?' is-current':position<index?' is-done':' is-ahead')}
         aria-current={position===index?'step':undefined}>
         <span>{item.label}</span>
       </li>)}
     </ol>
     {open&&<div className="research-artifacts">
-      {!research.artifacts.length&&<p>还没有制品。模型会先写 proposal.md，再登记来源。</p>}
-      {!!research.artifacts.length&&<ul>{research.artifacts.map(item=><li key={item.name}>
-        <code>.eca/research/{item.name}</code><small>{size(item.bytes)}</small></li>)}</ul>}
+      {!workflow.artifacts.length&&<p>{empty}</p>}
+      {!!workflow.artifacts.length&&<ul>{workflow.artifacts.map(item=><li key={item.name}>
+        <code>{folder}/{item.name}</code><small>{size(item.bytes)}</small></li>)}</ul>}
     </div>}
   </section>;
+}
+
+export function ResearchStages({research,busy}:{research?:Research|null;busy?:boolean}) {
+  if(!research?.stages?.length)return null;
+  const c=research.counts;
+  return <StageStrip workflow={research} title="科研" folder=".eca/research" busy={busy}
+    mark={<Flask size={14} weight="bold"/>}
+    hint="已登记来源 / 其中在线核验过 · 断言 / 其中已验证 · 运行次数"
+    metrics={[{label:'源',value:c.sources,detail:`/${c.verified_sources}核`},
+              {label:'断言',value:c.claims,detail:`/${c.verified_claims}核`},
+              {label:'运行',value:c.runs}]}
+    empty="还没有制品。模型会先写 proposal.md，再登记来源。"/>;
+}
+
+// Business mode reads markets, not code: the strip shows sources, claims and the
+// verdict the gates allowed, and nothing here can be ticked by hand either.
+export function VentureStages({business,busy}:{business?:Business|null;busy?:boolean}) {
+  if(!business?.stages?.length)return null;
+  const c=business.counts;
+  const verdict=business.verdict?.label;
+  return <StageStrip workflow={business} title="商业" folder=".eca/business" busy={busy}
+    mark={<ChartLineUp size={14} weight="bold"/>}
+    hint="已登记来源 · 断言 / 其中已验证 · 结论是否已落盘"
+    metrics={[{label:'源',value:c.sources},
+              {label:'断言',value:c.claims,detail:`/${c.verified_claims}核`},
+              ...(c.contradicted_claims?[{label:'反证',value:c.contradicted_claims}]:[]),
+              {label:'结论',value:verdict||'未出'}]}
+    empty="还没有制品。模型会先写 brief.md，再登记公开来源。"/>;
 }

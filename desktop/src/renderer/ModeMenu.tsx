@@ -1,23 +1,24 @@
 ﻿import React,{useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
-import {CaretDown, ChatCircleDots, Check, Code, Flask, Globe, ListChecks, Target} from '@phosphor-icons/react';
+import {CaretDown, ChartLineUp, ChatCircleDots, Check, Code, Flask, Globe, ListChecks, Target} from '@phosphor-icons/react';
 import './permission-menu.css';
 import './mode-menu.css';
 
 // A workflow choice, not a permission: the approval chip still decides what may run.
-export const modeLabels:Record<string,string>={code:'编码',plan:'计划',goal:'目标',research:'网络调研',scholar:'科研',chat:'对话'};
+export const modeLabels:Record<string,string>={code:'编码',plan:'计划',goal:'目标',research:'网络调研',scholar:'科研',venture:'商业',chat:'对话'};
 const descriptions:Record<string,string>={
   code:'可以修改文件、运行命令和测试',
   plan:'只读调研，先给计划，不改任何文件',
   goal:'先定目标与验收标准，再推进到达标',
   research:'联网检索并读多个来源，只读，不改文件',
   scholar:'七阶段科研流程，证据与断言落盘到 .eca/research',
+  venture:'大规模查竞品与市场资料，判断这个项目值不值得做（只读，结论落盘）',
   chat:'不使用工具，只按上下文回答',
 };
 const titleFor=(busy?:boolean)=>busy?'任务运行中不能切换工作模式':'工作模式';
-const order=['code','plan','goal','research','scholar','chat'];
+const order=['code','plan','goal','research','scholar','venture','chat'];
 const marks:Record<string,React.ReactNode>={
-  code:<Code size={15}/>,plan:<ListChecks size={15}/>,goal:<Target size={15}/>,research:<Globe size={15}/>,scholar:<Flask size={15}/>,chat:<ChatCircleDots size={15}/>,
+  code:<Code size={15}/>,plan:<ListChecks size={15}/>,goal:<Target size={15}/>,research:<Globe size={15}/>,scholar:<Flask size={15}/>,venture:<ChartLineUp size={15}/>,chat:<ChatCircleDots size={15}/>,
 };
 
 export function ModeControl({mode,busy,onChange}:{mode:string;busy?:boolean;onChange:(mode:string)=>void}) {
