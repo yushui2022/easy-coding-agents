@@ -28,7 +28,7 @@ class Settings:
     context_reserve_tokens: int = 1024
     command_timeout: int = 120
     request_timeout: int = 120
-    output_limit: int = 24_000
+    output_limit: int = 48_000
     stream_usage: bool = True
     subagent_max_turns: int = 6
     subagent_max_calls: int = 3

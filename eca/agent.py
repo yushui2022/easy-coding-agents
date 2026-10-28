@@ -438,6 +438,7 @@ If execution was interrupted, inspect the actual state before repeating mutation
         previous_results = {}
         repeat_hint = ""
         output_recoveries = 0
+        recovery_target = None
         context_recoveries = 0
         self.goal_continuations = 0
         try:
@@ -476,19 +477,48 @@ If execution was interrupted, inspect the actual state before repeating mutation
                     if self.state.get('context_start', 0) <= previous:
                         raise ContextLimitError()
                     continue
-                except OutputLimitError:
+                except OutputLimitError as error:
                     output_recoveries += 1
                     if self.settings.output_recovery_limit and output_recoveries > self.settings.output_recovery_limit:
                         raise
-                    hint = ('[Runtime recovery] Previous response hit the output token limit and was discarded. '
-                            'No tools from that response executed. Previously completed tools remain applied. '
-                            'Do not replay them. Split remaining edits into smaller files or exact edits, '
-                            'use fewer tool calls per response, and keep prose short.')
+                    partial = getattr(error, 'partial', '') or ''
+                    pending_tools = bool(getattr(error, 'pending_tools', False))
+                    if partial.strip():
+                        # The user already watched this text stream in. Dropping it loses work,
+                        # so keep it as the assistant turn and continue from the cut-off point.
+                        self.state['messages'].append({'role': 'assistant', 'content': partial})
+                        recovery_target = len(self.state['messages']) - 1
+                        hint = ('[Runtime recovery] The previous response was cut off at the output token limit. '
+                                + ('The tool call it was writing was incomplete and did not run; its text is kept above. '
+                                   'Issue that same operation again in smaller pieces (one file or one exact edit per response). '
+                                   if pending_tools else
+                                   'Its text is kept above and the user can already see it. ')
+                                + 'Continue from the exact point where it stopped. Do not repeat, restart or '
+                                  're-summarise what is already above, and do not replay tools that already ran.')
+                    else:
+                        hint = ('[Runtime recovery] Previous response hit the output token limit and produced no usable '
+                                'text. No tools from that response executed. Previously completed tools remain applied. '
+                                'Do not replay them. Split remaining edits into smaller files or exact edits, '
+                                'use fewer tool calls per response, and keep prose short.')
                     self.state['messages'].append({'role': 'user', 'content': hint})
                     self.store.save(self.state)
-                    self.emit('notice', f'Output limit recovery {output_recoveries}/{self.settings.output_recovery_limit or "unlimited"}. Requesting smaller steps; completed edits are preserved. You can interrupt.')
+                    self.emit('notice', f'Output limit reached; streamed text kept and resuming (recovery '
+                                        f'{output_recoveries}/{self.settings.output_recovery_limit or "unlimited"}). You can interrupt.')
                     continue
-                self.state["messages"].append(message)
+                merged = False
+                if recovery_target is not None and not message.get('tool_calls') and 0 <= recovery_target < len(self.state['messages']):
+                    target = self.state['messages'][recovery_target]
+                    tail = self.state['messages'][recovery_target + 1:]
+                    if (target.get('role') == 'assistant' and isinstance(target.get('content'), str) and
+                            all(m.get('role') == 'user' and str(m.get('content', '')).startswith('[Runtime recovery]') for m in tail)):
+                        # Second half of the same answer: extend one bubble, drop the recovery notes.
+                        del self.state['messages'][recovery_target + 1:]
+                        target['content'] += message.get('content') or ''
+                        message = target
+                        merged = True
+                if not merged:
+                    self.state['messages'].append(message)
+                recovery_target = None
                 self.state["usage"] = usage or self.state.get("usage", {})
                 self.store.save(self.state)
                 calls = message.get("tool_calls", [])

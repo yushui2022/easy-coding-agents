@@ -3,6 +3,14 @@ import {Plus,FileText,X} from '@phosphor-icons/react';
 import './attachments.css';
 type Attachment={name:string;mime:string;size:number;data:string};
 const imageTypes:Record<string,string>={png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp'};
+// Documents become text on the backend, so they are quoted and searchable instead
+// of being a picture the model has to guess at.
+const docTypes:Record<string,string>={
+  pdf:'application/pdf',
+  docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+};
 const textTypes=new Set('txt md mdx csv tsv json jsonl yaml yml toml xml html css scss js jsx ts tsx py rs go java c h cpp hpp cs sql sh ps1 bat ini cfg log gitignore dockerfile'.split(' '));
 const db=new Promise<IDBDatabase>((resolve,reject)=>{
   const req=indexedDB.open('eca-attachment-drafts',1);
@@ -33,9 +41,10 @@ export function useAttachments(scope:string,disabled=false){
       const batch:Attachment[]=[];
       for(const file of files){
         const ext=file.name.split('.').pop()!.toLowerCase();
-        const mime=imageTypes[ext]||(file.type.startsWith('image/')?file.type:'text/plain');
-        if(!Object.values(imageTypes).includes(mime)&&!(textTypes.has(ext)||file.type.startsWith('text/')))throw Error(`${file.name}：暂不支持此格式，请使用图片、代码或文本文件。`);
-        if(file.size>(mime==='text/plain'?256*1024:4*1024*1024))throw Error(`${file.name} 太大：图片最大 4 MB，文本最大 256 KB。`);
+        const mime=imageTypes[ext]||docTypes[ext]||(file.type.startsWith('image/')?file.type:'text/plain');
+        if(!Object.values(imageTypes).includes(mime)&&!docTypes[ext]&&!(textTypes.has(ext)||file.type.startsWith('text/')))throw Error(`${file.name}：暂不支持此格式，请使用图片、PDF、Word、Excel、PowerPoint、代码或文本文件。`);
+        const limit=mime==='text/plain'?256*1024:docTypes[ext]?8*1024*1024:4*1024*1024;
+        if(file.size>limit)throw Error(`${file.name} 太大：图片最大 4 MB，文档最大 8 MB，文本最大 256 KB。`);
         const bytes=await file.arrayBuffer();
         if(mime==='text/plain'){const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes);if(text.includes('\0'))throw Error(`${file.name} 不是文本文件。`);}
         const data=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=()=>reject(Error('无法读取附件'));reader.readAsDataURL(file);});
@@ -54,9 +63,10 @@ export function useAttachments(scope:string,disabled=false){
       onDrop:(e:React.DragEvent)=>{if(e.dataTransfer.files.length){e.preventDefault();void add(Array.from(e.dataTransfer.files));}},
       onPaste:(e:React.ClipboardEvent)=>{if(e.clipboardData.files.length){e.preventDefault();void add(Array.from(e.clipboardData.files));}}
     },
-    button:<><input hidden ref={input} type="file" multiple aria-label="选择附件" onChange={e=>{void add(Array.from(e.target.files||[]));e.target.value='';}}/><button className="attach-button" aria-label="添加文件或图片" title="添加文件或图片，也可以拖入或粘贴截图" disabled={busy} onClick={()=>input.current?.click()}><Plus size={18}/></button></>,
+    button:<><input hidden ref={input} type="file" multiple accept="image/png,image/jpeg,image/webp,application/pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.json,.ts,.tsx,.js,.jsx,.py,.go,.rs,.java,.c,.h,.cpp,.css,.html,.sql,.sh,.ps1,.yml,.yaml,.toml" aria-label="选择附件" onChange={e=>{void add(Array.from(e.target.files||[]));e.target.value='';}}/><button className="attach-button" aria-label="添加文件或图片" title="添加文件或图片，也可以拖入或粘贴截图" disabled={busy} onClick={()=>input.current?.click()}><Plus size={18}/></button></>,
     preview:<>{!!items.length&&<div className="attachment-tray">{items.map((a,i)=><div className="attachment-chip" key={i}>{a.mime.startsWith('image/')?<img src={`data:${a.mime};base64,${a.data}`} alt={a.name}/>:<FileText size={22}/>}<span title={a.name}>{a.name}<small>{Math.max(1,Math.ceil(a.size/1024))} KB</small></span><button disabled={busy} aria-label={'移除 '+a.name} onClick={()=>void save(items.filter((_,j)=>i!==j)).catch(e=>setError(String(e)))}><X size={13}/></button></div>)}</div>}
       {items.some(a=>a.mime.startsWith('image/'))&&<small className="attachment-hint">图片将发送给当前模型，请选择支持看图的模型。</small>}
+      {items.some(a=>docTypes[a.name.split('.').pop()!.toLowerCase()])&&<small className="attachment-hint">PDF / Office 会在这里抽出文字再发给模型，扫描件没有文字层，需要改用图片。</small>}
       {reading&&<small className="attachment-hint" role="status">正在读取附件…</small>}
       {error&&<p className="attachment-error" role="alert">{error}</p>}</>
   };

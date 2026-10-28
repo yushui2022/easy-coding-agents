@@ -34,12 +34,15 @@ async def complete(client, settings, messages, tools, emit, usage_callback):
     stream = await client.responses.create(**kwargs)
     response = None
     names = {}
+    streamed, saw_call = [], False
     try:
         async for event in stream:
             if event.type == 'response.output_text.delta':
+                streamed.append(event.delta)
                 emit('text', event.delta)
             elif event.type == 'response.output_item.added':
                 if event.item.type == 'function_call':
+                    saw_call = True
                     names[event.output_index] = event.item.name
                     emit('model_delta', {'tool': event.item.name, 'phase': 'tool_arguments'})
                 elif event.item.type == 'reasoning':
@@ -58,7 +61,7 @@ async def complete(client, settings, messages, tools, emit, usage_callback):
         await stream.close()
     if (response is not None and response.status == 'incomplete' and
             getattr(getattr(response, 'incomplete_details', None), 'reason', None) == 'max_output_tokens'):
-        raise OutputLimitError()
+        raise OutputLimitError(''.join(streamed), saw_call)
     if response is None or response.status != 'completed':
         raise RuntimeError('Incomplete Responses result; no tools executed')
     calls, text, items, ids = [], [], [], set()

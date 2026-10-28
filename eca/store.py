@@ -5,6 +5,7 @@ from pathlib import Path
 import sqlite3
 import time
 import uuid
+from . import fsguard
 
 INTERRUPTED_UNKNOWN = ("Interrupted: outcome unknown. Inspect current files/processes before retrying. "
                        "Do not assume this action failed or succeeded.")
@@ -69,11 +70,21 @@ class Store:
         directory = self.root / ".eca"
         if directory.is_symlink() or directory.resolve() != directory:
             raise ValueError(".eca must not be a symbolic link")
-        directory.mkdir(exist_ok=True)
-        self.lock = _acquire(directory, shared)
-        self.db = sqlite3.connect(directory / "sessions.sqlite3")
-        self.db.execute("PRAGMA journal_mode=WAL")
-        self.db.execute("PRAGMA synchronous=FULL")
+        self.lock = None
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+            self.lock = _acquire(directory, shared)
+            self.db = sqlite3.connect(directory / "sessions.sqlite3")
+            self.db.execute("PRAGMA journal_mode=WAL")
+            self.db.execute("PRAGMA synchronous=FULL")
+        except (OSError, sqlite3.Error) as exc:
+            # Opening a project is where a full or read-only disk shows up first; say
+            # that, instead of a path with an errno attached. Release the lock we may
+            # already hold, or the next attempt reports "another ECA is using it".
+            if self.lock is not None:
+                _release(self.lock)
+                self.lock = None
+            raise ValueError(fsguard.describe(exc, '打开项目会话库', directory)) from None
         self.db.executescript("""
             CREATE TABLE IF NOT EXISTS sessions (
                 id TEXT PRIMARY KEY, title TEXT, updated REAL, state TEXT NOT NULL);

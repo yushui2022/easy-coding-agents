@@ -213,7 +213,7 @@ class Provider:
         finally:
             await stream.close()
         if finish == 'length':
-            raise OutputLimitError()
+            raise OutputLimitError(content, bool(calls))
         if finish not in {"stop", "tool_calls"}:
             raise RuntimeError(f"Incomplete model response ({finish or 'disconnected'}); no tools were executed.")
         if not content and not calls:

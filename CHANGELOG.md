@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.17.0 — 附件能读 PDF 和 Office，长回答不再被截断丢弃
+
+**文档附件**（`eca/documents.py`）。以前只能贴图片、UTF-8 文本和代码：论文、需求文档、财报要么拖不进去，要么只能当图片发给模型——图片里的字既不能引用也不能事后核对。现在 PDF / Word / Excel / PowerPoint 在附件边界就被抽成**文本**，带页码 / 工作表 / 幻灯片标记进对话，可引用、可 diff、可搜索。PDF 走 `pypdf`（唯一的解析依赖，纯 Python）；docx/xlsx/pptx 用标准库直接解 zip + XML，不引入三个重依赖。上限：单文档 8 MB、抽取文本 12 万字符（截断会写明"已截断"），扫描件没有文本层会明确提示"请改用图片并选择支持看图的模型"。文件名后缀和真实字节都要对得上：改名成 `.pdf` 的 docx 会被拒，损坏的 zip 会被点名。
+
+**磁盘与权限错误说人话**（`eca/fsguard.py`）。以前往满盘的磁盘写文件，模型和用户看到的是 `[Errno 28] No space left on device: '...'`。现在按 errno 分类给出「磁盘空间不足 / 没有权限 / 所在磁盘是只读的 / 路径不存在 / 文件被占用」，带上路径和下一步动作，并明确"这不是模型或任务的问题"。覆盖四处最常撞墙的写入：工具写文件（`atomic_write`）、附件快照、科研制品、打开项目会话库（顺带修了一个真 bug：`.eca` 目录建失败时把项目锁一起漏掉了，下一次打开会误报"另一个 ECA 正在使用"）。
+
+验证：`tests/test_documents.py` 13 项（PDF 页码标记、扫描件提示、docx/xlsx/pptx 抽取、改名文件被拒、损坏 zip 被点名、超大拒绝、截断标记、附件边界只产生一个文本块而不产生图片块）；`tests/test_fsguard.py` 7 项（ENOSPC/EACCES/EROFS/ENOENT 文案、`atomic_write`、附件写入、工具结果、打开项目）。新增 `desktop/tests/documents-e2e.cjs` 用隐藏窗口 + 本地模拟模型跑通「贴入 PDF → 请求里出现页文本 → 没有 image_url → 损坏 PDF 被拒」，2 次本地请求、0 次付费 API。
+
+边界：PDF 只抽文本层，不 OCR；表格按行转成制表符分隔，合并单元格与公式只保留显示值；不支持旧版 `.doc`/`.xls`/`.ppt`；抽取结果进会话历史，原文不入库（附件目录里不会多出二进制快照）。
+
+**长回答不再被截断丢弃**（`eca/errors.py`、`eca/provider.py`、`eca/anthropic.py`、`eca/responses.py`、`eca/agent.py`）。以前模型一次响应撞到输出上限（`finish_reason: length` / `stop_reason: max_tokens` / `incomplete: max_output_tokens`）时整段回答被丢掉，只留一句"拆小一点重来"——用户看到的是写了一半突然消失，长文、长代码、调研总结都中招。现在三个适配器都把已经流式输出的正文带上来，Agent 把它留作本轮回答、追加一条隐藏的运行提示让模型从断点接着写，续写结果**合并进同一个回答气泡**，会话历史里也是一条完整消息。截断发生在写工具调用参数中途时，那个调用不完整、不会执行，正文保留并提示"同一操作拆小重发"。`output_recovery_limit` 仍是连续续写次数（0 = 不限）。
+
+工具日志 `output_limit` 默认从 24000 字符提到 48000，抓网页长文更容易一次读完。验证：`tests/test_output_continuation.py` 5 项；`desktop/tests/output-continuation-e2e.cjs` 用隐藏窗口 + 本地模拟模型跑通「第一次响应被 length 截断 → 下一次请求里出现续写提示 → 界面只有一个回答气泡且含两段文字 → 历史只有一条 assistant」，3 次本地请求、0 付费 API。
+
 ## 1.16.0 — 科研模式：七阶段工作流，闸门在磁盘上
 
 新增工作模式 **科研**（内部 `scholar`），把 cs-research-skills 那类「科研阶段之间怎么交接证据」做进产品，而不是搬 177 个工具说明书：**选题 → 检索 → 精读 → 复现 → 实验 → 写作 → 汇报**，每一步的产出落在 `.eca/research/` 里。

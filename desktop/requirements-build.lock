@@ -33,6 +33,7 @@ pydantic_core==2.50.1
 Pygments==2.21.0
 pyinstaller==6.22.3
 pyinstaller-hooks-contrib==2026.8
+pypdf==6.21.2
 PyJWT==2.15.1
 python-dotenv==1.2.4
 python-multipart==0.0.32

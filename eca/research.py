@@ -78,9 +78,22 @@ def _jsonl(path):
     return rows
 
 
+def _save(path, text, append=False):
+    """Write one artifact; a full or read-only disk is named, not dumped raw."""
+    from . import fsguard
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if append:
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(text)
+        else:
+            path.write_text(text, "utf-8")
+    except OSError as exc:
+        raise ValueError(fsguard.describe(exc, '写入科研制品', path)) from None
+
+
 def _write_jsonl(path, rows):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows), "utf-8")
+    _save(path, "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows))
 
 
 def _clean_id(value, label="id"):
@@ -213,10 +226,9 @@ def enter(root, state, target, note=""):
     # truth, but a research folder that cannot say where it stands is hard to hand
     # to anyone else or to read after a restore.
     folder = base(root)
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / "stage.json").write_text(json.dumps(
+    _save(folder / "stage.json", json.dumps(
         {"stage": target, "updated_at": now(), "history": state["history"][-40:]},
-        ensure_ascii=False, indent=2), "utf-8")
+        ensure_ascii=False, indent=2))
     return state
 
 
@@ -294,9 +306,7 @@ def add_run(root, run):
            "outcome": outcome, "matches_paper": matches,
            "claims": [_clean_id(value, "claim id") for value in (run.get("claims") or [])][:12],
            "note": _text(run.get("note"), "note", 1000, allow_empty=True), "at": now()}
-    folder = base(root) / "runs"
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / f"{ident}.json").write_text(json.dumps(row, ensure_ascii=False, indent=2), "utf-8")
+    _save(base(root) / "runs" / f"{ident}.json", json.dumps(row, ensure_ascii=False, indent=2))
     return row
 
 
@@ -324,13 +334,15 @@ def write_doc(root, name, content, append=False):
             raise ValueError("reading card " + name + " belongs to an unregistered source. Register it "
                              "with research_source first, so a card cannot be filed for a paper nobody fetched.")
     target = base(root) / name
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if append:
-        with target.open("a", encoding="utf-8") as handle:
-            handle.write(body if body.endswith("\n") else body + "\n")
-    else:
-        target.write_text(body, "utf-8")
-    return {"name": name, "bytes": target.stat().st_size, "appended": append}
+    if append and not body.endswith("\n"):
+        body += "\n"
+    _save(target, body, append)
+    try:
+        size = target.stat().st_size
+    except OSError:
+        size = len(body)
+    return {"name": name, "bytes": size, "appended": append}
+
 
 CITATION = re.compile(r"\[src:\s*([a-z0-9][a-z0-9._-]{0,63})\s*\]", re.I)
 

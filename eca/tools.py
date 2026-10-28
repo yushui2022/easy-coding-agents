@@ -15,6 +15,7 @@ import tempfile
 import time
 from .verification import no_tests_found
 from . import workgraph
+from . import fsguard
 
 
 SKIP = {".git", ".eca", ".ssh", ".aws", ".kube", ".agent_memory", ".pytest_cache", "output", "node_modules", "venv", ".venv", "__pycache__", "dist", "build", ".next", "target"}
@@ -96,19 +97,23 @@ def allowed(mode):
 
 
 def atomic_write(path, content):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(prefix=".eca-write-", dir=path.parent)
+    """Replace one file atomically, and say why when the disk says no."""
     try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
-            f.write(content)
-            f.flush()
-            os.fsync(f.fileno())
-        if path.exists():
-            os.chmod(tmp, path.stat().st_mode)
-        os.replace(tmp, path)
-    finally:
-        if os.path.exists(tmp):
-            os.unlink(tmp)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(prefix=".eca-write-", dir=path.parent)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
+                f.write(content)
+                f.flush()
+                os.fsync(f.fileno())
+            if path.exists():
+                os.chmod(tmp, path.stat().st_mode)
+            os.replace(tmp, path)
+        finally:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+    except OSError as exc:
+        raise ValueError(fsguard.describe(exc, '写入文件', path)) from None
 
 
 async def terminate(proc):
@@ -131,7 +136,7 @@ async def terminate(proc):
         await proc.wait()
 
 
-async def run_process(argv, root, timeout=120, limit=24_000, on_progress=None):
+async def run_process(argv, root, timeout=120, limit=48_000, on_progress=None):
     options = {"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {"start_new_session": True}
     spawning = asyncio.create_task(asyncio.create_subprocess_exec(*argv, cwd=root, stdout=asyncio.subprocess.PIPE,
                                                stderr=asyncio.subprocess.PIPE, stdin=asyncio.subprocess.DEVNULL, **options))
@@ -304,7 +309,11 @@ class Tools:
             if name == "shell" or name.startswith('process_'):
                 return result  # Already bounded per stream; keep the JSON envelope valid.
             return result[:self.settings.output_limit] + ("\n[truncated]" if len(result) > self.settings.output_limit else "")
-        except (ValueError, OSError, UnicodeError) as exc:
+        except OSError as exc:
+            # Disk, permission and read-only failures are about the machine, not the
+            # task; say which one it is instead of echoing a bare errno.
+            return f"Error: {fsguard.describe(exc)}"
+        except (ValueError, UnicodeError) as exc:
             return f"Error: {exc}"
 
     async def web_fetch(self, url, max_chars=12000):

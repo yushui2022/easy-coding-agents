@@ -2,8 +2,14 @@
 
 
 class OutputLimitError(RuntimeError):
-    def __init__(self):
-        super().__init__('Model output limit reached; incomplete response discarded; no tools executed.')
+    """Cut off at the output token limit. Carries the prose already streamed so
+    the agent can keep it and continue instead of discarding the work."""
+
+    def __init__(self, partial='', pending_tools=False):
+        self.partial = partial if isinstance(partial, str) else ''
+        self.pending_tools = bool(pending_tools)
+        detail = 'incomplete tool call dropped; no tools executed' if self.pending_tools else 'no tools executed'
+        super().__init__(f'Model output limit reached; {detail}.')
 
 
 class ContextLimitError(RuntimeError):

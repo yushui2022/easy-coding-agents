@@ -147,7 +147,7 @@ const Message=memo(function Message({message,sessionId,regenerate,onRegenerate,e
   const more=<>{message.truncated&&!full&&<button className="log-more" disabled={loading} onClick={async()=>{setLoading(true);try{setFull(await window.eca.invoke('session.message',{project_id,id:sessionId,index:message.message_index,message_ref:message.message_ref}));}catch(e){setError(String(e));}finally{setLoading(false);}}}>{loading?'正在加载…':'加载完整消息'}</button>}{error&&<p role="alert">{error}</p>}</>;
   if(message.role==='system')return null;
   if(message.role==='tool')return <div className="orphan-tool"><LazyDetail title="工具结果 · 调用位于前页" text={String(data.content)}/>{more}</div>;
-  const internal=message.role==='user'&&/^(User-requested verification command:|Repair the failed user-selected verification)/.test(message.content||'');
+  const internal=message.role==='user'&&/^(User-requested verification command:|Repair the failed user-selected verification|\[Runtime guidance\]|\[Runtime recovery\])/.test(message.content||'');
   if(internal)return <div className="runtime-note"><LazyDetail title={<><Code size={13}/>运行时检查与修复指令</>} text={data.content}/>{more}</div>;
   const reasoning=typeof data.reasoning_content==='string'?data.reasoning_content.trim():'';
   return <article className={'message '+message.role}><div className="message-label">{message.role==='user'?'你':'ECA'}{message.role==='assistant'&&<span>编码助手</span>}</div>
@@ -174,7 +174,7 @@ export const Transcript=memo(function Transcript({messages,sessionId,projectId,r
     for(let position=messages.length-1;position>=0;position-=1){
       const message=messages[position];
       if(!message||message.role!=='user'||typeof message.content!=='string'||!message.content.trim())continue;
-      if(/^(User-requested verification command:|Repair the failed user-selected verification|\[Runtime guidance\])/.test(message.content))continue;
+      if(/^(User-requested verification command:|Repair the failed user-selected verification|\[Runtime guidance\]|\[Runtime recovery\])/.test(message.content))continue;
       return message;
     }
     return null;},[messages]);

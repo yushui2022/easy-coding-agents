@@ -166,7 +166,8 @@ class AnthropicProvider:
                 # Ping and future metadata events do not modify content.
         if started and stopped and finish == 'max_tokens':
             from .errors import OutputLimitError
-            raise OutputLimitError()
+            partial = ''.join(block.get('text', '') for _, block in sorted(blocks.items()) if block['type'] == 'text')
+            raise OutputLimitError(partial, any(block['type'] == 'tool_use' for block in blocks.values()))
         if not started or not stopped or len(closed) != len(blocks) or finish not in {"end_turn", "tool_use", "stop_sequence"}:
             raise RuntimeError(f"Incomplete Anthropic response ({finish or 'disconnected'}); no tools were executed.")
         content, calls, ids = [], [], set()
