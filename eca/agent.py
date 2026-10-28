@@ -274,6 +274,9 @@ If execution was interrupted, inspect the actual state before repeating mutation
         if self.settings.mode == "venture":
             from . import venture as business_workflow
             prompt += business_workflow.prompt(self.state.get("business"), self.settings.root)
+        if self.settings.mode == "scout":
+            from . import scout as scanning_workflow
+            prompt += scanning_workflow.prompt(self.state.get("scout"), self.settings.root)
         if self.state["tasks"]:
             prompt += "\nCurrent task plan:\n" + json.dumps(self.state["tasks"], ensure_ascii=False)
             if any(task.get("blocked") for task in self.state["tasks"]):
@@ -461,6 +464,9 @@ If execution was interrupted, inspect the actual state before repeating mutation
                     ("[Runtime guidance] Business mode: unless the request already says what the product is, make "
                      "your first action one web search that establishes what it is and who already sells it. "
                      "Do not answer from memory. " if self.settings.mode == 'venture' and turn == 0 else '') +
+                    ("[Runtime guidance] Scanning mode: start from the criteria file, and make your first search "
+                     "about a specific industry's payable products, not about 'AI ideas'. Breadth first. "
+                     if self.settings.mode == 'scout' and turn == 0 else '') +
                     (f"[Runtime guidance] Run budget: {remaining} model response(s) remaining, including this one. " if self.settings.max_turns else
                      '[Runtime guidance] No response-count cap. Finish the task and verification; the user can interrupt. ') +
                     ("This is the last response: report completed work, actual checks and anything unfinished. Only use tools if essential; there will be no follow-up response." if remaining == 1 else

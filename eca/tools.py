@@ -33,6 +33,7 @@ STAGE_NAMES = ("proposal", "search", "reading", "reproduction", "experiment", "w
 
 # Business workflow stages, also a literal so the schema avoids an import.
 BIZ_STAGE_NAMES = ("brief", "market", "competition", "economics", "diligence", "verdict")
+SCOUT_STAGE_NAMES = ("criteria", "sweep", "screen", "shortlist")
 SCHEMAS = [
     schema('lsp_rename', 'Preview cross-file semantic rename; no file writes. Line 1-based, character UTF-16 0-based.', {'server': STR, 'path': STR, 'new_name': STR, 'line': INT, 'character': INT}, ['server', 'path', 'new_name']),
     schema('lsp_apply', 'Apply a saved rename preview after conflict checks and normal edit approval, then request diagnostics.', {'preview_id': STR}, ['preview_id']),
@@ -74,6 +75,12 @@ SCHEMAS = [
     schema("business_claim", "Record one claim in .eca/business/claims.jsonl. 'verified' needs at least one registered source id; counter-evidence belongs in the ledger too.", {'id': STR, 'claim': STR, 'status': {'type': 'string', 'enum': ['asserted', 'verified', 'contradicted', 'unverified']}, 'sources': {'type': 'array', 'items': STR}, 'note': STR}, ['id', 'claim']),
     schema("business_doc", "Write one business artifact: brief.md, competitors.md, unit.md, diligence.md or evidence.md. This is the only way to write under .eca/business; verdict.md is written by business_verdict.", {'name': STR, 'content': STR, 'append': {'type': 'boolean'}}, ['name', 'content']),
     schema("business_verdict", "Write the feasibility verdict (verdict.md + verdict.json). Refused while a claim is still 'asserted', unit.md or diligence.md is missing, or fewer than 3 sources/claims are registered. Answer the four questions: why buy once, why return, why stay when copied, what each delivery earns.", {'verdict': {'type': 'string', 'enum': ['validate', 'build_small', 'narrow', 'pause', 'misfit', 'stop']}, 'confidence': {'type': 'string', 'enum': ['low', 'medium', 'high']}, 'summary': STR, 'why_buy': STR, 'why_return': STR, 'why_stay': STR, 'margin': STR, 'falsifier': STR, 'risks': {'type': 'array', 'items': STR}, 'next_steps': {'type': 'array', 'items': STR}}, ['verdict', 'confidence', 'summary', 'why_buy', 'why_return', 'why_stay', 'margin', 'falsifier', 'risks', 'next_steps']),
+    schema("scout_stage", "Four-stage scanning workflow (criteria, sweep, screen, shortlist) for finding payable products a small team could rebuild. Moving forward needs the previous stage's artifacts on disk; moving back needs a note explaining why.", {'stage': {'type': 'string', 'enum': list(SCOUT_STAGE_NAMES)}, 'note': STR}, ['stage']),
+    schema("scout_doc", "Write one scanning artifact: criteria.md or notes.md. Candidates, the rejection list and the shortlist are written by their own tools; .eca is protected for write/edit.", {'name': STR, 'content': STR, 'append': {'type': 'boolean'}}, ['name', 'content']),
+    schema("scout_source", "Register one public page under .eca/scout/sources.jsonl (product, pricing, app-store/marketplace, review, community or report). A candidate cannot cite an unregistered id.", {'id': STR, 'kind': {'type': 'string', 'enum': ['product', 'pricing', 'marketplace', 'review', 'community', 'report', 'other']}, 'url': STR, 'title': STR, 'published': STR, 'note': STR}, ['id', 'kind', 'url', 'title']),
+    schema("scout_candidate", "Register one payable product a small team could rebuild. Requires a registered source, a price, a buyer, why it is replicable, how it most likely fails, and why it is not the obvious pick. At most 3 candidates per category: the quota forces breadth instead of twenty variants of one idea.", {'id': STR, 'name': STR, 'company': STR, 'category': STR, 'what': STR, 'buyer': STR, 'price': STR, 'replicable': STR, 'effort': {'type': 'string', 'enum': ['days', 'weeks', 'months']}, 'moat': STR, 'risk': STR, 'why_not_obvious': STR, 'sources': {'type': 'array', 'items': STR}}, ['id', 'name', 'company', 'category', 'what', 'buyer', 'price', 'replicable', 'effort', 'moat', 'risk', 'why_not_obvious', 'sources']),
+    schema("scout_exclude", "Record one rejected idea in the rejection list (.eca/scout/excluded.jsonl and excluded.md): the obvious ideas and why they are not worth the weeks. The shortlist gate requires at least 5.", {'idea': STR, 'why': STR, 'category': STR}, ['idea', 'why']),
+    schema("scout_shortlist", "Write shortlist.md and shortlist.json with 3..7 picks, each with why it beat the others and one minimal first experiment. Refused until 20 candidates over 8+ categories and 5+ rejected ideas exist on disk.", {'picks': {'type': 'array', 'minItems': 3, 'maxItems': 7, 'items': {'type': 'object', 'properties': {'id': STR, 'why': STR, 'first_experiment': STR}, 'required': ['id', 'why', 'first_experiment']}}}, ['picks']),
     schema("research_doc", "Write one research artifact: proposal.md, deviations.md, report.md, evidence-matrix.csv, claim-to-artifact.json, search-log.jsonl, slides/outline.md, or reading/<source-id>.md (the source must be registered). This is the only way to write under .eca/research; write/edit cannot touch .eca.", {'name': STR, 'content': STR, 'append': {'type': 'boolean'}}, ['name', 'content']),
     schema("delegate", "Delegate a bounded subtask to an independent child agent. It shares files, not conversation. No recursive delegation. Default plan is read-only.",
            {"task":STR,"mode":{"type":"string","enum":["plan","code"]}, 'verify_commands': {'type': 'array', 'items': STR}}, ["task"]),
@@ -100,6 +107,7 @@ READ_ONLY = {"skills", "lsp_rename", "web_fetch", "web_search", "read", "glob", 
 # The business workflow writes only its own artifacts, so its tools are the one
 # thing venture mode adds to the read-only set.
 VENTURE_TOOLS = {"business_stage", "business_source", "business_claim", "business_doc", "business_verdict"}
+SCOUT_TOOLS = {"scout_stage", "scout_doc", "scout_source", "scout_candidate", "scout_exclude", "scout_shortlist"}
 
 
 def allowed(mode):
@@ -107,6 +115,8 @@ def allowed(mode):
     # layer still asks for every write, command and network call it normally would.
     if mode == "venture":
         return READ_ONLY | VENTURE_TOOLS
+    if mode == "scout":
+        return READ_ONLY | SCOUT_TOOLS
     return READ_ONLY if mode in {"plan", "research"} else (set() if mode == "chat" else {s["function"]["name"] for s in SCHEMAS})
 
 
@@ -243,7 +253,7 @@ class Tools:
         so the choice of mode covers network reads. Everything else, this mode
         cannot even attempt: its tool set stops at read-only.
         """
-        if self.settings.mode not in {'research', 'venture'}:
+        if self.settings.mode not in {'research', 'venture', 'scout'}:
             return await self.approve(message, detail)
         if not self.web_auto_noted:
             self.web_auto_noted = True
@@ -714,6 +724,62 @@ class Tools:
         return json.dumps({"verdict": value, "file": ".eca/business/verdict.md",
                            "note": "A verdict is a decision record, not a prediction: the falsifier says what "
                                    "would change it."}, ensure_ascii=False)
+
+    # Scanning mode tools: breadth quotas and the rejection list live in
+    # eca/scout.py, so "twenty ideas" cannot be twenty variants of one idea.
+    def scout_public(self):
+        from . import scout
+        return scout.public(self.state.get("scout"), self.settings.root)
+
+    async def scout_stage(self, stage, note=""):
+        from . import scout
+        self.state["scout"] = scout.enter(self.settings.root, self.state.get("scout"), stage, note)
+        value = self.scout_public()
+        self.emit("scout", value)
+        return json.dumps({"stage": value["stage"], "label": value["label"], "counts": value["counts"],
+                           "tally": value["tally"], "next": scout.missing(self.settings.root, value["stage"])},
+                          ensure_ascii=False)
+
+    async def scout_doc(self, name, content, append=False):
+        from . import scout
+        row = scout.write_doc(self.settings.root, name, content, append)
+        self.emit("scout", self.scout_public())
+        return json.dumps({"doc": row}, ensure_ascii=False)
+
+    async def scout_source(self, id, kind, url, title, published="", note=""):
+        from . import scout
+        row = scout.add_source(self.settings.root, {"id": id, "kind": kind, "url": url, "title": title,
+                                                   "published": published, "note": note})
+        self.emit("scout", self.scout_public())
+        return json.dumps({"source": row, "note": "Registered, not verified: the page is recorded, whether the "
+                           "company is healthy is your judgement to defend."}, ensure_ascii=False)
+
+    async def scout_candidate(self, id, name, company, category, what, buyer, price, replicable, effort,
+                              moat, risk, why_not_obvious, sources=None):
+        from . import scout
+        row = scout.add_candidate(self.settings.root, {
+            "id": id, "name": name, "company": company, "category": category, "what": what, "buyer": buyer,
+            "price": price, "replicable": replicable, "effort": effort, "moat": moat, "risk": risk,
+            "why_not_obvious": why_not_obvious, "sources": sources or []})
+        value = self.scout_public()
+        self.emit("scout", value)
+        return json.dumps({"candidate": row, "counts": value["counts"], "tally": value["tally"],
+                           "note": f"Spread so far: {len(value['tally'])} categories, at most 3 per category."},
+                          ensure_ascii=False)
+
+    async def scout_exclude(self, idea, why, category=""):
+        from . import scout
+        row = scout.add_excluded(self.settings.root, {"idea": idea, "why": why, "category": category})
+        value = self.scout_public()
+        self.emit("scout", value)
+        return json.dumps({"rejected": row, "counts": value["counts"]}, ensure_ascii=False)
+
+    async def scout_shortlist(self, picks):
+        from . import scout
+        value = scout.shortlist(self.settings.root, {"picks": picks})
+        self.emit("scout", self.scout_public())
+        return json.dumps({"picks": value["picks"], "files": [".eca/scout/shortlist.md", ".eca/scout/shortlist.json"],
+                           "note": "A shortlist names what to test next, not what will work."}, ensure_ascii=False)
     async def todo(self, items):
         tasks = workgraph.validate(items)
         self.state["tasks"] = tasks

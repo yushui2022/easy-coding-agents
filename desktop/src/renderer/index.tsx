@@ -6,7 +6,7 @@ import {ModelSettings} from './ModelSettings';
 import {ModelMenu,effortLabels} from './ModelMenu';
 import {RunActivity} from './RunActivity';
 import {PlanChecklist} from './PlanChecklist';
-import {ResearchStages,VentureStages} from './ResearchStages';
+import {ResearchStages,VentureStages,ScoutStages} from './ResearchStages';
 import {Transcript, LazyDetail, LogText} from './Transcript';
 import {Workspace} from './workspace/Workspace';
 import {EmptyState} from './ui/EmptyState';
@@ -504,6 +504,7 @@ const [pickedSkills,setPickedSkills] = useState<SkillRow[]>([]);
           </div>}
           {state.project&&state.settings?.mode==='scholar'&&<ResearchStages research={state.research} busy={state.busy}/>}
           {state.project&&state.settings?.mode==='venture'&&<VentureStages business={state.business} busy={state.busy}/>}
+          {state.project&&state.settings?.mode==='scout'&&<ScoutStages scan={state.scout} busy={state.busy}/>}
           {state.project&&<GoalBar goal={state.goal||null} onEdit={()=>setGoalOpen(true)} onClear={()=>void clearGoal()}/>}
           {rewindPending&&state.project&&<div className="rewind-note" role="status">
             <span>发送时会先撤回上一轮的指令和回答，再按现在这段内容重跑。</span>

@@ -12,14 +12,14 @@ goal      full tool set plus an agreed objective: still a working mode, so verif
           repair and code children stay available exactly as in code mode.
 """
 
-MODES = ("code", "plan", "goal", "research", "scholar", "venture", "chat")
+MODES = ("code", "plan", "goal", "research", "scholar", "venture", "scout", "chat")
 # scholar is a working mode: reproduction and experiments need to run commands,
 # and the research artifacts are files the user can read. The gates that keep it
 # honest live in eca/research.py, not in the tool list.
 WORKING = frozenset({"code", "goal", "scholar"})
 # venture stays read-only for the project: the workflow writes only its own
 # artifacts, through tools whose gates live in eca/venture.py.
-READING = frozenset({"plan", "research", "venture"})
+READING = frozenset({"plan", "research", "venture", "scout"})
 
 
 def working(mode):

@@ -47,6 +47,17 @@ def agent_business(agent):
     except (OSError, ValueError):
         return None
 
+
+def agent_scout(agent):
+    """Stage, counts, category spread and artifact names only."""
+    if not agent:
+        return None
+    try:
+        from . import scout
+        return scout.public(agent.state.get('scout'), agent.settings.root)
+    except (OSError, ValueError):
+        return None
+
 PROTOCOL = 1
 MODEL_FIELDS = {'model', 'base_url', 'api_format', 'api_key', 'thinking_mode', 'reasoning_effort'}
 MAX_QUOTES = 3
@@ -311,6 +322,7 @@ class DesktopRPC:
             'goal': goals.public(agent.state.get('goal')) if agent else None,
             'research': agent_research(agent),
             'business': agent_business(agent),
+            'scout': agent_scout(agent),
             'pending': [entry for entry, future in self.pending.values() if not future.done()], 'seq': self.sequence}
         params = params or {}
         offset = params.get('stream_offset')

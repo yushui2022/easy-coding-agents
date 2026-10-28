@@ -1,5 +1,5 @@
 import React,{useState} from 'react';
-import {CaretDown, ChartLineUp, FileText, Flask} from '@phosphor-icons/react';
+import {CaretDown, ChartLineUp, Compass, FileText, Flask} from '@phosphor-icons/react';
 import './research-stages.css';
 
 type Stage={id:string;label:string};
@@ -93,4 +93,26 @@ export function VentureStages({business,busy}:{business?:Business|null;busy?:boo
               ...(c.contradicted_claims?[{label:'反证',value:c.contradicted_claims}]:[]),
               {label:'结论',value:verdict||'未出'}]}
     empty="还没有制品。模型会先写 brief.md，再登记公开来源。"/>;
+}
+
+// Scanning mode: the pool size and the spread are the point, so the strip shows
+// how many candidates exist, over how many categories, and what was rejected.
+export type Scan={
+  stage:string;label:string;stages:Stage[];artifacts:Artifact[];
+  counts:{sources:number;candidates:number;categories:number;excluded:number;shortlist:boolean};
+  history:{from:string|null;to:string|null;at:string;note:string}[];
+  tally?:Record<string,number>;
+};
+
+export function ScoutStages({scan,busy}:{scan?:Scan|null;busy?:boolean}) {
+  if(!scan?.stages?.length)return null;
+  const c=scan.counts;
+  return <StageStrip workflow={scan} title="找方向" folder=".eca/scout" busy={busy}
+    mark={<Compass size={14} weight="bold"/>}
+    hint="候选池大小 · 覆盖类别（每类上限 3） · 主动排除的惯性想法 · 是否已出候选清单"
+    metrics={[{label:'候选',value:c.candidates},
+              {label:'类别',value:c.categories},
+              {label:'排除',value:c.excluded},
+              {label:'清单',value:c.shortlist?'已出':'未出'}]}
+    empty="还没有制品。模型会先写 criteria.md，再逐个行业登记候选。"/>;
 }
