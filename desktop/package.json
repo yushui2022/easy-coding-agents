@@ -12,7 +12,10 @@
     "dev": "npm run build && electron .",
     "test": "node --test tests/*.test.cjs",
     "test:e2e": "node tests/e2e.cjs",
-    "package": "npm run build && electron-builder --win nsis --x64"
+    "package": "npm run build && electron-builder --win nsis --x64",
+    "backend:mac": "node scripts/build-backend-mac.mjs",
+    "package:mac": "npm run build && npm run backend:mac && electron-builder --mac --arm64",
+    "test:mac": "node tests/mac-smoke.cjs"
   },
   "build": {
     "appId": "dev.easycodingagent.desktop",
@@ -25,7 +28,6 @@
     "files": [
       "dist/**/*",
       "package.json",
-      "!node_modules/node-pty/prebuilds/darwin-*/**/*",
       "!node_modules/node-pty/prebuilds/win32-arm64/**/*",
       "!node_modules/node-pty/third_party/**/win10-arm64/**/*"
     ],
@@ -38,6 +40,20 @@
     "win": {
       "target": "nsis",
       "signExecutable": false
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools",
+      "icon": "resources/icon.icns",
+      "identity": null,
+      "artifactName": "ECA-Desktop-${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -70,5 +86,10 @@
     "@xterm/addon-fit": "0.11.0",
     "@xterm/xterm": "6.0.0",
     "node-pty": "1.1.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "node-pty@1.1.0": true,
+    "electron-winstaller@5.4.0": true
   }
 }

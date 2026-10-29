@@ -47,6 +47,15 @@ app.setPath('temp', tempHome);
 process.env.TEMP = tempHome;
 process.env.TMP = tempHome;
 const root = path.resolve(__dirname, '../../..');
+// Development runs the Python core straight from this checkout. Windows installs
+// the interpreter as `python`; macOS and Linux only ship `python3`, and the repo
+// venv is the intended one, so prefer it when it exists.
+function devPython(): string {
+  if (process.env.ECA_PYTHON) return process.env.ECA_PYTHON;
+  if (process.platform === 'win32') return 'python';
+  const venv = path.join(root, '.venv', 'bin', 'python');
+  return fs.existsSync(venv) ? venv : 'python3';
+}
 const html = path.resolve(__dirname, '../renderer/index.html');
 // A local `gh auth login` keeps a token on this machine; offering it is one click
 // instead of a browser round trip. Absent or logged out is a normal answer here.
@@ -169,10 +178,11 @@ async function backend() {
   if (rpc && !rpc.exited) return rpc;
   // The runtime is named after the product so Task Manager shows it as ours. The
   // older file name stays as a fallback for an install that was only half replaced.
-  const backendNames = ['ECA Desktop Backend.exe', 'eca-backend.exe'];
+  // macOS and Linux have no .exe suffix, so the bare name is part of the list.
+  const backendNames = ['ECA Desktop Backend.exe', 'eca-backend.exe', 'eca-backend'];
   const packaged = backendNames.map(name => path.join(process.resourcesPath, 'backend', name)).find(file => fs.existsSync(file))
     || path.join(process.resourcesPath, 'backend', backendNames[0]);
-  const command = app.isPackaged ? packaged : (process.env.ECA_PYTHON || 'python');
+  const command = app.isPackaged ? packaged : devPython();
   rpc = new RpcClient(command, app.isPackaged ? [] : ['-B', '-m', 'eca.desktop_rpc'], app.isPackaged ? home : root);
   rpc.on('event', data => {
     if(data.event==='subagent_progress'&&['text','model_activity'].includes(data.data?.event)) {
