@@ -23,23 +23,56 @@ ECA_MODEL=qwen3.8:27b-mlx \
 eca
 ```
 
-### ⚠️ 必须调大上下文
+### ⚠️ 先确认上下文够用
 
-Ollama 的默认上下文是 4096 token，而 ECA 的系统提示加工具定义本身就有 7k 左右。
-超出部分会被**静默截断**，表现为"模型乱答、忘记任务、不调用工具"，很难排查。
+Ollama 实际用的上下文不是模型的"最大上下文"，而是下面三者里最小的那个：
+
+1. `OLLAMA_CONTEXT_LENGTH`（**没有**在 Modelfile 里写 `num_ctx` 时的默认值）
+2. 模型 Modelfile 里的 `PARAMETER num_ctx`
+3. 模型本身的原生上限
+
+超出的部分会被**静默截断**，表现为"模型乱答、忘记任务、不调用工具"。
+
+先查这台机器到底是多少，不要猜：
 
 ```bash
-# 启动 Ollama 服务时指定（推荐，全局生效）
-OLLAMA_CONTEXT_LENGTH=32768 open -a Ollama
+# 服务端的默认值（空 = 用 Ollama 内置默认）
+launchctl getenv OLLAMA_CONTEXT_LENGTH
+
+# 每个模型的原生上限 + 实际生效的 num_ctx + 是否支持工具
+/Applications/Ollama.app/Contents/Resources/ollama show qwen3.8:27b-mlx
 ```
 
-或者在模型层面固定（Modelfile）：
+要看两个数：`context length`（原生上限）和 `Parameters → num_ctx`（实际生效）。
+线上实测的这台 Mac Studio（64 GB）：
 
-```
-PARAMETER num_ctx 32768
+| 模型 | 原生上限 | 实际 num_ctx | 工具 | 32K 时实测占用 |
+| --- | --- | --- | --- | --- |
+| `qwen3.8:27b-mlx` | 262144 | 32768 | ✅ 且带视觉 | 约 32 GB |
+| `qwen3.8-27b-abliterated-mlx:4bit` | 262144 | 32768 | ✅ | — |
+| `qwen3.8-27b-abliterated:q4km` | 262144 | 32768 | ✅ | — |
+| `ravenx-cyber:35b` | 262144 | 32768 | ✅ | — |
+
+这台机器服务端已设 `OLLAMA_CONTEXT_LENGTH=32768`、`OLLAMA_FLASH_ATTENTION=1`、
+`OLLAMA_KV_CACHE_TYPE=q8_0`，模型里也写了 `num_ctx 32768`，所以 **32768 就是实际生效值**，
+正好等于 ECA 的默认 `context_window_tokens`，不需要再调。
+
+**要往上调时两边都要改**：只改 Ollama 不会让 ECA 多用，只改 ECA 会被 Ollama 截断。
+
+```bash
+# 1) Ollama：换一个更大的 num_ctx（内存随之增长，KV cache 随上下文线性上升）
+OLLAMA_CONTEXT_LENGTH=65536 open -a Ollama
+
+# 2) ECA：告诉它这个窗口，否则它仍按 32768 预算
+#    命令行
+eca --context-window-tokens 65536
+#    或项目里的 eca.toml
+#    [agent]
+#    context_window_tokens = 65536
 ```
 
-检查是否够用：对话里发 `/context` 看本地估算，输入预算应明显小于你设置的上下文长度。
+按上面的实测比例估算，64K 大约会多占 10 GB 左右统一内存；64 GB 机器上还有余量，
+但不要和 ComfyUI 这类吃显存的程序同时跑 128K。对话里用 `/context` 可以看当前估算。
 
 ## vLLM
 
