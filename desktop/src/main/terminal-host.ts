@@ -11,7 +11,11 @@ const flush=setInterval(()=>{
 parent.on('message',({data:m}:any)=>{
   try {
     if(m.type==='start') {
-      terminal=pty.spawn(process.platform==='win32'?'powershell.exe':'/bin/sh',process.platform==='win32'?['-NoLogo','-NoProfile']:[],{cwd:m.cwd,env:process.env as Record<string,string>,cols:80,rows:24,name:'xterm-256color'});
+      // Windows gets PowerShell; macOS gets a login zsh so the project terminal
+      // reads the user's real PATH instead of the GUI's minimal environment.
+      const shell = process.platform==='win32' ? 'powershell.exe' : (process.platform==='darwin' ? '/bin/zsh' : '/bin/sh');
+      const shellArgs = process.platform==='win32' ? ['-NoLogo','-NoProfile'] : (process.platform==='darwin' ? ['-l'] : []);
+      terminal=pty.spawn(shell,shellArgs,{cwd:m.cwd,env:process.env as Record<string,string>,cols:80,rows:24,name:'xterm-256color'});
       parent.postMessage({type:'ready',pid:terminal.pid});
       terminal.onData(data=>{pending+=data;if(pending.length>262144){dropped+=pending.length-262144;pending=pending.slice(-262144);}if(pending.length>131072)terminal?.pause();});
       terminal.onExit(e=>{parent.postMessage({type:'data',data:pending,dropped});pending='';parent.postMessage({type:'exit',code:e.exitCode});clearInterval(flush);process.exit(0);});
