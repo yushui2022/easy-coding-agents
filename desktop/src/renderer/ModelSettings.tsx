@@ -9,6 +9,7 @@ const presets = [
   {id:'openai',name:'OpenAI',base_url:'https://api.openai.com/v1',api_format:'responses'},
   {id:'anthropic',name:'Anthropic',base_url:'https://api.anthropic.com/v1',api_format:'anthropic'},
   {id:'ollama',name:'Ollama 本地',base_url:'http://localhost:11434/v1',api_format:'openai'},
+  {id:'vllm',name:'vLLM 本地',base_url:'http://localhost:8000/v1',api_format:'openai'},
   {id:'custom',name:'自定义兼容服务',base_url:'',api_format:'openai'},
 ];
 const blank = () => ({id:'',name:'',model:'',base_url:'https://api.deepseek.com/v1',api_format:'openai',thinking_mode:'fast',api_key:'',no_auth:false,persist:true,make_default:false});

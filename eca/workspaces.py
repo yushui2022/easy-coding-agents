@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 
 from .modes import working
+from .fsguard import unsymlinked
 
 
 def source_files(tools):
@@ -43,7 +44,7 @@ def digest(data):
 
 def workspace(store, state):
     path = store.root / '.eca' / 'workspaces' / state['id']
-    if path.resolve() != path or not path.is_relative_to(store.root / '.eca'):
+    if not unsymlinked(path, store.root / '.eca'):
         raise ValueError('Invalid isolated workspace path')
     return path
 

@@ -56,3 +56,28 @@ def check_target(path, action='写入', minimum=1):
         free_mb = free / (1024 * 1024)
         raise ValueError(f'{action}失败：{path} 所在磁盘只剩 {free_mb:.1f} MB，'
                          '空间不足——先释放磁盘空间，再重试。这不是模型或任务的问题。')
+
+
+def unsymlinked(path, root):
+    """True when ``path`` sits under ``root`` without a symlink at or below it.
+
+    Comparing ``path.resolve()`` with ``path`` looks like the same check but is
+    wrong on macOS, where /var and /tmp are symlinks to /private/var and
+    /private/tmp: every project inside a temporary directory was rejected even
+    though nothing in the project itself was linked. Resolving both sides against
+    the project root keeps the guarantee — a link at the state directory or below
+    it still fails — without depending on where the volume is mounted.
+    """
+    from pathlib import Path
+
+    path, root = Path(path), Path(root)
+    if path.is_symlink():
+        return False
+    try:
+        relative = path.relative_to(root)
+    except ValueError:
+        return False
+    try:
+        return path.resolve() == root.resolve() / relative
+    except OSError:
+        return False

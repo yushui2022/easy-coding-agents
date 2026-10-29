@@ -7,13 +7,14 @@ import uuid
 from agent_memory_core.storage import MemoryStorage
 from .tools import SKIP
 from .verification import no_tests_found
+from .fsguard import unsymlinked
 
 
 class Knowledge:
     def __init__(self, settings, files, resolve):
         self.settings, self.files, self.resolve = settings, files, resolve
         path = settings.state_dir / "knowledge.sqlite3"
-        if path.is_symlink() or path.resolve() != path:
+        if not unsymlinked(path, settings.root):
             raise ValueError("Memory database must not be a symbolic link")
         self.storage = MemoryStorage(path)
         self.closed = False

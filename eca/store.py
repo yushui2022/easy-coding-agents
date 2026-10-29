@@ -68,7 +68,7 @@ class Store:
         self.resources = []
         self.root = root.resolve()
         directory = self.root / ".eca"
-        if directory.is_symlink() or directory.resolve() != directory:
+        if not fsguard.unsymlinked(directory, self.root):
             raise ValueError(".eca must not be a symbolic link")
         self.lock = None
         try:

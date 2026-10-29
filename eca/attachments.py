@@ -43,7 +43,7 @@ def prepare(root, values):
                 folder.mkdir(parents=True, exist_ok=True)
             except OSError as exc:
                 raise ValueError(fsguard.describe(exc, '保存图片附件', folder)) from None
-            if folder.resolve() != folder:
+            if not fsguard.unsymlinked(folder, root):
                 raise ValueError('附件目录不能是符号链接。')
             target = folder / ident
             if target.is_symlink():
@@ -81,7 +81,7 @@ def image_data(root, item):
         raise ValueError('图片附件标识无效。')
     folder = root / '.eca' / 'attachments'
     target = folder / ident
-    if folder.resolve() != folder or target.is_symlink():
+    if not fsguard.unsymlinked(folder, root) or target.is_symlink():
         raise ValueError('图片附件路径无效。')
     raw = target.read_bytes()
     if len(raw) > MAX_IMAGE or hashlib.sha256(raw).hexdigest() != ident:

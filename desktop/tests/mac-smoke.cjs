@@ -69,7 +69,13 @@ const server = http.createServer(async (req, res) => {
 
   await page.getByRole('button', {name: '模型与设置'}).click();
   await page.getByLabel('API 地址').fill(base);
-  await page.getByLabel('API 密钥').fill(credential);
+  if (process.env.SMOKE_NO_AUTH === '1') {
+    // Local servers need no key. This path also skips macOS keychain storage,
+    // which blocks on a system prompt for an ad-hoc signed build.
+    await page.getByLabel('本机服务无需密钥').check();
+  } else {
+    await page.getByLabel('API 密钥').fill(credential);
+  }
   await expect(page.getByLabel('服务返回的模型')).toBeEnabled({timeout: 20000});
   await page.getByLabel('服务返回的模型').selectOption(modelId);
   await page.getByRole('button', {name: '保存配置', exact: true}).click();
@@ -89,8 +95,9 @@ const server = http.createServer(async (req, res) => {
   await expect(page.getByRole('button', {name: '本次允许'})).toBeVisible({timeout: 90000});
   await page.getByRole('button', {name: '本次允许'}).click();
   await expect(page.locator('.tool-record').first()).toBeVisible({timeout: 90000});
+  // Models are free to add a trailing newline; the task was the content, not the bytes.
   await expect.poll(() => fs.existsSync(path.join(project, 'hello.txt'))
-    ? fs.readFileSync(path.join(project, 'hello.txt'), 'utf8') : null, {timeout: 60000}).toBe('hello');
+    ? fs.readFileSync(path.join(project, 'hello.txt'), 'utf8').trim() : null, {timeout: 60000}).toBe('hello');
   console.log('file write through backend: ok');
   console.log('model requests:', requests.length);
   console.log('renderer errors:', errors.length ? errors : 'none');

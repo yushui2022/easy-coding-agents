@@ -186,7 +186,7 @@ class Provider:
                     finish = choice.finish_reason
                 delta = choice.delta
                 produced = False
-                thought = getattr(delta, 'reasoning_content', None)
+                thought = getattr(delta, 'reasoning_content', None) or getattr(delta, 'reasoning', None)
                 if isinstance(thought, str) and thought:
                     produced = True
                     emit('model_delta', {'reasoning': thought})
@@ -196,16 +196,27 @@ class Provider:
                     produced = True
                     content += delta.content
                     emit("text", delta.content)
-                for tc in delta.tool_calls or []:
+                for position, tc in enumerate(delta.tool_calls or []):
                     produced = True
-                    call = calls.setdefault(tc.index, {"id": "", "type": "function", "function": {"name": "", "arguments": ""}})
+                    # vLLM and some gateways omit index on single-call responses.
+                    index = tc.index if isinstance(tc.index, int) else position
+                    call = calls.setdefault(index, {"id": "", "type": "function", "function": {"name": "", "arguments": ""}})
                     if tc.id:
                         call["id"] = tc.id
                     if tc.function:
                         call["function"]["name"] += tc.function.name or ""
-                        call["function"]["arguments"] += tc.function.arguments or ""
+                        piece = tc.function.arguments
+                        # Ollama returns a finished object; OpenAI and vLLM stream
+                        # JSON text that has to be concatenated across chunks.
+                        if isinstance(piece, dict):
+                            piece = json.dumps(piece, ensure_ascii=False)
+                        elif piece is None:
+                            piece = ""
+                        elif not isinstance(piece, str):
+                            piece = str(piece)
+                        call["function"]["arguments"] += piece
                         emit('model_delta', {'tool': call['function']['name'],
-                                            'arguments': tc.function.arguments or ''})
+                                            'arguments': piece})
                 if produced:
                     last_content = time.monotonic()
                 elif time.monotonic() - last_content > idle:
@@ -214,17 +225,36 @@ class Provider:
             await stream.close()
         if finish == 'length':
             raise OutputLimitError(content, bool(calls))
+        # Some local servers end the stream right after the tool call without a
+        # finish_reason; a complete tool call is enough to keep the turn going.
+        if finish is None and calls:
+            finish = 'tool_calls'
         if finish not in {"stop", "tool_calls"}:
             raise RuntimeError(f"Incomplete model response ({finish or 'disconnected'}); no tools were executed.")
         if not content and not calls:
             raise RuntimeError("Model returned an empty response")
         ordered = [calls[i] for i in sorted(calls)]
         ids = set()
-        for call in ordered:
-            if not call["id"] or call["id"] in ids or not call["function"]["name"]:
+        for position, call in enumerate(ordered):
+            name = call["function"]["name"]
+            if not name:
+                raise RuntimeError("Invalid tool-call identity in model response")
+            if not call["function"]["arguments"].strip():
+                # A tool without parameters arrives as empty text on several servers.
+                call["function"]["arguments"] = "{}"
+            if not call["id"]:
+                # Ollama sends ids; gateways that do not still need a stable,
+                # distinct key for the tool reply message.
+                digest = hashlib.sha256((name + call["function"]["arguments"] + str(position)).encode()).hexdigest()[:8]
+                call["id"] = f"call_{position}_{digest}"
+            if call["id"] in ids:
                 raise RuntimeError("Invalid tool-call identity in model response")
             ids.add(call["id"])
-            if not isinstance(json.loads(call["function"]["arguments"]), dict):
+            try:
+                parsed = json.loads(call["function"]["arguments"])
+            except json.JSONDecodeError:
+                raise RuntimeError("Tool arguments are not valid JSON") from None
+            if not isinstance(parsed, dict):
                 raise RuntimeError("Tool arguments must be an object")
         message = {"role": "assistant", "content": content or None}
         if deepseek and reasoning:

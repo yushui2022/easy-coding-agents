@@ -8,6 +8,7 @@ from urllib.parse import urlsplit
 
 from . import __version__
 from .config import Settings
+from .fsguard import unsymlinked
 
 
 def diagnose(root, **overrides):
@@ -22,7 +23,7 @@ def diagnose(root, **overrides):
     else:
         check("project", "ok" if os.access(root, os.W_OK) else "warning", "Directory access checked; actual filesystem writes were not attempted.")
         state = root / ".eca"
-        invalid = state.is_symlink() or state.resolve() != state or (state.exists() and not state.is_dir())
+        invalid = not unsymlinked(state, root) or (state.exists() and not state.is_dir())
         check("state_directory", "error" if invalid else "ok", "The .eca path must be a real directory, not a link or file.")
         try:
             settings = Settings.load(root, **overrides)

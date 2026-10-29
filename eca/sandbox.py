@@ -6,6 +6,7 @@ import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from .fsguard import unsymlinked
 
 
 def snapshot(tools, destination):
@@ -72,7 +73,7 @@ async def run(tools, command, timeout, runner):
                          'On Windows, start Docker Desktop from the Start menu and wait for engine readiness, '
                          'then retry. This tool does not start or reset Docker Desktop.')
     base = tools.settings.state_dir / 'sandbox'
-    if base.resolve() != base or base.is_symlink():
+    if not unsymlinked(base, tools.settings.root):
         raise ValueError('Sandbox storage must not be an alias')
     base.mkdir(parents=True, exist_ok=True)
     name = 'eca-' + uuid.uuid4().hex

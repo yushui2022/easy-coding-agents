@@ -5,6 +5,7 @@ import json
 import re
 import sqlite3
 import time
+from .fsguard import unsymlinked
 
 
 def structure(path, text):
@@ -114,7 +115,7 @@ class CodeIndex:
                         partial = True
                         break
                     rel = source.relative_to(root).as_posix()
-                    if source.is_symlink() or source.resolve() != root / rel:
+                    if not unsymlinked(source, root):
                         skipped += 1
                         continue
                     try:
